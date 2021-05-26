@@ -1,4 +1,4 @@
-package com.github.ecboot.service.exchange;
+package com.github.ecboot.service.activity.exchange;
 
 
 class ExchangeGoodsService {

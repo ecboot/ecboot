@@ -1,11 +1,10 @@
 package com.github.ecboot.controller.console;
 
-import com.github.ecboot.constant.SystemConst;
+import com.github.ecboot.constant.GlobalConst;
 import com.github.ecboot.entity.AdminUser;
 import com.github.ecboot.enums.ResultEnum;
-import com.github.ecboot.request.AdminLoginRequest;
 import com.github.ecboot.service.admin.AdminUserService;
-import com.github.ecboot.utils.JsonResponse;
+import com.github.ecboot.support.JsonResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -39,14 +38,14 @@ public class AuthController {
         }
 
         // 图片验证码校验
-        if (!session.getAttribute(SystemConst.CAPTCHA).toString().equalsIgnoreCase(adminLoginRequest.getCaptcha())) {
+        if (!session.getAttribute(GlobalConst.CAPTCHA).toString().equalsIgnoreCase(adminLoginRequest.getCaptcha())) {
             return JsonResponse.failed(ResultEnum.CAPTCHA_ERROR);
         }
 
         JsonResponse<AdminUser> adminUser = adminUserService.login(adminLoginRequest);
 
         if (adminUser.getStatus().equalsIgnoreCase("success")) {
-            session.setAttribute(SystemConst.AUTH_ADMIN_ID, adminUser.getData().getUserId());
+            session.setAttribute(GlobalConst.AUTH_ADMIN_ID, adminUser.getData().getUserId());
             return adminUser;
         } else {
             return JsonResponse.failed(ResultEnum.USERNAME_OR_PASSWORD_ERROR);

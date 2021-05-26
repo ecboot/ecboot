@@ -1,4 +1,4 @@
-package com.github.ecboot.service.auth;
+package com.github.ecboot.service.user;
 
 
 public interface UserOAuthService {

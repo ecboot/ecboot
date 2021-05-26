@@ -1,4 +1,4 @@
-package com.github.ecboot.service.wholesale;
+package com.github.ecboot.service.activity.wholesale;
 
 
 class WholesaleService {

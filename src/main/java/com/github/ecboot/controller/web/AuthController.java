@@ -2,7 +2,7 @@ package com.github.ecboot.controller.web;
 
 import com.github.ecboot.model.UserModel;
 import com.github.ecboot.request.UserLoginRequest;
-import com.github.ecboot.service.auth.UserAuthService;
+import com.github.ecboot.service.user.UserAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.DigestUtils;

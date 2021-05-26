@@ -1,4 +1,4 @@
-package com.github.ecboot.service.packages;
+package com.github.ecboot.service.activity.packages;
 
 
 public interface PackageGoodsService {

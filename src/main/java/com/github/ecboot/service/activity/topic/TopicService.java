@@ -1,4 +1,4 @@
-package com.github.ecboot.service.topic;
+package com.github.ecboot.service.activity.topic;
 
 
 class TopicService {

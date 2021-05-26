@@ -1,4 +1,4 @@
-package com.github.ecboot.service.groupbuy;
+package com.github.ecboot.service.activity.groupbuy;
 
 
 class GroupGoodsService {

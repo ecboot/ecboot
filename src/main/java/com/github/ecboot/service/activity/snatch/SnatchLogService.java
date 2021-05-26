@@ -1,4 +1,4 @@
-package com.github.ecboot.service.snatch;
+package com.github.ecboot.service.activity.snatch;
 
 
 public interface SnatchLogService {

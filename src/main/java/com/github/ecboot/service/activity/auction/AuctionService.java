@@ -1,4 +1,4 @@
-package com.github.ecboot.service.auction;
+package com.github.ecboot.service.activity.auction;
 
 
 public interface AuctionService {

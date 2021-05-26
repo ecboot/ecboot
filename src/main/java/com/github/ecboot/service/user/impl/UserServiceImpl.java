@@ -1,13 +1,9 @@
-package com.github.ecboot.service.impl;
+package com.github.ecboot.service.user.impl;
 
-import com.github.ecboot.service.UserService;
+import com.github.ecboot.service.user.UserService;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserServiceImpl implements UserService {
 
-    @Override
-    public Boolean login(String username, String password) {
-        return null;
-    }
 }
