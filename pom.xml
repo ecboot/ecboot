@@ -15,8 +15,15 @@
     <description>ECBoot project for Spring Boot</description>
     <properties>
         <java.version>11</java.version>
+        <hutool.version>5.6.5</hutool.version>
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
