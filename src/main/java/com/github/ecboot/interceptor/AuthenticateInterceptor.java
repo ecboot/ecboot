@@ -21,7 +21,7 @@ public class AuthenticateInterceptor implements HandlerInterceptor {
         HttpSession session = request.getSession();
 
         if (session.getAttribute(this.guard + "_auth_id") == null) {
-            String redirectUrl = this.guard.equals("admin") ? this.guard + "/login" : "login";
+            String redirectUrl = this.guard + "/login";
             String callback = URLUtil.encodeQuery(request.getRequestURL().toString());
             response.sendRedirect("/" + redirectUrl + "?callback=" + callback);
 

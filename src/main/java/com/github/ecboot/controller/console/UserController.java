@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpSession;
 
-@Controller("admin.user")
+@Controller("console.UserController")
 @RequestMapping("/admin/user")
 public class UserController {
 

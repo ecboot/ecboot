@@ -6,19 +6,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpSession;
 
-@Controller
+@Controller("web.UserController")
 public class UserController {
 
-    @GetMapping("/user")
-    public String index() {
-        return "user/index";
-    }
 
-    @GetMapping("/session")
-    @ResponseBody
-    public String session(HttpSession session) {
-        session.setAttribute("auth", 1);
-
-        return session.getId() + ": " + session.getAttribute("auth");
-    }
 }

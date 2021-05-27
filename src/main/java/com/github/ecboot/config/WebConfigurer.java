@@ -21,7 +21,7 @@ public class WebConfigurer implements WebMvcConfigurer {
         for (String guard : guards) {
             registry.addInterceptor(getHandlerInterceptor(guard))
                     .addPathPatterns("/" + guard + "/**", "/" + guard)
-                    .excludePathPatterns("/" + guard + "/login");
+                    .excludePathPatterns("/" + guard + "/login", "/" + guard + "/forgot", "/" + guard + "/reset");
         }
     }
 

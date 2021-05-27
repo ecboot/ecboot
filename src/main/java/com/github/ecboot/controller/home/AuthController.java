@@ -1,4 +1,4 @@
-package com.github.ecboot.controller.console;
+package com.github.ecboot.controller.home;
 
 import com.github.ecboot.constant.GlobalConst;
 import com.github.ecboot.entity.AdminUser;
@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 
-@Controller("console.AuthController")
-@RequestMapping("admin")
+@Controller("home.AuthController")
+@RequestMapping("user")
 public class AuthController {
 
     @Autowired
@@ -27,7 +27,7 @@ public class AuthController {
 
     @GetMapping("login")
     public String index() {
-        return "console/auth/login";
+        return "home/auth/login";
     }
 
     @PostMapping("login")
@@ -57,4 +57,15 @@ public class AuthController {
 
         return JsonResponse.failed(ResultEnum.USERNAME_OR_PASSWORD_ERROR);
     }
+
+    @GetMapping("forgot")
+    public String forgot() {
+        return "home/auth/forgot";
+    }
+
+    @GetMapping("reset")
+    public String reset() {
+        return "home/auth/reset";
+    }
+
 }
