@@ -3,6 +3,10 @@ package com.github.ecboot.controller.console;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import javax.servlet.http.HttpSession;
+import java.util.HashMap;
+import java.util.UUID;
+
 @Controller("console.IndexController")
 public class IndexController {
 

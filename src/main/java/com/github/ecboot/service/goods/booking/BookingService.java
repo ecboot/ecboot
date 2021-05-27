@@ -1,5 +1,4 @@
-package com.github.ecboot.service.booking;
-
+package com.github.ecboot.service.goods.booking;
 
 public interface BookingService {
 }

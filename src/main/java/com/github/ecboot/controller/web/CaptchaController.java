@@ -3,7 +3,7 @@ package com.github.ecboot.controller.web;
 import cn.hutool.captcha.CaptchaUtil;
 import cn.hutool.captcha.LineCaptcha;
 import cn.hutool.captcha.generator.RandomGenerator;
-import com.github.ecboot.constant.SystemConst;
+import com.github.ecboot.constant.GlobalConst;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -25,7 +25,7 @@ public class CaptchaController {
         captcha.setGenerator(randomGenerator);
         captcha.createCode();
 
-        session.setAttribute(SystemConst.CAPTCHA, captcha.getCode());
+        session.setAttribute(GlobalConst.CAPTCHA, captcha.getCode());
 
         ServletOutputStream outputStream = response.getOutputStream();
         captcha.write(outputStream);

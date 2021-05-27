@@ -1,5 +1,4 @@
-package com.github.ecboot.service.search;
-
+package com.github.ecboot.service.goods.search;
 
 public interface SearchEngineService {
 }

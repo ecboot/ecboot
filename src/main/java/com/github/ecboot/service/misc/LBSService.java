@@ -1,6 +1,5 @@
 package com.github.ecboot.service.misc;
 
-
-class LBSService {
+public interface LBSService {
 
 }

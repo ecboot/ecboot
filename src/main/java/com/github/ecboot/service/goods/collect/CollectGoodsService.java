@@ -1,5 +1,4 @@
-package com.github.ecboot.service.collect;
-
+package com.github.ecboot.service.goods.collect;
 
 public interface CollectGoodsService {
 }

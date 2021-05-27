@@ -1,5 +1,4 @@
-package com.github.ecboot.service.goods;
-
+package com.github.ecboot.service.goods.goods;
 
 public interface ProductService {
 }

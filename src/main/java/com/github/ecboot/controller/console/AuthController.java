@@ -3,6 +3,8 @@ package com.github.ecboot.controller.console;
 import com.github.ecboot.constant.GlobalConst;
 import com.github.ecboot.entity.AdminUser;
 import com.github.ecboot.enums.ResultEnum;
+import com.github.ecboot.request.console.AuthLoginRequest;
+import com.github.ecboot.service.admin.AdminAuthService;
 import com.github.ecboot.service.admin.AdminUserService;
 import com.github.ecboot.support.JsonResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,9 @@ import javax.validation.Valid;
 public class AuthController {
 
     @Autowired
+    private AdminAuthService adminAuthService;
+
+    @Autowired
     private AdminUserService adminUserService;
 
     @GetMapping("login")
@@ -29,7 +34,7 @@ public class AuthController {
 
     @PostMapping("login")
     @ResponseBody
-    public JsonResponse<AdminUser> login(@Valid @RequestBody AdminLoginRequest adminLoginRequest,
+    public JsonResponse<AdminUser> login(@Valid @RequestBody AuthLoginRequest authLoginRequest,
                                          BindingResult bindingResult,
                                          HttpSession session) {
         // 表单验证
@@ -38,17 +43,20 @@ public class AuthController {
         }
 
         // 图片验证码校验
-        if (!session.getAttribute(GlobalConst.CAPTCHA).toString().equalsIgnoreCase(adminLoginRequest.getCaptcha())) {
+        if (!session.getAttribute(GlobalConst.CAPTCHA).toString().equalsIgnoreCase(authLoginRequest.getCaptcha())) {
             return JsonResponse.failed(ResultEnum.CAPTCHA_ERROR);
         }
 
-        JsonResponse<AdminUser> adminUser = adminUserService.login(adminLoginRequest);
+        if (adminAuthService.login(authLoginRequest)) {
+            AdminUser adminUser = adminUserService.getAdminUserByUsername(authLoginRequest.getUsername());
 
-        if (adminUser.getStatus().equalsIgnoreCase("success")) {
-            session.setAttribute(GlobalConst.AUTH_ADMIN_ID, adminUser.getData().getUserId());
-            return adminUser;
-        } else {
-            return JsonResponse.failed(ResultEnum.USERNAME_OR_PASSWORD_ERROR);
+            if (adminUser != null) {
+                session.setAttribute(GlobalConst.AUTH_ADMIN_ID, adminUser.getUserId());
+                // TOTO pojo transform
+                return JsonResponse.succeed(adminUser);
+            }
         }
+
+        return JsonResponse.failed(ResultEnum.USERNAME_OR_PASSWORD_ERROR);
     }
 }

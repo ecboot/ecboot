@@ -1,9 +1,7 @@
 package com.github.ecboot.controller.web;
 
 import com.github.ecboot.entity.Article;
-import com.github.ecboot.model.ArticleModel;
 import com.github.ecboot.service.article.ArticleService;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,7 +19,7 @@ public class ArticleController {
 
     @GetMapping("/articles")
     public String index(Model model) {
-        List<ArticleModel> all = articleService.getAll();
+        List<Article> all = articleService.getList();
         model.addAttribute("articles", all);
 
         System.out.println(model);
@@ -33,22 +31,10 @@ public class ArticleController {
         return "create";
     }
 
-    @PostMapping("/articles")
-    @ResponseBody
-    public String store(@RequestBody ArticleModel articleModel) {
-        System.out.println(articleModel.toString());
-        articleService.save(articleModel);
-        return "created";
-    }
-
     @GetMapping("/articles/{article}")
-    public ArticleModel show(@PathVariable("article") Long id) {
-        Article article = articleService.show(id);
+    public Object show(@PathVariable("article") Long id) {
 
-        ArticleModel articleModel = new ArticleModel();
-        BeanUtils.copyProperties(article, articleModel);
-
-        return articleModel;
+        return null;
     }
 
     @GetMapping("/articles/{article}/edit")

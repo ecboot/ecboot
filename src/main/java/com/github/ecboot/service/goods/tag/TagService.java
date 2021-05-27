@@ -1,5 +1,4 @@
-package com.github.ecboot.service.tag;
-
+package com.github.ecboot.service.goods.tag;
 
 public interface TagService {
 }

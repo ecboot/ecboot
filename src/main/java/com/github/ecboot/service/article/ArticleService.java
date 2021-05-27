@@ -1,16 +1,18 @@
 package com.github.ecboot.service.article;
 
 import com.github.ecboot.entity.Article;
-import com.github.ecboot.model.ArticleModel;
-import com.github.ecboot.repository.ArticleRepository;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.ArrayList;
 import java.util.List;
-
 
 public interface ArticleService {
 
+    List<Article> getList();
 
+    Article create(Article article);
+
+    Article getArticleById(Long id);
+
+    Article updateArticle(Article article);
+
+    Boolean deleteArticleById(Long id);
 }
