@@ -1,4 +1,4 @@
-package com.github.ecboot.service.trade;
+package com.github.ecboot.service.order;
 
 public interface ShippingAreaService {
 }

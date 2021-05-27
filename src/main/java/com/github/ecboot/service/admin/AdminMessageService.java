@@ -1,4 +1,4 @@
-package com.github.ecboot.service.shop;
+package com.github.ecboot.service.admin;
 
 public interface AdminMessageService {
 }
