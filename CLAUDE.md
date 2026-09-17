@@ -1,15 +1,10 @@
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for AI coding agents working in this repository.
-
-## Agent Rules
-
-- Generate commit message in chinese.
-- Commit messages follow Conventional Commits style, e.g. `feat: 新增用户登录`, `chore: 升级依赖`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffold stage: a Java 25 / Spring Boot 4.1.1 backend plus three independent frontend apps. Most backend modules are empty placeholder POMs describing a planned layering; only `start/` contains runnable code.
+ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffold stage: a Java 25 / Spring Boot 4.1.1 backend plus three independent frontend apps. Commit messages are Chinese conventional commits (`feat:`, `chore:`) — match that style. Most backend modules are empty placeholder POMs describing a planned layering; only `start/` contains runnable code.
 
 ## Repository Layout
 
