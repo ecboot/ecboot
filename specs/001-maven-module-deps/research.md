@@ -54,6 +54,11 @@ start ──┘                  spring-boot-dependencies (${spring-boot.version
 - 各模块各自导入 ecboot-dependencies BOM（不经父级）→ 10 处重复声明，违反 DRY 与宪法 V。
 - start 保留 starter-parent 直继承（澄清 Q1 选项 B）→ 已被用户否决。
 
+> **实现修订（2026-09-17）**：BOM 模块不继承 ecboot-parent（独立声明 GA），否则
+> "根导入 BOM + BOM 继承根"构成 scope=import 自环。Maven 3.9.16 已支持 reactor
+> 内 import 解析（无需预安装 BOM）。模块 groupId 归一为 `org.juling.ecboot`
+> （与根 POM 一致）。
+
 ## D3: 依赖方向强制机制（FR-008、澄清 Q2 内置强制）
 
 **Decision**: 采用 `maven-enforcer-plugin` 的 `bannedDependencies` 规则，按模块

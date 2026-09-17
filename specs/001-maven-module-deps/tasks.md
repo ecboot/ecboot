@@ -67,10 +67,10 @@ description: "Task list for feature implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] 在 `dependencies/pom.xml` 定义属性 `<spring-boot.version>4.1.1</spring-boot.version>`（框架版本全仓库唯一字面量），并在 `dependencyManagement` 导入 `org.springframework.boot:spring-boot-dependencies:${spring-boot.version}`（type=pom, scope=import）（依据 research.md D2）
-- [ ] T010 [US2] 在根 `pom.xml` 的 `dependencyManagement` 导入 `org.juling:ecboot-dependencies:${project.version}`（type=pom, scope=import），使 BOM 仲裁经父级传递到全部模块（依据 research.md D2 就近优先规则）
-- [ ] T011 [US2] 构建配置上移：将 `start/pom.xml` 中 maven-compiler-plugin 注解处理器路径（lombok + spring-boot-configuration-processor）、default-testCompile 处理器、hibernate-maven-plugin enhance 执行、native-maven-plugin 声明上移至根 `pom.xml` 的 build/pluginManagement；`start/pom.xml` 仅保留依赖清单与 spring-boot-maven-plugin 声明（依据 research.md D5/D6）
-- [ ] T012 [US2] 验证场景二：从根 `./mvnw clean package` 复验构建成功；执行 quickstart 场景二三步（版本声明唯一性检索、spring-boot.version 无效值失败还原、ecboot-common 添加未登记依赖失败），结果记入 `specs/001-maven-module-deps/quickstart.md` 验证记录区
+- [x] T009 [US2] 在 `dependencies/pom.xml` 定义属性 `<spring-boot.version>4.1.1</spring-boot.version>`（框架版本全仓库唯一字面量），并在 `dependencyManagement` 导入 `org.springframework.boot:spring-boot-dependencies:${spring-boot.version}`（type=pom, scope=import）（依据 research.md D2）
+- [x] T010 [US2] 在根 `pom.xml` 的 `dependencyManagement` 导入 `org.juling.ecboot:ecboot-dependencies:${project.version}`（type=pom, scope=import），使 BOM 仲裁经父级传递到全部模块（依据 research.md D2 就近优先规则）
+- [x] T011 [US2] 构建配置上移：将 `start/pom.xml` 中 maven-compiler-plugin 注解处理器路径（lombok + spring-boot-configuration-processor）、default-testCompile 处理器、hibernate-maven-plugin enhance 执行、native-maven-plugin 声明上移至根 `pom.xml` 的 build/pluginManagement；`start/pom.xml` 仅保留依赖清单与 spring-boot-maven-plugin 声明（依据 research.md D5/D6）
+- [x] T012 [US2] 验证场景二：从根 `./mvnw clean package` 复验构建成功；执行 quickstart 场景二三步（版本声明唯一性检索、spring-boot.version 无效值失败还原、ecboot-common 添加未登记依赖失败），结果记入 `specs/001-maven-module-deps/quickstart.md` 验证记录区
 
 **Checkpoint**: US2 完成——版本单点改、全仓库生效；未登记/冲突版本在构建期失败
 

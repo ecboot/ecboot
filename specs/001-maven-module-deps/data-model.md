@@ -7,10 +7,10 @@
 
 ## 实体：POM 模块（11 个）
 
-| 构件（GA: org.juling:*） | packaging | parent | 角色 |
+| 构件（GA: org.juling.ecboot:*） | packaging | parent | 角色 |
 | --- | --- | --- | --- |
 | ecboot-parent | pom | spring-boot-starter-parent (外部) | 聚合器 + 根父级 + 插件版本集中点 |
-| ecboot-dependencies | pom | ecboot-parent | 依赖/框架版本唯一仲裁 BOM |
+| ecboot-dependencies | pom | 无（独立 BOM，避免导入自环） | 依赖/框架版本唯一仲裁 BOM |
 | ecboot-common | jar | ecboot-parent | infrastructure 基础库（汇点） |
 | ecboot-infra-core | jar | ecboot-parent | infrastructure 基础库 |
 | ecboot-service-user | jar | ecboot-parent | user 领域服务 |
@@ -23,7 +23,7 @@
 
 ## 关系：依赖边白名单矩阵（enforcer bannedDependencies 的依据）
 
-"允许"指对 org.juling 业务构件的白名单；第三方构件不受方向规则约束（仅受版本纪律约束）。未列入"允许"的业务构件一律进入该模块的 enforcer 禁止清单。
+"允许"指对 org.juling.ecboot 业务构件的白名单；第三方构件不受方向规则约束（仅受版本纪律约束）。未列入"允许"的业务构件一律进入该模块的 enforcer 禁止清单。
 
 | 模块 | 允许依赖的业务构件 | 明确禁止 |
 | --- | --- | --- |

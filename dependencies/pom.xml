@@ -2,18 +2,24 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.juling.ecboot</groupId>
-		<artifactId>ecboot-parent</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
-	</parent>
+	<!-- 独立 BOM：不继承 ecboot-parent，避免"根导入 BOM + BOM 继承根"的导入自环 -->
 	<groupId>org.juling.ecboot</groupId>
 	<artifactId>ecboot-dependencies</artifactId>
-	<version>0.0.1-SNAPSHOT</version>   
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
 	<properties>
-		<java.version>25</java.version>
+		<!-- 全仓库框架版本唯一字面量（FR-005）：第三方依赖版本一律在此声明 -->
+		<spring-boot.version>4.1.1</spring-boot.version>
 	</properties>
-	<dependencies>
-	</dependencies>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-dependencies</artifactId>
+				<version>${spring-boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 </project>

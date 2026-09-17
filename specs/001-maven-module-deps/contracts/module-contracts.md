@@ -14,7 +14,7 @@
   `services/ecboot-service-shop`、`apps/ecboot-api-common`、`apps/ecboot-api-user`、
   `apps/ecboot-api-shop`、`apps/ecboot-api-admin`、`start`
 - properties：`java.version=25`（保留），新增 enforcer 参数默认值
-- dependencyManagement：import `org.juling:ecboot-dependencies:${project.version}`
+- dependencyManagement：import `org.juling.ecboot:ecboot-dependencies:${project.version}`
 - pluginManagement / build：compiler（lombok + configuration-processor 注解处理器、
   release 25）、hibernate 增强（自 start 上移）、maven-enforcer（bannedDependencies +
   banDuplicatePomDependencyVersions + reactorModuleConvergence，绑定 validate），
@@ -23,8 +23,8 @@
 
 ## BOM：ecboot-dependencies（dependencies/pom.xml）
 
-- 坐标 `org.juling:ecboot-dependencies:0.0.1-SNAPSHOT`，`packaging=pom`
-- parent：ecboot-parent
+- 坐标 `org.juling.ecboot:ecboot-dependencies:0.0.1-SNAPSHOT`，`packaging=pom`
+- parent：**无（独立 BOM）**——实现修订：若继承 ecboot-parent，"根导入 BOM + BOM 继承根"会构成 import 自环
 - properties：`spring-boot.version=4.1.1`（框架版本全仓库唯一字面量）
 - dependencyManagement：import `spring-boot-dependencies:${spring-boot.version}`；
   未来第三方版本仅在此追加
@@ -34,35 +34,35 @@
 
 | 模块 | 业务依赖白名单 | enforcer 禁止清单（属性值，逗号分隔 GA 通配） |
 | --- | --- | --- |
-| ecboot-common | 无 | `org.juling:*` |
-| ecboot-infra-core | ecboot-common | `org.juling:*` 排除 `org.juling:ecboot-common` |
+| ecboot-common | 无 | `org.juling.ecboot:*` |
+| ecboot-infra-core | ecboot-common | `org.juling.ecboot:*` 排除 `org.juling.ecboot:ecboot-common` |
 
 ## services 层
 
 | 模块 | 业务依赖白名单 | enforcer 禁止清单 |
 | --- | --- | --- |
-| ecboot-service-user | ecboot-common、ecboot-infra-core | `org.juling:ecboot`、`org.juling:ecboot-api-*` |
+| ecboot-service-user | ecboot-common、ecboot-infra-core | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-*` |
 | ecboot-service-shop | 同上 | 同上 |
 
 ## apps 层
 
 | 模块 | 业务依赖白名单 | enforcer 禁止清单 |
 | --- | --- | --- |
-| ecboot-api-common | ecboot-common、ecboot-infra-core | `org.juling:ecboot`、`org.juling:ecboot-service-*`、`org.juling:ecboot-api-user`、`org.juling:ecboot-api-shop`、`org.juling:ecboot-api-admin` |
-| ecboot-api-user | ecboot-api-common、ecboot-service-*、ecboot-common、ecboot-infra-core | `org.juling:ecboot`、`org.juling:ecboot-api-shop`、`org.juling:ecboot-api-admin` |
-| ecboot-api-shop | 同上（渠道白名单互换） | `org.juling:ecboot`、`org.juling:ecboot-api-user`、`org.juling:ecboot-api-admin` |
-| ecboot-api-admin | 同上（渠道白名单互换） | `org.juling:ecboot`、`org.juling:ecboot-api-user`、`org.juling:ecboot-api-shop` |
+| ecboot-api-common | ecboot-common、ecboot-infra-core | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-service-*`、`org.juling.ecboot:ecboot-api-user`、`org.juling.ecboot:ecboot-api-shop`、`org.juling.ecboot:ecboot-api-admin` |
+| ecboot-api-user | ecboot-api-common、ecboot-service-*、ecboot-common、ecboot-infra-core | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-shop`、`org.juling.ecboot:ecboot-api-admin` |
+| ecboot-api-shop | 同上（渠道白名单互换） | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-user`、`org.juling.ecboot:ecboot-api-admin` |
+| ecboot-api-admin | 同上（渠道白名单互换） | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-user`、`org.juling.ecboot:ecboot-api-shop` |
 
 ## 装配：ecboot（start/pom.xml）
 
-- 坐标 `org.juling:ecboot:0.0.1-SNAPSHOT`，`packaging=jar`
+- 坐标 `org.juling.ecboot:ecboot:0.0.1-SNAPSHOT`，`packaging=jar`
 - parent：**改为 ecboot-parent**（不再直接继承 spring-boot-starter-parent）
 - 业务依赖：ecboot-api-user、ecboot-api-shop、ecboot-api-admin
 - 第三方依赖：现有 12 个 Boot starter + flyway-mysql、mysql-connector-j、
   devtools、docker-compose、lombok、12 个 test starter —— **全部保留**，
   无版本号（经继承链管理）
-- enforcer 禁止清单：`org.juling:ecboot-service-*`、`org.juling:ecboot-infra-*`、
-  `org.juling:ecboot-api-common`
+- enforcer 禁止清单：`org.juling.ecboot:ecboot-service-*`、`org.juling.ecboot:ecboot-infra-*`、
+  `org.juling.ecboot:ecboot-api-common`
 - build：保留 spring-boot-maven-plugin 声明（repackage 由 starter-parent 托管）；
   移除已上移的 compiler/hibernate 配置
 

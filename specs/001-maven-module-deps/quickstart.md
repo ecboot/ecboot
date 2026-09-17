@@ -64,7 +64,13 @@ Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。应�
 
 ## 验证记录
 
-### 场景一（US1）：全新构建 — 2026-09-17 ✅
+### 场景二（US2）：版本单点仲裁 — 2026-09-17 ✅
+
+- 步骤 1 唯一性检索：`<version>` 声明仅存于 `dependencies/pom.xml`（spring-boot.version 属性 + BOM 导入）与根 `pom.xml`（starter-parent 继承链声明、BOM 导入 ${project.version}、hibernate 插件 ${hibernate.version}）✅ 业务模块零版本
+- 步骤 2 单点生效：`spring-boot.version` 改为 99.99.99 → 构建失败 `Non-resolvable import POM: spring-boot-dependencies:pom:99.99.99`；还原 4.1.1 → BUILD SUCCESS ✅ 证明仲裁点在 `dependencies`
+- 步骤 3 未登记依赖：**方法修正**——`validate` 阶段不解析依赖图，须用 `dependency:resolve`（或 compile）。探针一 commons-lang3 解析 3.20.0 成功：被 spring-boot-dependencies 托管，属"框架对齐=已登记"，仲裁链按设计生效；探针二 guava（框架未托管）→ `'dependencies.dependency.version' for com.google.guava:guava:jar is missing` ✅
+- 还原后终验：`./mvnw clean package -DskipTests` → BUILD SUCCESS（8.8 s）
+- 实现备注：BOM 模块独立化（不继承 ecboot-parent），否则根导入 BOM + BOM 继承根构成导入自环（Maven 报 "scope=import form a cycle"）；Maven 3.9.16 支持 reactor 内 import 解析
 
 - `./mvnw clean package -DskipTests`（仓库根）：**BUILD SUCCESS**，11 个项目全部 SUCCESS
 - reactor 顺序：ecboot-parent → dependencies → common → infra-core → service-user → service-shop → api-common → api-user → api-shop → api-admin → ecboot(start) ✅ 符合 infrastructure → services → apps → start
