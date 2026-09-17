@@ -13,6 +13,8 @@
 	<version>0.0.1-SNAPSHOT</version>   
 	<properties>
 		<java.version>25</java.version>
+		<enforcer.banned.1>org.juling.ecboot:*</enforcer.banned.1>
+		<enforcer.allowed.1>org.juling.ecboot:ecboot-common</enforcer.allowed.1>
 	</properties>
 	<dependencies>
 	</dependencies>

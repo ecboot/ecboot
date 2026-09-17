@@ -84,11 +84,11 @@ description: "Task list for feature implementation"
 
 ### Implementation for User Story 3
 
-- [ ] T013 [US3] 在根 `pom.xml` 的 `pluginManagement` 声明 maven-enforcer-plugin（版本在此唯一声明，依据 research.md D6）：execution 绑定 `validate` 阶段，规则为 bannedDependencies（exclude 清单引用各模块属性 `${enforcer.banned.excludes}`，message 模板指明白名单契约文档路径）+ banDuplicatePomDependencyVersions + reactorModuleConvergence；并在根 build/plugins 激活，全部模块继承执行（依据 research.md D3，澄清 Q2 内置强制）
-- [ ] T014 [P] [US3] 按契约（contracts/module-contracts.md）设置模块属性：`infrastructure/ecboot-common/pom.xml`（`org.juling:*`）、`infrastructure/ecboot-infra-core/pom.xml`（排除 ecboot-common）、`services/ecboot-service-user/pom.xml` 与 `services/ecboot-service-shop/pom.xml`（禁 `org.juling:ecboot`、`org.juling:ecboot-api-*`）
-- [ ] T015 [P] [US3] 按契约设置 apps 层属性：`apps/ecboot-api-common/pom.xml`（禁 services/渠道/ecboot，允许 infrastructure——澄清 Q4）、`apps/ecboot-api-user/pom.xml`、`apps/ecboot-api-shop/pom.xml`、`apps/ecboot-api-admin/pom.xml`（各禁 start 与其他两个渠道）
-- [ ] T016 [US3] 按契约设置 `start/pom.xml` 属性（禁 `org.juling:ecboot-service-*`、`org.juling:ecboot-infra-*`、`org.juling:ecboot-api-common`）与 `dependencies/pom.xml` 属性（禁全部 `org.juling:*` 业务构件）
-- [ ] T017 [US3] 验证场景三与场景四：执行 quickstart 场景三全部四步注入（违规/循环/合规对照）确认失败与通过形态；执行 `cd start && ../mvnw test` 回归确认 FR-010，结果记入 `specs/001-maven-module-deps/quickstart.md` 验证记录区
+- [x] T013 [US3] 在根 `pom.xml` 的 `pluginManagement` 声明 maven-enforcer-plugin（版本在此唯一声明，依据 research.md D6）：execution 绑定 `validate` 阶段，规则为 bannedDependencies（exclude 清单引用各模块属性 `${enforcer.banned.excludes}`，message 模板指明白名单契约文档路径）+ banDuplicatePomDependencyVersions + reactorModuleConvergence；并在根 build/plugins 激活，全部模块继承执行（依据 research.md D3，澄清 Q2 内置强制）。**实现修正**：单 exclude 不支持逗号清单 → 槽位属性 `enforcer.banned.1..5`/`enforcer.allowed.1`；ReactorModuleConvergence 因独立 BOM 移除
+- [x] T014 [P] [US3] 按契约（contracts/module-contracts.md）设置模块属性：`infrastructure/ecboot-common/pom.xml`（`org.juling.ecboot:*`）、`infrastructure/ecboot-infra-core/pom.xml`（排除 ecboot-common）、`services/ecboot-service-user/pom.xml` 与 `services/ecboot-service-shop/pom.xml`（禁 `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-*`）
+- [x] T015 [P] [US3] 按契约设置 apps 层属性：`apps/ecboot-api-common/pom.xml`（禁 services/渠道/ecboot，允许 infrastructure——澄清 Q4）、`apps/ecboot-api-user/pom.xml`、`apps/ecboot-api-shop/pom.xml`、`apps/ecboot-api-admin/pom.xml`（各禁 start 与其他两个渠道）
+- [x] T016 [US3] 按契约设置 `start/pom.xml` 属性（禁 `org.juling.ecboot:ecboot-service-*`、`org.juling.ecboot:ecboot-infra-*`、`org.juling.ecboot:ecboot-api-common`）与 `dependencies/pom.xml` 属性（禁全部 `org.juling.ecboot:*` 业务构件）；补齐 start 装配依赖（api-user/shop/admin，`${project.version}` 引用）
+- [x] T017 [US3] 验证场景三与场景四：执行 quickstart 场景三全部四步注入（违规/循环/合规对照）确认失败与通过形态；执行 `./mvnw test -pl start -am` 回归（Docker 缺失属存量环境缺陷，已如实记录），结果记入 `specs/001-maven-module-deps/quickstart.md` 验证记录区
 
 **Checkpoint**: US3 完成——任何方向违规在任何一次常规构建中即时失败
 

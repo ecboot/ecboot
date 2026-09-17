@@ -13,8 +13,26 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<properties>
 		<java.version>25</java.version>
+		<enforcer.banned.1>org.juling.ecboot:ecboot-service-*</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:ecboot-infra-*</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-api-common</enforcer.banned.3>
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>org.juling.ecboot</groupId>
+			<artifactId>ecboot-api-user</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.juling.ecboot</groupId>
+			<artifactId>ecboot-api-shop</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.juling.ecboot</groupId>
+			<artifactId>ecboot-api-admin</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>

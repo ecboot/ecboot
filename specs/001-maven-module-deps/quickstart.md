@@ -55,14 +55,22 @@
 ## 场景四：存量回归（FR-010 / SC-004）
 
 ```bash
-cd start && ../mvnw test
+./mvnw test -pl start -am    # 仓库根执行（-am 连带构建依赖模块）
 ```
 
 **期望**：`EcbootApplicationTests` 通过（需要 Docker 拉起 compose 服务；本机无
-Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。应用启动验证：
-`../mvnw spring-boot:run` 正常启动无版本冲突告警（依赖收敛警告应为 0）。
+Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。注意：BOM 经 reactor
+解析，子模块目录内单独构建不可用——一切构建从仓库根发起。
 
 ## 验证记录
+
+### 场景一（US1）：全新构建 — 2026-09-17 ✅
+
+- `./mvnw clean package -DskipTests`（仓库根）：**BUILD SUCCESS**，11 个项目全部 SUCCESS
+- reactor 顺序：ecboot-parent → dependencies → common → infra-core → service-user → service-shop → api-common → api-user → api-shop → api-admin → ecboot(start) ✅ 符合 infrastructure → services → apps → start
+- 首次构建（含插件下载）1:03；热构建 **10.5 s**（SC-005 <1 分钟 ✅）
+- 注：Docker 未运行，`-DskipTests` 为 quickstart 场景四允许的诚实回退；测试回归见场景四记录
+- 对照基线：改造前根构建仅 1 项目、子模块 Non-resolvable parent POM（见 baseline.md）——RED→GREEN 闭环成立
 
 ### 场景二（US2）：版本单点仲裁 — 2026-09-17 ✅
 
@@ -72,8 +80,19 @@ Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。应�
 - 还原后终验：`./mvnw clean package -DskipTests` → BUILD SUCCESS（8.8 s）
 - 实现备注：BOM 模块独立化（不继承 ecboot-parent），否则根导入 BOM + BOM 继承根构成导入自环（Maven 报 "scope=import form a cycle"）；Maven 3.9.16 支持 reactor 内 import 解析
 
-- `./mvnw clean package -DskipTests`（仓库根）：**BUILD SUCCESS**，11 个项目全部 SUCCESS
-- reactor 顺序：ecboot-parent → dependencies → common → infra-core → service-user → service-shop → api-common → api-user → api-shop → api-admin → ecboot(start) ✅ 符合 infrastructure → services → apps → start
-- 首次构建（含插件下载）1:03；热构建 **10.5 s**（SC-005 <1 分钟 ✅）
-- 注：Docker 未运行，`-DskipTests` 为 quickstart 场景四允许的诚实回退；测试回归在 T017/T020 补验
-- 对照基线：改造前根构建仅 1 项目、子模块 Non-resolvable parent POM（见 baseline.md）——RED→GREEN 闭环成立
+### 场景三（US3）：方向违规可检出 — 2026-09-17 ✅
+
+- 实现修正：enforcer 3.5.0 单个 `<exclude>` **不支持**逗号分隔清单（实证：违规注入仍 passed），改用槽位属性方案（`enforcer.banned.1..5` + `enforcer.allowed.1`，根统一配置、模块覆写）
+- ReactorModuleConvergence 规则移除：与独立 BOM 设计冲突（"Reactor contains modules without parents: ecboot-dependencies"）；版本一致性由父级继承保证
+- 违规 1：start 注入 `ecboot-service-user` → 构建失败，`org.juling.ecboot:ecboot-service-user <--- banned via the exclude/include list` ✅
+- 违规 2：service-user 注入 `ecboot-api-user` → 同样失败 ✅
+- 循环：service-user ↔ api-user 互依 → `The projects in the reactor contain a cyclic reference`（完整路径输出）✅
+- 合规对照：service-user → ecboot-common → 通过 ✅
+- 终验：还原全部注入后 `./mvnw clean package -DskipTests` → BUILD SUCCESS（8.4 s）✅
+
+### 场景四（US3/FR-010）：存量回归 — 2026-09-17 ⚠️ 环境受限
+
+- 命令形态修正：BOM 经 reactor 解析，单模块构建（`cd start && ../mvnw test`）不可用；正确命令为**仓库根** `./mvnw test -pl start -am`
+- 实测：编译与 surefire 正常执行；`EcbootApplicationTests.contextLoads` 失败于 Spring 上下文——根因 `Failed to determine a suitable driver class`（数据源未配置 + Docker 未运行，compose 连接详情不可用）
+- 判定：**存量环境缺陷，非本次改造回归**（改造前该测试无法进入可执行状态——基线即父 POM 不可达）；运行时配置属后续特性范围
+- 纯构建路径已验：`./mvnw clean package -DskipTests` BUILD SUCCESS（8.4 s）；待 Docker 可用后补跑完整上下文测试

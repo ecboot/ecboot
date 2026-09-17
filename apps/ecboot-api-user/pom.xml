@@ -13,6 +13,9 @@
 	<version>0.0.1-SNAPSHOT</version>   
 	<properties>
 		<java.version>25</java.version>
+		<enforcer.banned.1>org.juling.ecboot:ecboot</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:ecboot-api-shop</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-api-admin</enforcer.banned.3>
 	</properties>
 	<dependencies>
 	</dependencies>

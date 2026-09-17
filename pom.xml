@@ -14,6 +14,15 @@
 	<packaging>pom</packaging>
 	<properties>
 		<java.version>25</java.version>
+		<!-- 分层依赖强制（FR-001～004/007/008）：槽位属性供各模块覆写（enforcer 的单个
+		     exclude 不支持逗号分隔清单，实证 3.5.0），默认值不匹配任何构件；
+		     禁止清单契约见 specs/001-maven-module-deps/contracts/module-contracts.md -->
+		<enforcer.banned.1>org.juling.ecboot:__none__</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:__none__</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:__none__</enforcer.banned.3>
+		<enforcer.banned.4>org.juling.ecboot:__none__</enforcer.banned.4>
+		<enforcer.banned.5>org.juling.ecboot:__none__</enforcer.banned.5>
+		<enforcer.allowed.1>org.juling.ecboot:__none__</enforcer.allowed.1>
 	</properties>
 	<modules>
 		<module>dependencies</module>
@@ -52,9 +61,46 @@
 					<groupId>org.graalvm.buildtools</groupId>
 					<artifactId>native-maven-plugin</artifactId>
 				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-enforcer-plugin</artifactId>
+					<version>3.5.0</version>
+					<executions>
+						<execution>
+							<id>enforce-layer-dependencies</id>
+							<phase>validate</phase>
+							<goals>
+								<goal>enforce</goal>
+							</goals>
+							<configuration>
+								<rules>
+									<bannedDependencies>
+										<excludes>
+											<exclude>${enforcer.banned.1}</exclude>
+											<exclude>${enforcer.banned.2}</exclude>
+											<exclude>${enforcer.banned.3}</exclude>
+											<exclude>${enforcer.banned.4}</exclude>
+											<exclude>${enforcer.banned.5}</exclude>
+										</excludes>
+										<includes>
+											<include>${enforcer.allowed.1}</include>
+										</includes>
+										<message>违反分层依赖契约（start → apps → services → infrastructure）：见 specs/001-maven-module-deps/contracts/module-contracts.md</message>
+									</bannedDependencies>
+									<banDuplicatePomDependencyVersions/>
+								</rules>
+								<fail>true</fail>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
 			</plugins>
 		</pluginManagement>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
