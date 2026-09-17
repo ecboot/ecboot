@@ -5,6 +5,7 @@
 	<groupId>org.juling.ecboot</groupId>
 	<artifactId>ecboot-parent</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
 	<properties>
 		<java.version>25</java.version>
 	</properties>
