@@ -26,14 +26,9 @@
 	</properties>
 	<modules>
 		<module>dependencies</module>
-		<module>infrastructure/ecboot-common</module>
-		<module>infrastructure/ecboot-infra-core</module>
-		<module>services/ecboot-service-user</module>
-		<module>services/ecboot-service-shop</module>
-		<module>apps/ecboot-api-common</module>
-		<module>apps/ecboot-api-user</module>
-		<module>apps/ecboot-api-shop</module>
-		<module>apps/ecboot-api-admin</module>
+		<module>infrastructure</module>
+		<module>services</module>
+		<module>apps</module>
 		<module>start</module>
 	</modules>
 	<!-- 依赖/框架版本唯一仲裁点：ecboot-dependencies（就近优先，覆盖祖父级清单默认值） -->

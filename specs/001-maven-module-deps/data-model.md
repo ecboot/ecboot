@@ -5,12 +5,15 @@
 本特性为构建体系改造，"领域数据"即：模块实体、依赖边（白名单矩阵）、版本仲裁流。
 无生命周期状态迁移；构建行为验证规则见文末映射表。
 
-## 实体：POM 模块（11 个）
+## 实体：POM 模块（14 个）
 
 | 构件（GA: org.juling.ecboot:*） | packaging | parent | 角色 |
 | --- | --- | --- | --- |
 | ecboot-parent | pom | spring-boot-starter-parent (外部) | 聚合器 + 根父级 + 插件版本集中点 |
 | ecboot-dependencies | pom | 无（独立 BOM，避免导入自环） | 依赖/框架版本唯一仲裁 BOM |
+| ecboot-infrastructure | pom | ecboot-parent | infrastructure 层聚合器（用户决策 2026-09-17 接入） |
+| ecboot-services | pom | ecboot-parent | services 层聚合器（同上） |
+| ecboot-apps | pom | ecboot-parent | apps 层聚合器（同上） |
 | ecboot-common | jar | ecboot-parent | infrastructure 基础库（汇点） |
 | ecboot-infra-core | jar | ecboot-parent | infrastructure 基础库 |
 | ecboot-service-user | jar | ecboot-parent | user 领域服务 |
@@ -20,6 +23,10 @@
 | ecboot-api-shop | jar | ecboot-parent | shop 渠道 API |
 | ecboot-api-admin | jar | ecboot-parent | admin 渠道 API |
 | ecboot | jar | ecboot-parent | 唯一可运行装配模块（start） |
+
+根 `<modules>` 聚合 5 个条目：`dependencies`（BOM 须经根 reactor 供导入解析）、
+三个层聚合器、`start`；层聚合器各自聚合层内叶子模块（聚合器 ≠ 父级，叶子
+parent 仍为 ecboot-parent）。
 
 ## 关系：依赖边白名单矩阵（enforcer bannedDependencies 的依据）
 

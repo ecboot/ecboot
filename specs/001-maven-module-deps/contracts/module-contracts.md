@@ -9,10 +9,9 @@
 
 - 坐标 `org.juling.ecboot:ecboot-parent:0.0.1-SNAPSHOT`，`packaging=pom`
 - parent：`org.springframework.boot:spring-boot-starter-parent:4.1.1`
-- 聚合 modules（10）：`dependencies`、`infrastructure/ecboot-common`、
-  `infrastructure/ecboot-infra-core`、`services/ecboot-service-user`、
-  `services/ecboot-service-shop`、`apps/ecboot-api-common`、`apps/ecboot-api-user`、
-  `apps/ecboot-api-shop`、`apps/ecboot-api-admin`、`start`
+- 聚合 modules（5，用户决策 2026-09-17：层聚合器间接聚合叶子模块）：
+  `dependencies`（BOM 必须经根 reactor 供导入解析）、`infrastructure`、
+  `services`、`apps`、`start`
 - properties：`java.version=25`（保留），新增 enforcer 参数默认值
 - dependencyManagement：import `org.juling.ecboot:ecboot-dependencies:${project.version}`
 - pluginManagement / build：compiler（lombok + configuration-processor 注解处理器、
@@ -30,6 +29,14 @@
 - dependencyManagement：import `spring-boot-dependencies:${spring-boot.version}`；
   未来第三方版本仅在此追加
 - 禁止依赖任何 org.juling 业务构件
+
+## 层聚合器（infrastructure/、services/、apps/ 的 pom.xml）
+
+- 坐标 `org.juling.ecboot:ecboot-infrastructure|ecboot-services|ecboot-apps:0.0.1-SNAPSHOT`，`packaging=pom`
+- parent：ecboot-parent（`../pom.xml`）；`<modules>` 聚合层内叶子模块——
+  **聚合器 ≠ 父级**，叶子 parent 仍为 ecboot-parent（`../../pom.xml`）
+- MUST NOT 声明任何依赖；enforcer 默认空禁令经继承覆盖（packaging=pom 无影响）
+- `dependencies` BOM 不属于任何层，独立挂于根 modules（其 import 由根 reactor 解析）
 
 ## infrastructure 层
 

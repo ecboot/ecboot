@@ -15,6 +15,12 @@
 	<properties>
 		<java.version>25</java.version>
 	</properties>
+	<modules>
+		<module>ecboot-api-common</module>
+		<module>ecboot-api-user</module>
+		<module>ecboot-api-shop</module>
+		<module>ecboot-api-admin</module>
+	</modules>
 	<dependencies>
 	</dependencies>
 </project>

@@ -9,16 +9,11 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<groupId>org.juling.ecboot</groupId>
-	<artifactId>ecboot-infrastructure</artifactId>
+	<artifactId>ecboot-services</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-   	<packaging>pom</packaging>
-	<properties>
-		<java.version>25</java.version>
-	</properties>
+	<packaging>pom</packaging>
 	<modules>
-		<module>ecboot-common</module>
-		<module>ecboot-infra-core</module>
+		<module>ecboot-service-user</module>
+		<module>ecboot-service-shop</module>
 	</modules>
-	<dependencies>
-	</dependencies>
 </project>
