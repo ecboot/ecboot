@@ -26,17 +26,19 @@ ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffol
 
 ### Backend
 
-The root `pom.xml` (`ecboot-parent`) is **not an aggregator** — it has no `<modules>` section. Build and run from within `start/`:
+The root `pom.xml` (`ecboot-parent`) is the aggregator + parent (inherits `spring-boot-starter-parent`). **All builds run from the repo root** — single-module builds fail because the BOM in `dependencies/` is resolved from the reactor:
 
 ```bash
-cd start
-../mvnw spring-boot:run              # run the app (auto-starts compose.yaml services via docker-compose support; needs Docker)
-../mvnw test                         # all tests
-../mvnw test -Dtest=EcbootApplicationTests   # a single test class
-../mvnw package                      # build the jar
+./mvnw clean package -DskipTests      # full reactor build
+./mvnw test -pl start -am             # tests for the runnable app (+ its module deps)
+./mvnw spring-boot:run -pl start -am  # run the app (auto-starts compose.yaml services; needs Docker)
 ```
 
-Gotcha: modules under `apps/`, `services/`, `infrastructure/`, `dependencies/` declare `ecboot-parent` with `<relativePath/>`, which disables the default `../pom.xml` lookup — they won't build until the parent is installed to the local repo (`../mvnw -N install` from the repo root).
+Dependency rules are enforced by maven-enforcer at the `validate` phase — violations fail the build:
+
+- Layer direction: `start → apps → services → infrastructure`; `ecboot-api-common` must not depend on `services/*`; cycles fail at build time.
+- Version arbitration: third-party/framework versions are declared ONLY in `dependencies/pom.xml` (`spring-boot.version` property + BOM imports); plugin versions ONLY in the root `pluginManagement`. Business module POMs carry zero version numbers.
+- Per-module ban lists: slot properties `enforcer.banned.1..5` (+ `enforcer.allowed.1` exception), defined per module, defaults in the root POM. A single `<exclude>` does NOT support comma-separated lists.
 
 Local infrastructure is defined in `compose.yaml`: MySQL (db `mydatabase`, user `myuser`/`secret`), Redis, Elasticsearch 9.3.3 (security disabled). Start manually with `docker compose up -d`.
 
@@ -66,9 +68,9 @@ npm is the package manager (`package-lock.json` committed, no workspace config �
 
 ## Architecture
 
-### Backend (planned layering)
+### Backend (layering, enforced)
 
-The module skeleton defines a modular monolith: `infrastructure/*` (shared libs) ← `services/*` (domain: user, shop) ← `apps/*` (API per channel: user, shop, admin, plus `api-common`) — assembled by `start/` into one deployable. Dependency wiring between these modules is not yet implemented.
+The modules form a modular monolith: `infrastructure/*` (shared libs) ← `services/*` (domain: user, shop) ← `apps/*` (API per channel: user, shop, admin, plus `api-common`) — assembled by `start/` into one deployable. The dependency wiring IS implemented and enforced (see Backend commands above).
 
 The `start/` stack: WebMVC, Security, JPA + Flyway (MySQL), Redis, Elasticsearch, Quartz, Mail, WebSocket, RestClient, Validation, Actuator. Build-time extras: Lombok + `spring-boot-configuration-processor` annotation processors, Hibernate bytecode enhancement, GraalVM native plugin. Spring Boot 4 uses per-tech test starters (e.g. `spring-boot-starter-webmvc-test`).
 

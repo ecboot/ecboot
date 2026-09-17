@@ -2,7 +2,7 @@
 
 电商平台 Monorepo —— 包含 Spring Boot 后端与三个前端应用（Web 商城、管理后台、移动端）。
 
-> 项目当前处于初始脚手架阶段：后端仅 `start/` 模块包含可运行代码，其余 Maven 模块为规划中的分层占位。
+> 项目当前处于初始脚手架阶段：后端仅 `start/` 模块包含可运行代码，其余 Maven 模块为分层占位（依赖接线与版本仲裁已就绪，业务实现待填充）。
 
 ## 技术栈
 
@@ -40,13 +40,12 @@
 ### 后端
 
 ```bash
-cd start
-../mvnw spring-boot:run    # 启动应用；Spring Boot docker-compose 支持会自动拉起 compose.yaml 中的基础设施（需 Docker 已启动）
-../mvnw test               # 运行测试
-../mvnw test -Dtest=EcbootApplicationTests   # 运行单个测试
+./mvnw spring-boot:run -pl start -am   # 启动应用（-am 连带构建依赖模块）；docker-compose 支持会自动拉起基础设施（需 Docker 已启动）
+./mvnw test -pl start -am              # 运行 start 模块测试
+./mvnw clean package -DskipTests       # 全量构建（跳过测试）
 ```
 
-> 注意：根 `pom.xml` 不是聚合器（无 `<modules>`），请在 `start/` 目录内构建。
+> 构建一律从仓库根发起：根 `pom.xml` 是聚合器 + 父级；`dependencies/` 是唯一版本仲裁点（业务模块零版本号）；分层依赖方向（start → apps → services → infrastructure）由 maven-enforcer 在 validate 阶段强制，违规即构建失败。
 
 ### 前端
 
