@@ -42,15 +42,18 @@
 
 以下均使用临时修改 + `./mvnw validate`（最快阶段即触发），验证后还原：
 
-1. `start/pom.xml` 临时添加 `org.juling:ecboot-service-user` 依赖 →
-   **构建失败**，enforcer 输出含 `org.juling:ecboot-service-*` 违规说明；
-2. `services/ecboot-service-user/pom.xml` 临时添加 `org.juling:ecboot-api-user` →
+1. `start/pom.xml` 临时添加 `org.juling.ecboot:ecboot-service-user` 依赖 →
+   **构建失败**，enforcer 输出含 `banned via the exclude/include list` 违规说明；
+2. `services/ecboot-service-user/pom.xml` 临时添加 `org.juling.ecboot:ecboot-api-user` →
    同样失败；
-3. `services/ecboot-service-user/pom.xml` 临时添加 `org.juling:ecboot-api-user` 且
-   `apps/ecboot-api-user/pom.xml` 临时添加 `org.juling:ecboot-service-user` →
+3. `services/ecboot-service-user/pom.xml` 临时添加 `org.juling.ecboot:ecboot-api-user` 且
+   `apps/ecboot-api-user/pom.xml` 临时添加 `org.juling.ecboot:ecboot-service-user` →
    构建失败，报告循环引用；
 4. 合规对照：`services/ecboot-service-user/pom.xml` 临时添加
-   `org.juling:ecboot-common` → 构建通过。
+   `org.juling.ecboot:ecboot-common` → 构建通过；
+5. 传递合规（评审新增）：`apps/ecboot-api-user/pom.xml` 添加契约允许的
+   `org.juling.ecboot:ecboot-service-user` → 全量构建必须通过
+   （依赖 searchTransitive=false）。
 
 ## 场景四：存量回归（FR-010 / SC-004）
 
@@ -67,7 +70,7 @@ Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。注�
 ### 场景一（US1）：全新构建 — 2026-09-17 ✅
 
 - `./mvnw clean package -DskipTests`（仓库根）：**BUILD SUCCESS**，11 个项目全部 SUCCESS
-- reactor 顺序：ecboot-parent → dependencies → common → infra-core → service-user → service-shop → api-common → api-user → api-shop → api-admin → ecboot(start) ✅ 符合 infrastructure → services → apps → start
+- reactor 顺序：dependencies（被根导入，排首）→ ecboot-parent → common → infra-core → service-user → service-shop → api-common → api-user → api-shop → api-admin → ecboot(start) ✅ 拓扑序符合 infrastructure → services → apps → start
 - 首次构建（含插件下载）1:03；热构建 **10.5 s**（SC-005 <1 分钟 ✅）
 - 注：Docker 未运行，`-DskipTests` 为 quickstart 场景四允许的诚实回退；测试回归见场景四记录
 - 对照基线：改造前根构建仅 1 项目、子模块 Non-resolvable parent POM（见 baseline.md）——RED→GREEN 闭环成立
@@ -89,6 +92,14 @@ Docker 时允许以 `-DskipTests` 验证纯打包路径并如实记录）。注�
 - 循环：service-user ↔ api-user 互依 → `The projects in the reactor contain a cyclic reference`（完整路径输出）✅
 - 合规对照：service-user → ecboot-common → 通过 ✅
 - 终验：还原全部注入后 `./mvnw clean package -DskipTests` → BUILD SUCCESS（8.4 s）✅
+
+### 场景三补充（评审修复后复验）— 2026-09-17 ✅
+
+- 评审发现 Critical：enforcer `searchTransitive` 默认 true，会检查传递依赖——合规的 apps→services 接线一旦真实发生，start 的传递图将触发误禁（评审者在独立 worktree 实证）。修复：`<searchTransitive>false>` 仅查直接依赖
+- 用例 5（修复前必挂）：api-user 注入契约允许的 `ecboot-service-user` → 全量构建 **BUILD SUCCESS**（17.1 s）✅
+- 直接违规仍拦截：start 注入 `ecboot-infra-core` → `banned via the exclude/include list` ✅
+- 兄弟违规拦截（FR-003 完整化）：service-user 注入 `ecboot-service-shop` → 构建失败 ✅
+- 终验：BUILD SUCCESS（8.4 s）✅；enforcer 版本改由 starter-parent 托管（3.6.3）
 
 ### 场景四（US3/FR-010）：存量回归 — 2026-09-17 ⚠️ 环境受限
 

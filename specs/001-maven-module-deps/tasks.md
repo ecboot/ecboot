@@ -101,6 +101,7 @@ description: "Task list for feature implementation"
 - [x] T018 汇总归档：核对 `specs/001-maven-module-deps/quickstart.md` 验证记录区已含四个场景的命令、结果、耗时摘要（对照宪法 IV"以输出为证"）
 - [x] T019 文档同步：更新 `README.md`、`CLAUDE.md`、`AGENTS.md` 中"根 POM 非聚合器、需在 start/ 内构建"的构建说明与陷阱提示为新的"仓库根一条命令构建"事实，并移除已失效的 `mvnw -N install` 前置说明
 - [x] T020 终验：完整重跑 quickstart 四场景（干净本地仓库 org.juling 前提下），全部通过后本特性可提交
+- [x] T021 [评审修复] 代码评审裁定 With fixes：Critical#1 bannedDependencies 加 `searchTransitive=false`（默认查传递图会误禁合规的 apps→services 接线）；Important#2 services 同层兄弟互禁补齐（FR-003 完整化）；Important#3 契约移除 reactorModuleConvergence；Minor：enforcer 版本改由 starter-parent 托管、BOM 惰性属性移除、孤儿聚合器 relativePath 修复、quickstart 探针 groupId 修正、data-model 版本字面量计数更新；补跑传递合规/直接违规/兄弟违规/全量构建四项实证
 
 ---
 

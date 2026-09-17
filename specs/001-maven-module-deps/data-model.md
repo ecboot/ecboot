@@ -30,7 +30,7 @@
 | ecboot-dependencies | 无 | 任何业务构件（BOM 不依赖业务） |
 | ecboot-common | 无 | 任何业务构件 |
 | ecboot-infra-core | ecboot-common | 其余全部业务构件 |
-| ecboot-service-user / shop | ecboot-common、ecboot-infra-core | ecboot、全部 ecboot-api-* |
+| ecboot-service-user / shop | ecboot-common、ecboot-infra-core | ecboot、全部 ecboot-api-*、同层兄弟 service |
 | ecboot-api-common | ecboot-common、ecboot-infra-core | ecboot-service-*、全部渠道 ecboot-api-*（澄清 Q4：禁依赖 services）、ecboot |
 | ecboot-api-user / shop / admin | ecboot-api-common、ecboot-service-*、ecboot-common、ecboot-infra-core | ecboot、其他两个渠道模块 |
 | ecboot (start) | ecboot-api-user、ecboot-api-shop、ecboot-api-admin | ecboot-service-*、ecboot-infra-*、ecboot-api-common（FR-001 白名单枚举之外） |
@@ -52,7 +52,8 @@ ecboot-parent dependencyManagement ──► 传递给全部子模块（就近�
 ```
 
 版本字面量全仓库仅两处：`dependencies/pom.xml` 的 `spring-boot.version` 属性、
-根 `pom.xml` 的 enforcer 插件版本（插件治理，澄清 Q3）。模块自身版本
+根 `pom.xml` 继承链声明的 starter-parent 版本（4.1.1）。enforcer 插件版本由
+starter-parent 托管（评审修订，原显式 3.5.0 已移除）。模块自身版本
 `0.0.1-SNAPSHOT` 由 parent 坐标定义，子模块经继承获得。
 
 ## 验证规则映射（FR → 机制）

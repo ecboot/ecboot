@@ -16,9 +16,10 @@
 - properties：`java.version=25`（保留），新增 enforcer 参数默认值
 - dependencyManagement：import `org.juling.ecboot:ecboot-dependencies:${project.version}`
 - pluginManagement / build：compiler（lombok + configuration-processor 注解处理器、
-  release 25）、hibernate 增强（自 start 上移）、maven-enforcer（bannedDependencies +
-  banDuplicatePomDependencyVersions + reactorModuleConvergence，绑定 validate），
-  enforcer 插件版本在此唯一声明
+  release 25）、hibernate 增强（自 start 上移）、maven-enforcer（bannedDependencies
+  **searchTransitive=false 仅查直接依赖** + banDuplicatePomDependencyVersions，绑定
+  validate）；enforcer 版本由 starter-parent 继承链托管（实现修订：ReactorModuleConvergence
+  因独立 BOM 移除，enforcer 显式版本移除）
 - **对全仓库承诺**：从根目录 `mvnw` 任意生命周期一次构建全部模块
 
 ## BOM：ecboot-dependencies（dependencies/pom.xml）
@@ -41,8 +42,8 @@
 
 | 模块 | 业务依赖白名单 | enforcer 禁止清单 |
 | --- | --- | --- |
-| ecboot-service-user | ecboot-common、ecboot-infra-core | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-*` |
-| ecboot-service-shop | 同上 | 同上 |
+| ecboot-service-user | ecboot-common、ecboot-infra-core | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-*`、`org.juling.ecboot:ecboot-service-shop`（同层互禁，评审修订） |
+| ecboot-service-shop | 同上（兄弟禁令互换） | `org.juling.ecboot:ecboot`、`org.juling.ecboot:ecboot-api-*`、`org.juling.ecboot:ecboot-service-user` |
 
 ## apps 层
 

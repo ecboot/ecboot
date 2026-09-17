@@ -10,8 +10,8 @@
 	<properties>
 		<!-- 全仓库框架版本唯一字面量（FR-005）：第三方依赖版本一律在此声明 -->
 		<spring-boot.version>4.1.1</spring-boot.version>
-		<!-- BOM 不依赖任何业务构件 -->
-		<enforcer.banned.1>org.juling.ecboot:*</enforcer.banned.1>
+		<!-- "BOM 不依赖任何业务构件"为结构性保证：import 作用域只消费
+		     dependencyManagement，本 POM 若声明 dependencies 亦不会传递给消费方 -->
 	</properties>
 	<dependencyManagement>
 		<dependencies>

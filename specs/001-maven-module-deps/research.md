@@ -76,6 +76,12 @@ reactor 原生检测兜底（"cyclic reference" 构建失败，FR-007 双保险�
 - 仅 CI 检查 → 仓库无 CI，且违反澄清 Q2 的"内置强制"。
 - maven-archetype/Gradle 重构 → 推倒重来，违反宪法 II/V。
 
+> **实现修订（2026-09-17，评审修复）**：槽位属性 `enforcer.banned.1..5` /
+> `enforcer.allowed.1`（单个 exclude 不支持逗号清单，实证）+ `<searchTransitive>false>`
+> （只查直接依赖——enforcer 默认检查传递图，合规的 apps→services 接线会在 start
+> 的传递图中被误禁）；ReactorModuleConvergence 因独立 BOM 移除；services 同层
+> 兄弟互禁补齐（FR-003 完整化）。
+
 ## D4: 版本纪律的机械强制边界（FR-005、US2 场景 3）
 
 **Decision**: 三层机制——
@@ -119,6 +125,9 @@ US2.3 可全机械化验证）；硬编码版本属低频越轨行为，引入�
 一项（选用当时稳定版 3.x）；其余插件（compiler、spring-boot、hibernate-enhance、
 native、surefire 等）版本全部由继承链上的 spring-boot-starter-parent 托管，零声明。
 业务模块 POM 不出现任何 `<version>`（依赖或插件）。
+
+> **实现修订（2026-09-17，评审修复）**：starter-parent 本身已托管 maven-enforcer-plugin
+> （3.6.3），显式 3.5.0 移除——插件版本零新增字面量，全部继承链托管。
 
 **Rationale**: 框架插件与框架版本同源（starter-parent），天然一致；新增插件唯一
 需要显式版本，且声明点唯一（根父 POM），满足"插件版本集中在根父 POM"。

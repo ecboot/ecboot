@@ -15,6 +15,7 @@
 		<java.version>25</java.version>
 		<enforcer.banned.1>org.juling.ecboot:ecboot</enforcer.banned.1>
 		<enforcer.banned.2>org.juling.ecboot:ecboot-api-*</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-service-user</enforcer.banned.3>
 	</properties>
 	<dependencies>
 	</dependencies>
