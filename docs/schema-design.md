@@ -41,6 +41,7 @@
 | V23 | 业务评审修复 | 地址区划码 / 售后数量 / 秒杀关联 / 包邮例外 / 关系链锁定 / 规格组合唯一 / 枚举扩位 | V22 |
 | V24 | 拼团定价下沉 | 新表 `group_buy_item`（SKU 级成团价，对齐 flash_sale 模式），移除活动级 `group_price` | V17 |
 | V25 | 余额消费 | 订单头/项 `account_amount` 抵扣列 + 账户流水枚举扩位（资金语义=用户资产消耗，非优惠） | V23 |
+| V26 | 运营与配置 | 地区限售（SPU 黑名单 JSON）/ 积分滚动过期 / `notify_template` / `operation_banner`+`operation_floor` | V19/V2 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -99,7 +100,7 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - **P1-⑤ 关系链锁定**：`user_relation.locked/lock_time`——绑定窗口（保护期可换绑、期满锁定）的承载；换绑=UPDATE 本行，`UNIQUE(user_id)` 不受影响。
 - **P1-⑦ 规格组合唯一**：`product_sku.specs_hash CHAR(64) AS (SHA2(specs,256)) STORED` + `UNIQUE(spu_id, specs_hash)`。**实证（2026-09-18）：MySQL JSON 存储层先规范化键序再参与生成列计算——键序不同的同组合同样被 1062 拒绝，属语义级唯一**（强于 V23 文件注释所述"依赖应用序列化稳定"，以本条为准）。
 - 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
-- **评审遗留（待产品决策）**：~~拼团定价粒度~~（已决策落地 V24：SKU 级，新表 `group_buy_item` 对齐 flash_sale 模式）；~~佣金余额可否消费~~（已决策落地 V25）；账号合并流程；地区限售；积分有效期；通知模板表；运营位。
+- **评审遗留（全部已决策，2026-09-18）**：~~拼团定价粒度~~→V24 SKU 级；~~佣金余额消费~~→V25；~~账号合并~~→登录时手机号优先归并（零 DDL，规则见 `ecboot-service-user/README.md`，不做迁移式合并）；~~地区限售~~→V26 SPU 黑名单；~~积分有效期~~→V26 滚动 12 个月（批次制为升级路径，触发条件：积分商城/兑换比例变化/财务审计要求）；~~通知模板~~→V26 `notify_template`（平台模板 ID + 参数契约建模）；~~运营位~~→V26 轻量两表。
 
 ### 余额消费（V25，产品决策落地）
 
