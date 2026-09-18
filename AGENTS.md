@@ -35,6 +35,13 @@ Guidance for AI coding agents working in this repository.
 - Generate commit messages in Chinese, following Conventional Commits style, e.g. `feat: 新增用户登录`, `chore: 升级依赖`.
 - 金额（Money）一律使用 `DECIMAL(10,2)` 存储与 `CHAR(3)` ISO 4217 币种（默认 `CNY`）；应用层统一 `BigDecimal`，比较必须用 `compareTo`。禁止 `float`/`double` 存金额，禁止 `equals`/`==` 比较金额。
 
+## 合规红线（中国，设计前必须知道）
+
+1. **分销层级 ≤ 2 级**：三级及以上即触《禁止传销条例》，这是刑事红线，不是设计偏好——`user_relation` 结构上就只允许两级。
+2. **注销权**：个保法要求，不是"删除按钮"而是可验证的匿名化流程。
+3. **电子发票**：B2C 完税需求，`order_invoice`（抬头类型、税号、开票状态），按需上。
+4. **手机号等敏感字段**：个保法最小化原则，加密列+哈希索引是上线前最后一改的机会。
+
 ## Project Overview
 
 ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffold stage: a Java 25 / Spring Boot 4.1.1 backend at `apps/api` plus four frontend apps, all in a Vite+ / pnpm workspace (Node >= 22.18, pnpm). Most backend modules are empty placeholder POMs describing a planned layering; only `ecboot-start` contains runnable code. Spec Kit scaffolding lives in `.specify/` (spec-driven development via the `speckit-*` skills); the ratified constitution at `.specify/memory/constitution.md` (v1.0.0) defines five principles: 模块化单体 / 统一技术栈 / 中文优先 / 可验证交付 / 简单优先.
