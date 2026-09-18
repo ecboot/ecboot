@@ -22,6 +22,24 @@
 
 共 26 张表。
 
+### 增量迁移总览（V11~V21，特性 002 社交电商扩展）
+
+| 版本 | 域 | 表/改动 | 前提 |
+|---|---|---|---|
+| V11 | 隐私安全 | `user` 改造（phone 密文化 + phone_hash 唯一）+ `user_login_log` | V1；存量数据环境须先跑应用侧密文化任务 |
+| V12 | 评价 | `product_review` | V6 |
+| V13 | 收藏足迹 | `user_favorite`、`user_footprint` | V2 |
+| V14 | 通知 | `notify_task`、`user_message` | V1 |
+| V15 | 物流 | `logistics_company` | — |
+| V16 | 分销 | `user_relation`、`distribution_user`、`commission_rule`、`commission_record`、`user_account`、`account_log`、`withdraw_order`、`invite_record` | V2/V6 |
+| V17 | 拼团 | `group_buy_activity`、`group_buy_team`、`group_buy_team_member` + `trade_order` 增列 | V6 |
+| V18 | 秒杀 | `flash_sale_activity`、`flash_sale_item` | V2 |
+| V19 | 积分等级 | `point_account`、`point_log`、`user_level_rule` + `user`/`trade_order`/`trade_order_item` 增列 | V1/V6 |
+| V20 | 满减 | `promotion_activity`、`promotion_activity_ladder`、`promotion_activity_scope` + 订单增列 | V2/V6/V9 |
+| V21 | 风控 | `risk_rule`、`risk_record` | V1 |
+
+执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
+
 ## 全局约定
 
 - **引擎/字符集**：InnoDB，`utf8mb4` / `utf8mb4_0900_ai_ci`。

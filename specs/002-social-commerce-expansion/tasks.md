@@ -24,8 +24,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Purpose**: 迁移基线环境就绪
 
-- [ ] T001 启动本地 MySQL（`cd apps/api && docker compose up -d mysql`）并应用基线迁移 V1~V10（启动 `./mvnw spring-boot:run -pl ecboot-start -am` 或 mysql 客户端手工按序执行），核对 `flyway_schema_history` 10 行 success=1、业务表 26 张
-- [ ] T002 [P] 核对迁移编号基线：确认 `db/migration/` 下最高版本为 V10、V11~V21 未被占用；将 data-model.md 各域字段清单标记为编写依据（不改动设计文档）
+- [x] T001 启动本地 MySQL（`cd apps/api && docker compose up -d mysql`）并应用基线迁移 V1~V10（启动 `./mvnw spring-boot:run -pl ecboot-start -am` 或 mysql 客户端手工按序执行），核对 `flyway_schema_history` 10 行 success=1、业务表 26 张
+- [x] T002 [P] 核对迁移编号基线：确认 `db/migration/` 下最高版本为 V10、V11~V21 未被占用；将 data-model.md 各域字段清单标记为编写依据（不改动设计文档）
 
 **Checkpoint**: 基线库就绪，编号无冲突
 
@@ -35,7 +35,7 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Purpose**: 各域文档同步的共享锚点（本特性无代码基建，仅此一项跨故事前置）
 
-- [ ] T003 在 `docs/schema-design.md` 文件清单表后新增"增量迁移总览（V11~V21）"小节：11 个文件的版本号/域/表名清单与执行前提（照抄 contracts/schema-contracts.md §1），作为后续各域决策增补的挂载点
+- [x] T003 在 `docs/schema-design.md` 文件清单表后新增"增量迁移总览（V11~V21）"小节：11 个文件的版本号/域/表名清单与执行前提（照抄 contracts/schema-contracts.md §1），作为后续各域决策增补的挂载点
 
 **Checkpoint**: 文档锚点就绪，用户故事可开始
 
@@ -49,8 +49,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] 编写 `apps/api/ecboot-start/src/main/resources/db/migration/V11__privacy_user_security.sql`：`ALTER TABLE user`（`phone` 列注释改"手机号密文"并放宽至 VARCHAR(256)、`ADD phone_hash CHAR(64) NOT NULL`、`DROP INDEX uk_phone`、`ADD UNIQUE KEY uk_phone_hash(phone_hash)`）+ 新建 `user_login_log`（字段按 data-model P0/V11，`idx(user_id, created_at)`）；文件头注释含"存量数据环境须先执行应用侧密文化任务"警示（research D2）
-- [ ] T005 [US1] 执行 V11 并运行 quickstart 场景四断言（SHOW INDEX / SHOW COLUMNS），输出留证到 `specs/002-social-commerce-expansion/` 验证记录（可追加至本文件 Notes 或单独 baseline 文件）
+- [x] T004 [US1] 编写 `apps/api/ecboot-start/src/main/resources/db/migration/V11__privacy_user_security.sql`：`ALTER TABLE user`（`phone` 列注释改"手机号密文"并放宽至 VARCHAR(256)、`ADD phone_hash CHAR(64) NOT NULL`、`DROP INDEX uk_phone`、`ADD UNIQUE KEY uk_phone_hash(phone_hash)`）+ 新建 `user_login_log`（字段按 data-model P0/V11，`idx(user_id, created_at)`）；文件头注释含"存量数据环境须先执行应用侧密文化任务"警示（research D2）
+- [x] T005 [US1] 执行 V11 并运行 quickstart 场景四断言（SHOW INDEX / SHOW COLUMNS），输出留证到 `specs/002-social-commerce-expansion/` 验证记录（可追加至本文件 Notes 或单独 baseline 文件）
 
 **Checkpoint**: US1 独立可验证——合规红线第 4 条的 Schema 侧就位
 
