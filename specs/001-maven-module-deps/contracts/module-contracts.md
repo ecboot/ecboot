@@ -81,3 +81,25 @@
 3. 新增插件版本：仅根 `pluginManagement`；
 4. 新增模块：挂入根 modules、parent 指向 ecboot-parent、按矩阵补 enforcer 属性，
    并同步更新 data-model 矩阵。
+
+## 扁平结构落地修订（2026-09-18，POM 重构）
+
+仓库重构后模块扁平挂于 `apps/api/`（层聚合器已删除），本节为权威矩阵的现行形态：
+
+- **禁令机制**：逐 GA 精确列举，槽位 `enforcer.banned.1..8`（默认 `__none__`）；
+  **`allowed` includes 机制已移除**。实证（enforcer 3.6.3）：`bannedDependencies`
+  仅支持精确 `groupId:artifactId` 匹配——纯 groupId 与 `groupId:*` 通配**均无效**
+  （2026-09-18 注入实验：exclude=`org.juling.ecboot` 时 api-user←api-shop 通过）。
+- **禁令 = 内部构件全集（9）− 本模块白名单**；反向依赖另由 reactor 环检测兜底拦截。
+- 白名单矩阵：common=∅；infra-core={common}；service-*= {common, infra-core}（兄弟互禁）；
+  api-common={common, infra-core}（全部 service 禁入）；api-user/shop={api-common,
+  service-*, common, infra-core}（兄弟渠道互禁）；api-admin 同左；start={api-user,
+  api-shop, api-admin}（service/infra/common 直连禁入，必须经渠道传递）。
+- **各层技术依赖登记**（零版本号，版本经 BOM 继承链）：
+  common=jackson-annotations、jakarta.validation-api、lombok(optional)；
+  infra-core=spring-boot-starter、configuration-processor(optional)；
+  service-*=data-jpa、validation、lombok(optional)、starter-test(test)；
+  api-common=webmvc、validation、lombok(optional)；
+  api-user/shop=api-common+对应 service+starter-test(test)；api-admin=api-common+双 service+test；
+  start=依赖清单不变（12 starter + flyway-mysql + mysql 驱动 + devtools/docker-compose + lombok + test starters）。
+- 模块 POM 不再冗余声明 `java.version`（继承父级）。

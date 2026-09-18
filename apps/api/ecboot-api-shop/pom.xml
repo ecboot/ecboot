@@ -8,12 +8,28 @@
 		<version>0.0.1-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
-	<groupId>org.juling.ecboot</groupId>
 	<artifactId>ecboot-api-shop</artifactId>
-	<version>0.0.1-SNAPSHOT</version>   
+	<!-- 分层禁令（enforcer 仅精确 GA 匹配，组级通配实测无效）：禁令 = 内部构件全集 − 白名单{ecboot-api-common、ecboot-service-user、ecboot-service-shop、ecboot-common、ecboot-infra-core}；矩阵见 specs/001-maven-module-deps/contracts/module-contracts.md -->
 	<properties>
-		<java.version>25</java.version>
+		<enforcer.banned.1>org.juling.ecboot:ecboot-api-user</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:ecboot-api-admin</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-start</enforcer.banned.3>
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>org.juling.ecboot</groupId>
+			<artifactId>ecboot-api-common</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.juling.ecboot</groupId>
+			<artifactId>ecboot-service-shop</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>

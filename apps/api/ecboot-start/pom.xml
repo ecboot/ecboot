@@ -11,8 +11,13 @@
 	<groupId>org.juling.ecboot</groupId>
 	<artifactId>ecboot-start</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<!-- 分层禁令（enforcer 仅精确 GA 匹配，组级通配实测无效）：禁令 = 内部构件全集 − 白名单{ecboot-api-user、ecboot-api-shop、ecboot-api-admin}；矩阵见 specs/001-maven-module-deps/contracts/module-contracts.md -->
 	<properties>
-		<java.version>25</java.version>
+		<enforcer.banned.1>org.juling.ecboot:ecboot-common</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:ecboot-infra-core</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-service-user</enforcer.banned.3>
+		<enforcer.banned.4>org.juling.ecboot:ecboot-service-shop</enforcer.banned.4>
+		<enforcer.banned.5>org.juling.ecboot:ecboot-api-common</enforcer.banned.5>
 	</properties>
 	<dependencies>
 		<dependency>

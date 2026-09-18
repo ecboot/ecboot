@@ -14,15 +14,19 @@
 	<packaging>pom</packaging>
 	<properties>
 		<java.version>25</java.version>
-		<!-- 分层依赖强制（FR-001～004/007/008）：槽位属性供各模块覆写（enforcer 的单个
-		     exclude 不支持逗号分隔清单，实证 3.5.0），默认值不匹配任何构件；
-		     禁止清单契约见 specs/001-maven-module-deps/contracts/module-contracts.md -->
+		<!-- 分层依赖强制：槽位属性供各模块覆写（enforcer 单个 exclude 不支持逗号清单，实证 3.5.0；
+		     且 bannedDependencies 仅支持精确 groupId:artifactId 匹配——纯 groupId 与 :* 通配实测无效，实证 2026-09-18）。
+		     落地模式（扁平结构）：各模块 banned.1..8 = 逐 GA 列举禁令 = 内部构件全集 − 本模块白名单；
+		     新增模块须同步修订相关模块禁令与契约矩阵（specs/001-maven-module-deps/contracts/module-contracts.md）；
+		     默认值不匹配任何构件 -->
 		<enforcer.banned.1>org.juling.ecboot:__none__</enforcer.banned.1>
 		<enforcer.banned.2>org.juling.ecboot:__none__</enforcer.banned.2>
 		<enforcer.banned.3>org.juling.ecboot:__none__</enforcer.banned.3>
 		<enforcer.banned.4>org.juling.ecboot:__none__</enforcer.banned.4>
 		<enforcer.banned.5>org.juling.ecboot:__none__</enforcer.banned.5>
-		<enforcer.allowed.1>org.juling.ecboot:__none__</enforcer.allowed.1>
+		<enforcer.banned.6>org.juling.ecboot:__none__</enforcer.banned.6>
+		<enforcer.banned.7>org.juling.ecboot:__none__</enforcer.banned.7>
+		<enforcer.banned.8>org.juling.ecboot:__none__</enforcer.banned.8>
 	</properties>
 	<modules>
 		<module>ecboot-api-admin</module>
@@ -80,10 +84,10 @@
 											<exclude>${enforcer.banned.3}</exclude>
 											<exclude>${enforcer.banned.4}</exclude>
 											<exclude>${enforcer.banned.5}</exclude>
+											<exclude>${enforcer.banned.6}</exclude>
+											<exclude>${enforcer.banned.7}</exclude>
+											<exclude>${enforcer.banned.8}</exclude>
 										</excludes>
-										<includes>
-											<include>${enforcer.allowed.1}</include>
-										</includes>
 										<!-- 仅检查本 POM 声明的直接依赖：传递依赖属下游模块的契约责任，
 										     否则合规的 apps→services 接线会在 start 的传递图中被误禁 -->
 										<searchTransitive>false</searchTransitive>
