@@ -44,6 +44,7 @@
 | V26 | 运营与配置 | 地区限售（SPU 黑名单 JSON）/ 积分滚动过期 / `notify_template` / `operation_banner`+`operation_floor` | V19/V2 |
 | V27 | 休眠账户风控 | `user.last_login_at/last_active_at`（休眠分级依据）+ `risk_rule` 枚举扩位（5 休眠账户分级） | V1/V21 |
 | V28 | 分享归因 | `share_record` 表 + `trade_order` 归因双列与卖家备注 + `user.share_code` + `invite_record.reward_trigger` | V1/V6 |
+| V29 | 砍价/助力/分销规则 | 砍价 4 表 + 助力 3 表 + `trade_order.bargain_record_id` + `distribution_user.level`（自购返佣为规则级） | V6/V16 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -103,6 +104,14 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - **P1-⑦ 规格组合唯一**：`product_sku.specs_hash CHAR(64) AS (SHA2(specs,256)) STORED` + `UNIQUE(spu_id, specs_hash)`。**实证（2026-09-18）：MySQL JSON 存储层先规范化键序再参与生成列计算——键序不同的同组合同样被 1062 拒绝，属语义级唯一**（强于 V23 文件注释所述"依赖应用序列化稳定"，以本条为准）。
 - 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
 - **评审遗留（全部已决策，2026-09-18）**：~~拼团定价粒度~~→V24 SKU 级；~~佣金余额消费~~→V25；~~账号合并~~→登录时手机号优先归并（零 DDL，规则见 `ecboot-service-user/README.md`，不做迁移式合并）；~~地区限售~~→V26 SPU 黑名单；~~积分有效期~~→V26 滚动 12 个月（批次制为升级路径，触发条件：积分商城/兑换比例变化/财务审计要求）；~~通知模板~~→V26 `notify_template`（平台模板 ID + 参数契约建模）；~~运营位~~→V26 轻量两表。
+
+### 砍价/助力与分销规则（V29，产品决策落地）
+
+- **自购返佣（规则级，无 DDL）**：买家为通过审核的推广员时，**一级佣金受益人=本人**（"自买自省"），其关系链上级二级照常——与正常订单同构；自购仍不算自己的**归因**（归因与佣金是两层规则，防自刷）。
+- **推广员等级**：`distribution_user.level` 预留（V1 单一等级=1）；触发条件 **推广员 > 500 人**时启用多级比例，届时 `commission_rule` 加等级维度。
+- **砍价（bargain）**：三段式对齐拼团/秒杀——活动（时段）→ 场次商品（SKU 级 `original_price/floor_price/max_cut_count` + 玩法参数 JSON）→ 砍价单（`current_price` **条件更新防并发超砍**、超时扫描、`order_no` 唯一防重复成交）+ 帮砍（一人一刀，只追加）；成交价经订单项 price 快照，订单关联 `bargain_record_id`。
+- **助力（assist）**：通用任务模型——活动（奖励=券/积分 + 所需人数 + 次数限制）→ 参与（一人一活动 `UNIQUE(activity_id,user_id)`，完成态发奖幂等）→ 助力人（一人一助力）；奖励落地 `user_coupon`/`point_log`。
+- **防刷红线**：砍价/助力是被刷重灾区——帮砍/助力入口 MUST 挂风控（`risk_rule` 2 高频/3 异常领券/4 套利特征），IP/设备/新用户限制由应用层实施。
 
 ### 分享归因（V28，社交电商第二轮评审 P0）
 

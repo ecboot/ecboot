@@ -23,7 +23,7 @@ org.juling.ecboot.shop
 | 交易（核心） | 订单状态机（10/20/30/40/90）、**订单项+收货+运费快照**、下单幂等（request_token）、优惠三构成恒等式、超时取消（30min）/自动收货（7 天） | `trade_order`、`trade_order_item`、`trade_order_log` |
 | 支付 | 支付单（一单多尝试）、回调幂等（条件更新+渠道单号唯一+金额校验）、原文留档 | `pay_order`、`pay_callback_log` |
 | 售后 | 仅退款/退货退款状态机、按订单项粒度、退款渠道幂等（out_refund_no）、完成回补库存+联动佣金冲销（领域事件） | `after_sale_order` |
-| 促销 | 优惠券模板（防超发）、满减（多档位/范围关系表/先满减后券）、拼团（一团一单/超时解散）、秒杀（**活动库存分账**、条件更新不超卖） | `coupon`、`promotion_activity/ladder/scope`、`group_buy_*`、`flash_sale_*` |
+| 促销 | 优惠券模板（防超发）、满减（多档位/范围关系表/先满减后券）、拼团（一团一单/超时解散）、秒杀（**活动库存分账**、条件更新不超卖）、砍价（SKU 级价格区间/一人一刀/条件更新防超砍）、助力（通用任务：邀 N 人得券/积分，发奖幂等） | `coupon`、`promotion_activity/ladder/scope`、`group_buy_*`、`flash_sale_*`、`bargain_*`、`assist_*` |
 | 评价 | 一项一评、商品快照、追评/商家回复各一次、审核 | `product_review` |
 | 物流 | 物流公司字典维护（编码唯一/停用保留） | `logistics_company` |
 | 风控 | 规则与事件（黑名单/高频/套利特征）、申诉流转 | `risk_rule`、`risk_record` |
