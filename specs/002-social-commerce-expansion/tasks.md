@@ -106,9 +106,9 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景二⑤（`user_relation` 仅直接上级单列，结构上无法表达三级）+ 场景五 R2（`user_account.balance` 有符号）
 
-- [ ] T014 [US6] 编写 `.../db/migration/V16__distribution.sql`：8 表按 data-model P1/V16（`user_relation` 仅 `inviter_id` 单列+UNIQUE(user_id)；`commission_rule` UNIQUE(scope_type, scope_id)；`commission_record` 含冲销关联列与四态状态机；`user_account` 可负 balance+frozen；`account_log` 只追加含 balance_after；`withdraw_order` UNIQUE(withdraw_channel, channel_order_no)+六态状态机；`invite_record` UNIQUE(new_user_id)；`distribution_user`）
-- [ ] T015 [P] [US6] 编写 `docs/adr/0003-distribution-two-level-cap.md`：两级封顶决策（背景=禁止传销条例红线、决策=仅直接上级单列、被拒方案=多级路径表、后果=扩展层级须修宪级别评审），引用 spec SC-002 与 contracts 契约 R1
-- [ ] T016 [US6] 执行 V16 并跑场景二⑤结构审查 + 场景五 R2 可负断言，留证
+- [x] T014 [US6] 编写 `.../db/migration/V16__distribution.sql`：8 表按 data-model P1/V16（`user_relation` 仅 `inviter_id` 单列+UNIQUE(user_id)；`commission_rule` UNIQUE(scope_type, scope_id)；`commission_record` 含冲销关联列与四态状态机；`user_account` 可负 balance+frozen；`account_log` 只追加含 balance_after；`withdraw_order` UNIQUE(withdraw_channel, channel_order_no)+六态状态机；`invite_record` UNIQUE(new_user_id)；`distribution_user`）
+- [x] T015 [P] [US6] 编写 `docs/adr/0003-distribution-two-level-cap.md`：两级封顶决策（背景=禁止传销条例红线、决策=仅直接上级单列、被拒方案=多级路径表、后果=扩展层级须修宪级别评审），引用 spec SC-002 与 contracts 契约 R1
+- [x] T016 [US6] 执行 V16 并跑场景二⑤结构审查 + 场景五 R2 可负断言，留证
 
 ---
 
