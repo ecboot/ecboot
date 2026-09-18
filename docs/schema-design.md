@@ -45,6 +45,7 @@
 | V27 | 休眠账户风控 | `user.last_login_at/last_active_at`（休眠分级依据）+ `risk_rule` 枚举扩位（5 休眠账户分级） | V1/V21 |
 | V28 | 分享归因 | `share_record` 表 + `trade_order` 归因双列与卖家备注 + `user.share_code` + `invite_record.reward_trigger` | V1/V6 |
 | V29 | 砍价/助力/分销规则 | 砍价 4 表 + 助力 3 表 + `trade_order.bargain_record_id` + `distribution_user.level`（自购返佣为规则级） | V6/V16 |
+| V30 | 系统配置 | `system_config`（code 唯一）+ 6 条种子（等级阈值/归因窗口/订单超时/自动收货/结算保护期/余额消费开关）；停用回退代码默认值 | V16 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -108,7 +109,8 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 ### 砍价/助力与分销规则（V29，产品决策落地）
 
 - **自购返佣（规则级，无 DDL）**：买家为通过审核的推广员时，**一级佣金受益人=本人**（"自买自省"），其关系链上级二级照常——与正常订单同构；自购仍不算自己的**归因**（归因与佣金是两层规则，防自刷）。
-- **推广员等级**：`distribution_user.level` 预留（V1 单一等级=1）；触发条件 **推广员 > 500 人**时启用多级比例，届时 `commission_rule` 加等级维度。
+- **推广员等级**：`distribution_user.level` 预留（V1 单一等级=1）；启用阈值**可配置**——`system_config: distribution.level.threshold`（初始 500），届时 `commission_rule` 加等级维度。
+- **系统配置层（V30）**：运营参数统一收敛至 `system_config`（code 唯一、value+类型、启停）；**配置是覆盖层不是唯一真源**——status=0 或缺失时应用回退代码内置默认值，配置表故障不阻断业务。种子 6 项：等级阈值 500、归因窗口 7 天、订单超时 30 分钟、自动收货 7 天、佣金保护期 7 天、余额消费开关 true。
 - **砍价（bargain）**：三段式对齐拼团/秒杀——活动（时段）→ 场次商品（SKU 级 `original_price/floor_price/max_cut_count` + 玩法参数 JSON）→ 砍价单（`current_price` **条件更新防并发超砍**、超时扫描、`order_no` 唯一防重复成交）+ 帮砍（一人一刀，只追加）；成交价经订单项 price 快照，订单关联 `bargain_record_id`。
 - **助力（assist）**：通用任务模型——活动（奖励=券/积分 + 所需人数 + 次数限制）→ 参与（一人一活动 `UNIQUE(activity_id,user_id)`，完成态发奖幂等）→ 助力人（一人一助力）；奖励落地 `user_coupon`/`point_log`。
 - **防刷红线**：砍价/助力是被刷重灾区——帮砍/助力入口 MUST 挂风控（`risk_rule` 2 高频/3 异常领券/4 套利特征），IP/设备/新用户限制由应用层实施。
