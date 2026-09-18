@@ -62,8 +62,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景二②——同 order_item_id 二次插入报 ERROR 1062
 
-- [ ] T006 [P] [US2] 编写 `.../db/migration/V12__product_review.sql`：`product_review` 全字段（含快照列 `spu_name`/`sku_specs`，research D9；追评/回复各一次的承载列；`audit_status` 状态机注释）、`UNIQUE(order_item_id)`、`idx(spu_id, audit_status, created_at)`
-- [ ] T007 [US2] 执行 V12 并跑场景二②注入验证（1062 留证）
+- [x] T006 [P] [US2] 编写 `.../db/migration/V12__product_review.sql`：`product_review` 全字段（含快照列 `spu_name`/`sku_specs`，research D9；追评/回复各一次的承载列；`audit_status` 状态机注释）、`UNIQUE(order_item_id)`、`idx(spu_id, audit_status, created_at)`
+- [x] T007 [US2] 执行 V12 并跑场景二②注入验证（1062 留证）
 
 ---
 
