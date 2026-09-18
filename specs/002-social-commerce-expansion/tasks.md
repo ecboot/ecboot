@@ -73,8 +73,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景二①——重复收藏报 1062；足迹表无 deleted、含 idx(last_view_at)
 
-- [ ] T008 [P] [US3] 编写 `.../db/migration/V13__favorite_footprint.sql`：`user_favorite`（UNIQUE(user_id, spu_id)、软删）+ `user_footprint`（UNIQUE(user_id, spu_id)、`last_view_at`、无 deleted、`idx(last_view_at)`）
-- [ ] T009 [US3] 执行 V13 并跑场景二①验证（1062 留证）
+- [x] T008 [P] [US3] 编写 `.../db/migration/V13__favorite_footprint.sql`：`user_favorite`（UNIQUE(user_id, spu_id)、软删）+ `user_footprint`（UNIQUE(user_id, spu_id)、`last_view_at`、无 deleted、`idx(last_view_at)`）
+- [x] T009 [US3] 执行 V13 并跑场景二①验证（1062 留证）
 
 ---
 
@@ -84,8 +84,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: DESC 两表核对状态机枚举注释（10/20/30/40/50）与重试字段齐备
 
-- [ ] T010 [P] [US4] 编写 `.../db/migration/V14__notify.sql`：`notify_task`（channel/biz_type/template_code/params JSON/status 状态机/retry_count/next_retry_time，`idx(status, next_retry_time)`、`idx(user_id, created_at)`、`idx(biz_no)`）+ `user_message`（title/content/is_read，`idx(user_id, is_read, created_at)`）
-- [ ] T011 [US4] 执行 V14，`SHOW CREATE TABLE` 核对两表状态机注释与索引，留证
+- [x] T010 [P] [US4] 编写 `.../db/migration/V14__notify.sql`：`notify_task`（channel/biz_type/template_code/params JSON/status 状态机/retry_count/next_retry_time，`idx(status, next_retry_time)`、`idx(user_id, created_at)`、`idx(biz_no)`）+ `user_message`（title/content/is_read，`idx(user_id, is_read, created_at)`）
+- [x] T011 [US4] 执行 V14，`SHOW CREATE TABLE` 核对两表状态机注释与索引，留证
 
 ---
 
@@ -95,8 +95,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: 插入一启用一停用样例行，字典可用且停用保留
 
-- [ ] T012 [P] [US5] 编写 `.../db/migration/V15__logistics_company.sql`：`logistics_company`（`code VARCHAR(32) UNIQUE`、name、status、tracking_rule、软删）
-- [ ] T013 [US5] 执行 V15 并插入两条样例（启用/停用各一）验证，留证
+- [x] T012 [P] [US5] 编写 `.../db/migration/V15__logistics_company.sql`：`logistics_company`（`code VARCHAR(32) UNIQUE`、name、status、tracking_rule、软删）
+- [x] T013 [US5] 执行 V15 并插入两条样例（启用/停用各一）验证，留证
 
 ---
 
