@@ -140,8 +140,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: `point_account.balance` 有符号；`user.level` 可空；trade_order 新增 point_amount/point_used 带默认值
 
-- [ ] T021 [US9] 编写 `.../db/migration/V19__point_level.sql`：`point_account`（balance INT 有符号、UNIQUE(user_id)）+ `point_log`（biz_type 五态、balance_after、idx(user_id, id)）+ `user_level_rule`（UNIQUE(growth_threshold)、benefits JSON）+ `ALTER user ADD growth_value INT UNSIGNED DEFAULT 0 / level TINYINT NULL` + `ALTER trade_order ADD point_amount DECIMAL(10,2) NOT NULL DEFAULT 0 / point_used INT UNSIGNED NOT NULL DEFAULT 0` + `ALTER trade_order_item ADD point_amount DECIMAL(10,2) NOT NULL DEFAULT 0`
-- [ ] T022 [US9] 执行 V19，DESC 断言可负/可空/默认值三类列形态，留证
+- [x] T021 [US9] 编写 `.../db/migration/V19__point_level.sql`：`point_account`（balance INT 有符号、UNIQUE(user_id)）+ `point_log`（biz_type 五态、balance_after、idx(user_id, id)）+ `user_level_rule`（UNIQUE(growth_threshold)、benefits JSON）+ `ALTER user ADD growth_value INT UNSIGNED DEFAULT 0 / level TINYINT NULL` + `ALTER trade_order ADD point_amount DECIMAL(10,2) NOT NULL DEFAULT 0 / point_used INT UNSIGNED NOT NULL DEFAULT 0` + `ALTER trade_order_item ADD point_amount DECIMAL(10,2) NOT NULL DEFAULT 0`
+- [x] T022 [US9] 执行 V19，DESC 断言可负/可空/默认值三类列形态，留证
 
 ---
 
@@ -151,8 +151,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景二④（同活动同门槛 1062）+ 场景三恒等式校验（需 V19 已执行）
 
-- [ ] T023 [US10] 编写 `.../db/migration/V20__full_reduction.sql`：`promotion_activity`、`promotion_activity_ladder`（UNIQUE(activity_id, threshold_amount)）、`promotion_activity_scope`（scope_type 1全场/2分类/3商品、target_id NULL=全场、UNIQUE 三元组、`idx(scope_type, target_id)`）+ `ALTER trade_order ADD coupon_amount / full_reduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0 / promotion_activity_id BIGINT NULL` + `ALTER trade_order_item ADD coupon_amount / full_reduction_amount`
-- [ ] T024 [US10] 执行 V20，跑场景二④；随后按 quickstart 场景三手工 INSERT 样例订单并执行恒等式校验 SQL（依赖 T021 的 point 列），两断言留证
+- [x] T023 [US10] 编写 `.../db/migration/V20__full_reduction.sql`：`promotion_activity`、`promotion_activity_ladder`（UNIQUE(activity_id, threshold_amount)）、`promotion_activity_scope`（scope_type 1全场/2分类/3商品、target_id NULL=全场、UNIQUE 三元组、`idx(scope_type, target_id)`）+ `ALTER trade_order ADD coupon_amount / full_reduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0 / promotion_activity_id BIGINT NULL` + `ALTER trade_order_item ADD coupon_amount / full_reduction_amount`
+- [x] T024 [US10] 执行 V20，跑场景二④；随后按 quickstart 场景三手工 INSERT 样例订单并执行恒等式校验 SQL（依赖 T021 的 point 列），两断言留证
 
 ---
 
@@ -162,16 +162,16 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: `risk_record` 含 object_type 多态关联与 appeal_status 申诉四态
 
-- [ ] T025 [P] [US11] 编写 `.../db/migration/V21__risk_control.sql`：`risk_rule`（rule_type 四类、condition_expr、action、软删）+ `risk_record`（只追加；rule_id、object_type/object_no、action、appeal_status 0-3、`idx(user_id, created_at)`、`idx(object_no)`）
-- [ ] T026 [US11] 执行 V21，SHOW CREATE TABLE 核对申诉枚举与双索引，留证
+- [x] T025 [P] [US11] 编写 `.../db/migration/V21__risk_control.sql`：`risk_rule`（rule_type 四类、condition_expr、action、软删）+ `risk_record`（只追加；rule_id、object_type/object_no、action、appeal_status 0-3、`idx(user_id, created_at)`、`idx(object_no)`）
+- [x] T026 [US11] 执行 V21，SHOW CREATE TABLE 核对申诉枚举与双索引，留证
 
 ---
 
 ## Phase 14: Polish & Cross-Cutting Concerns
 
-- [ ] T027 完成文档同步三件套（契约 §5 逐项勾验）：`docs/schema-design.md` 按域增补决策/索引说明、文件清单扩至 V21、表总数 26→54；`CONTEXT.md` 增补 15 个术语（清单见契约 §5）；确认 `docs/adr/0003` 已在 ADR 索引可发现
-- [ ] T028 全量回归：全新空库重放 V1~V21，跑 quickstart 场景一（flyway 21 行 success=1、业务表 54）与场景三恒等式终验，输出留证
-- [ ] T029 收尾：`git status` 全量核对交付物（11 迁移 + 3 文档 + tasks/spec 系列），验证输出归档至特性目录，按宪法准备中文 Conventional Commits 分批提交（迁移与文档分批，如 `feat: 新增P0闭环域数据库迁移V11-V15`）
+- [x] T027 完成文档同步三件套（契约 §5 逐项勾验）：`docs/schema-design.md` 按域增补决策/索引说明、文件清单扩至 V21、表总数 26→54；`CONTEXT.md` 增补 15 个术语（清单见契约 §5）；确认 `docs/adr/0003` 已在 ADR 索引可发现
+- [x] T028 全量回归：全新空库重放 V1~V21，跑 quickstart 场景一（flyway 21 行 success=1、业务表 54）与场景三恒等式终验，输出留证
+- [x] T029 收尾：`git status` 全量核对交付物（11 迁移 + 3 文档 + tasks/spec 系列），验证输出归档至特性目录，按宪法准备中文 Conventional Commits 分批提交（迁移与文档分批，如 `feat: 新增P0闭环域数据库迁移V11-V15`）
 
 ---
 

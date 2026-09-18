@@ -40,6 +40,19 @@
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
+**域设计要点**（详细字段与状态机见 `specs/002-social-commerce-expansion/data-model.md`）：
+
+- **隐私安全（V11）**：`user.phone` 密文 + `phone_hash` 唯一盲索引，仅完整手机号精确检索（个保法最小化）；登录日志只追加。
+- **评价（V12）**：`UNIQUE(order_item_id)` 一项一评；商品快照列（spu_name/sku_specs）让评价不随商品软删漂移。
+- **收藏/足迹（V13）**：`(user_id, spu_id)` 双唯一；足迹 90 天物理清理（`idx(last_view_at)`）。
+- **通知（V14）**：一渠道一行 + 重试上限终态；站内信兜底必达。
+- **分销（V16）**：关系链仅 `inviter_id` 单列两级封顶（ADR-0003）；佣金基数=订单项实付；账户可负；提现渠道单号唯一幂等。
+- **拼团（V17）/秒杀（V18）**：完全复用订单/库存模型——团价/秒杀价走订单项快照；秒杀活动库存分账（`stock_count/sold_count` + CHECK），取消回补活动侧。
+- **积分/满减（V19/V20）**：双账本（积分可负消耗、成长值只增）；订单优惠三构成恒等式 `promotion_amount ≡ coupon_amount + full_reduction_amount + point_amount`（头/项两层成立，尾差记末行）；满减范围用关系表支撑热路径命中查询。
+- **风控（V21）**：规则与事件分离，事件多态关联业务对象、申诉四态；**站内搜索零建表**（商品既有结构足够）。
+
+表总数：**54**（V1~V10 基线 26 + V11~V21 新增 28）；`user`/`trade_order`/`trade_order_item` 为增列改造。
+
 ## 全局约定
 
 - **引擎/字符集**：InnoDB，`utf8mb4` / `utf8mb4_0900_ai_ci`。
