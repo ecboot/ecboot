@@ -46,6 +46,7 @@
 | V28 | 分享归因 | `share_record` 表 + `trade_order` 归因双列与卖家备注 + `user.share_code` + `invite_record.reward_trigger` | V1/V6 |
 | V29 | 砍价/助力/分销规则 | 砍价 4 表 + 助力 3 表 + `trade_order.bargain_record_id` + `distribution_user.level`（自购返佣为规则级） | V6/V16 |
 | V30 | 系统配置 | `system_config`（code 唯一）+ 6 条种子（等级阈值/归因窗口/订单超时/自动收货/结算保护期/余额消费开关）；停用回退代码默认值 | V16 |
+| V31 | 店铺体系 | `merchant`（管钱）/`seller`（管交易）/`shop`（管门面）三表 + 自营种子行 + 商品/订单/售后/运费注入 `seller_id` 维度（默认 1=自营） | V2/V5/V6/V8 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -105,6 +106,22 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - **P1-⑦ 规格组合唯一**：`product_sku.specs_hash CHAR(64) AS (SHA2(specs,256)) STORED` + `UNIQUE(spu_id, specs_hash)`。**实证（2026-09-18）：MySQL JSON 存储层先规范化键序再参与生成列计算——键序不同的同组合同样被 1062 拒绝，属语义级唯一**（强于 V23 文件注释所述"依赖应用序列化稳定"，以本条为准）。
 - 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
 - **评审遗留（全部已决策，2026-09-18）**：~~拼团定价粒度~~→V24 SKU 级；~~佣金余额消费~~→V25；~~账号合并~~→登录时手机号优先归并（零 DDL，规则见 `ecboot-service-user/README.md`，不做迁移式合并）；~~地区限售~~→V26 SPU 黑名单；~~积分有效期~~→V26 滚动 12 个月（批次制为升级路径，触发条件：积分商城/兑换比例变化/财务审计要求）；~~通知模板~~→V26 `notify_template`（平台模板 ID + 参数契约建模）；~~运营位~~→V26 轻量两表。
+
+### 店铺体系（V31，预留式多商家，产品决策落地）
+
+**统一语言三分**（详见 `CONTEXT.md`，三词不可互换）：
+
+| 概念 | 职责 | 表 | V1 |
+|---|---|---|---|
+| 商户 Merchant | **管钱**：结算/资质主体（支付商户号、进件、分账） | `merchant` | 自营种子行 |
+| 商家 Seller | **管交易**：商品/订单/售后的归属方 | `seller` | 自营种子行 |
+| 店铺 Shop | **管门面**：C 端店铺页/装修/公告/客服 | `shop` | 自营旗舰店种子行 |
+
+- 关系 **1:1:1 三视角**（V1 自营单主体）；`seller.merchant_id` / `shop.seller_id` 关系列就位，多商家开放时可放宽。
+- **维度注入一律指向 seller**（交易归属）：`product_spu`/`trade_order`/`after_sale_order`/`freight_template` 的 `seller_id NOT NULL DEFAULT 1`——既有业务零感知。
+- V1 不拆单（全自营）；多商家上线时购物车按商家分组结算。
+- 商家商品**参与分销**：`commission_rule` 按分类/商品粒度天然支持按商家差异化。
+- B 形态演进清单（届时再建）：入驻审核流、保证金、`seller_user` 商家端账号、平台-商家分账结算、店铺级装修配置、商家自营销。
 
 ### 砍价/助力与分销规则（V29，产品决策落地）
 

@@ -16,6 +16,7 @@ org.juling.ecboot.shop
 
 | 功能域 | 内容 | 对应表 |
 |---|---|---|
+| 店铺体系（预留式多商家） | **商户 Merchant**（管钱：结算/资质/支付商户号）、**商家 Seller**（管交易：商品/订单/售后归属）、**店铺 Shop**（管门面：装修/公告/客服）；V1 自营三视角各一行，`seller_id` 维度已注入商品/订单/售后/运费 | `merchant`、`seller`、`shop`（V31） |
 | 商品目录 | 三级分类树、品牌、SPU（规格定义 JSON/图集/上下架）、SKU（规格快照/两级上下架） | `product_category/brand/spu/sku` |
 | 库存 | **三段式锁定模型**（下单锁/支付核销/取消释放/售后回补，条件更新防超卖，ADR-0001）、全量流水与对账 | `inventory`、`inventory_log` |
 | 运费 | 运费模板（按件/按重、省份差异化、满额包邮）、下单快照 | `freight_template`、`freight_rule` |
