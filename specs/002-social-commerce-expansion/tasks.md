@@ -118,8 +118,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景二③（同团同用户 1062）+ 普通订单零影响（可空列、既有索引未变）
 
-- [ ] T017 [US7] 编写 `.../db/migration/V17__group_buy.sql`：`group_buy_activity`（group_price/group_size/时段/per_limit）、`group_buy_team`（状态机 1/2/3、`idx(status, expire_time)`）、`group_buy_team_member`（UNIQUE(team_id, user_id) + UNIQUE(order_no)）、`ALTER TABLE trade_order ADD group_buy_team_id BIGINT NULL + KEY idx_group_team`
-- [ ] T018 [US7] 执行 V17 并跑场景二③ + 零影响断言（`SHOW COLUMNS trade_order LIKE 'group_buy_team_id'` 可空），留证
+- [x] T017 [US7] 编写 `.../db/migration/V17__group_buy.sql`：`group_buy_activity`（group_price/group_size/时段/per_limit）、`group_buy_team`（状态机 1/2/3、`idx(status, expire_time)`）、`group_buy_team_member`（UNIQUE(team_id, user_id) + UNIQUE(order_no)）、`ALTER TABLE trade_order ADD group_buy_team_id BIGINT NULL + KEY idx_group_team`
+- [x] T018 [US7] 执行 V17 并跑场景二③ + 零影响断言（`SHOW COLUMNS trade_order LIKE 'group_buy_team_id'` 可空），留证
 
 ---
 
@@ -129,8 +129,8 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 
 **Independent Test**: quickstart 场景五 R4——stock_count/sold_count 在 flash_sale_item，与 inventory 零耦合
 
-- [ ] T019 [P] [US8] 编写 `.../db/migration/V18__flash_sale.sql`：`flash_sale_activity`（时段/状态）+ `flash_sale_item`（flash_price DECIMAL(10,2)、stock_count/sold_count、per_limit、UNIQUE(activity_id, sku_id)、`idx(sku_id)`）；文件尾注释活动库存条件更新语义（同构 ADR-0001）
-- [ ] T020 [US8] 执行 V18 并跑场景五 R4 分账断言，留证
+- [x] T019 [P] [US8] 编写 `.../db/migration/V18__flash_sale.sql`：`flash_sale_activity`（时段/状态）+ `flash_sale_item`（flash_price DECIMAL(10,2)、stock_count/sold_count、per_limit、UNIQUE(activity_id, sku_id)、`idx(sku_id)`）；文件尾注释活动库存条件更新语义（同构 ADR-0001）
+- [x] T020 [US8] 执行 V18 并跑场景五 R4 分账断言，留证
 
 ---
 
