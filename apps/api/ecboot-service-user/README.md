@@ -24,7 +24,7 @@ org.juling.ecboot.user
 | 成长值与等级 | 成长值只增不减、等级门槛判定与权益（双账本分离） | `user.growth_value/level`、`user_level_rule` |
 | 优惠券持有 | 领券（防超发）、核销/退回、可用性查询（模板在 shop 域） | `user_coupon` |
 | 消息中心 | 站内信必达、通知任务多渠道投递（重试上限）、订阅偏好 | `user_message`、`notify_task` |
-| 分销（合规核心） | **两级封顶关系链**（结构强制，ADR-0003）、推广员资质、佣金计提与冲销、账户（可负）、提现（渠道单号幂等）、邀请激励 | `user_relation`、`distribution_user`、`commission_rule/record`、`user_account`、`account_log`、`withdraw_order`、`invite_record` |
+| 分销（合规核心） | **两级封顶关系链**（结构强制，ADR-0003）、**分享归因**（分享>关系链>自然流量三级佣金判定，窗口默认 7 天）、推广员资质、佣金计提与冲销、账户（可负）、提现（渠道单号幂等）、邀请激励（注册/首单双时机） | `user_relation`、`share_record`、`distribution_user`、`commission_rule/record`、`user_account`、`account_log`、`withdraw_order`、`invite_record` |
 
 ## 职责边界
 

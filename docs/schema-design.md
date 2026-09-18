@@ -43,6 +43,7 @@
 | V25 | 余额消费 | 订单头/项 `account_amount` 抵扣列 + 账户流水枚举扩位（资金语义=用户资产消耗，非优惠） | V23 |
 | V26 | 运营与配置 | 地区限售（SPU 黑名单 JSON）/ 积分滚动过期 / `notify_template` / `operation_banner`+`operation_floor` | V19/V2 |
 | V27 | 休眠账户风控 | `user.last_login_at/last_active_at`（休眠分级依据）+ `risk_rule` 枚举扩位（5 休眠账户分级） | V1/V21 |
+| V28 | 分享归因 | `share_record` 表 + `trade_order` 归因双列与卖家备注 + `user.share_code` + `invite_record.reward_trigger` | V1/V6 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -102,6 +103,21 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - **P1-⑦ 规格组合唯一**：`product_sku.specs_hash CHAR(64) AS (SHA2(specs,256)) STORED` + `UNIQUE(spu_id, specs_hash)`。**实证（2026-09-18）：MySQL JSON 存储层先规范化键序再参与生成列计算——键序不同的同组合同样被 1062 拒绝，属语义级唯一**（强于 V23 文件注释所述"依赖应用序列化稳定"，以本条为准）。
 - 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
 - **评审遗留（全部已决策，2026-09-18）**：~~拼团定价粒度~~→V24 SKU 级；~~佣金余额消费~~→V25；~~账号合并~~→登录时手机号优先归并（零 DDL，规则见 `ecboot-service-user/README.md`，不做迁移式合并）；~~地区限售~~→V26 SPU 黑名单；~~积分有效期~~→V26 滚动 12 个月（批次制为升级路径，触发条件：积分商城/兑换比例变化/财务审计要求）；~~通知模板~~→V26 `notify_template`（平台模板 ID + 参数契约建模）；~~运营位~~→V26 轻量两表。
+
+### 分享归因（V28，社交电商第二轮评审 P0）
+
+**归因模型（佣金计提三级判定，回答"这笔订单是谁带来的"）**：
+
+| 优先级 | 类型 | 规则 |
+|---|---|---|
+| 1 | 分享归因 | 订单来自 `share_record` 分享触点（默认窗口 **7 天**，应用配置化）→ 归因人 = 分享人，**谁分享谁受益** |
+| 2 | 关系链兜底 | 无归因时按 `user_relation` 两级计佣 |
+| 3 | 自然流量 | 均无 → 不计佣 |
+
+- `trade_order.attributed_user_id` + `attribution_type`（1分享/2关系链/3自然）落订单；`user.share_code`（唯一）承载海报/口令；`share_record` 只追加，是归因判定入口与分享行为分析源。
+- **自购不算自己的归因**（防自刷）；自购返佣为独立计提规则，产品决策挂账（推广员自购按一级返本人？）。
+- 首单激励：`invite_record.reward_trigger`（1 注册即发 / 2 首单后发，防刷主流形态）。
+- 附带：`trade_order.seller_remark`（客服/仓库内部备注，买家不可见）。
 
 ### 休眠账户风控（V27，产品决策落地）
 
