@@ -1,82 +1,27 @@
-# AGENTS.md
+<!--VITE PLUS START-->
 
-Guidance for AI coding agents working in this repository.
+# Using Vite+, the Unified Toolchain for the Web
 
-## Agent Rules
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
 
-- Generate commit message in chinese.
-- Commit messages follow Conventional Commits style, e.g. `feat: 新增用户登录`, `chore: 升级依赖`.
+Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
 
-## Project Overview
+## Built-in Commands vs Scripts
 
-ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffold stage: a Java 25 / Spring Boot 4.1.1 backend plus three independent frontend apps. Most backend modules are empty placeholder POMs describing a planned layering; only `start/` contains runnable code.
+`vp <name>` runs a built-in command. `vp run <name>` runs a `package.json` script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so `vp dev` and `vp run dev` may do different things. Check `package.json` and `vite.config.ts` first, and run `vp run <name>` when the project defines a script or task with that name.
 
-## Repository Layout
+## Tool Versions
 
-- `start/` — the single runnable Spring Boot application (`EcbootApplication`). Its parent is `spring-boot-starter-parent` directly, so it builds standalone.
-- `infrastructure/` — `ecboot-common`, `ecboot-infra-core`: shared libraries (placeholder POMs).
-- `services/` — domain service modules: `ecboot-service-user`, `ecboot-service-shop` (placeholder POMs).
-- `apps/` — channel API modules: `ecboot-api-user`, `ecboot-api-shop`, `ecboot-api-admin`, `ecboot-api-common` (placeholder POMs).
-- `dependencies/` — `ecboot-dependencies` BOM placeholder.
-- `frontend/` — `ecboot-web` (storefront), `ecboot-admin` (admin console), `ecboot-mobile` (cross-platform mini-program app).
-- `.specify/` — Spec Kit scaffolding (spec-driven development via the `speckit-*` skills); the constitution at `.specify/memory/constitution.md` is still an unfilled template.
-- `scripts/codegen.sh` — empty placeholder for future code generation.
+Run `vp toolchain` to show versions and relationships in the active Vite+
+release. Add a tool name to select part of the graph. For example, run
+`vp toolchain vite`. Use `--global` to ignore the local `vite-plus` package. Use
+`vp why <package>` to show the package-manager dependency graph.
 
-## Commands
+## Review Checklist
 
-### Backend
+- [ ] Run `vp install` after pulling remote changes and before getting started.
+- [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
+- [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
+- [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
-The root `pom.xml` (`ecboot-parent`) is the aggregator + parent (inherits `spring-boot-starter-parent`). **All builds run from the repo root** — single-module builds fail because the BOM in `dependencies/` is resolved from the reactor:
-
-```bash
-./mvnw clean package -DskipTests      # full reactor build
-./mvnw test -pl start -am             # tests for the runnable app (+ its module deps)
-./mvnw spring-boot:run -pl start -am  # run the app (auto-starts compose.yaml services; needs Docker)
-```
-
-Dependency rules are enforced by maven-enforcer at the `validate` phase — violations fail the build:
-
-- Layer direction: `start → apps → services → infrastructure`; `ecboot-api-common` must not depend on `services/*`; cycles fail at build time.
-- Version arbitration: third-party/framework versions are declared ONLY in `dependencies/pom.xml` (`spring-boot.version` property + BOM imports); plugin versions ONLY in the root `pluginManagement`. Business module POMs carry zero version numbers.
-- Per-module ban lists: slot properties `enforcer.banned.1..5` (+ `enforcer.allowed.1` exception), defined per module, defaults in the root POM. A single `<exclude>` does NOT support comma-separated lists.
-
-Local infrastructure is defined in `compose.yaml`: MySQL (db `mydatabase`, user `myuser`/`secret`), Redis, Elasticsearch 9.3.3 (security disabled). Start manually with `docker compose up -d`.
-
-### Frontend
-
-`ecboot-web` and `ecboot-admin` (TanStack Start + React 19 + Tailwind CSS 4 + Vite 8):
-
-```bash
-cd frontend/ecboot-web   # or ecboot-admin
-npm install
-npm run dev              # vite dev server on port 3000 — BOTH projects use 3000; change one if running both
-npm run generate-routes  # regenerate src/routeTree.gen.ts (tsr generate)
-npm run build
-```
-
-`ecboot-mobile` (uni-app, Vue 3):
-
-```bash
-cd frontend/ecboot-mobile
-npm run dev:h5           # H5 dev server
-npm run dev:mp-weixin    # WeChat mini-program dev build
-npm run build:mp-weixin  # WeChat mini-program production build
-npm run type-check       # vue-tsc --noEmit
-```
-
-npm is the package manager (`package-lock.json` committed, no workspace config — each frontend is independent).
-
-## Architecture
-
-### Backend (layering, enforced)
-
-The modules form a modular monolith: `infrastructure/*` (shared libs) ← `services/*` (domain: user, shop) ← `apps/*` (API per channel: user, shop, admin, plus `api-common`) — assembled by `start/` into one deployable. The dependency wiring IS implemented and enforced (see Backend commands above).
-
-The `start/` stack: WebMVC, Security, JPA + Flyway (MySQL), Redis, Elasticsearch, Quartz, Mail, WebSocket, RestClient, Validation, Actuator. Build-time extras: Lombok + `spring-boot-configuration-processor` annotation processors, Hibernate bytecode enhancement, GraalVM native plugin. Spring Boot 4 uses per-tech test starters (e.g. `spring-boot-starter-webmvc-test`).
-
-`start/src/main/resources/application.yaml` is nearly empty (`spring.application.name: ecboot`) — runtime configuration is still to be defined.
-
-### Frontends
-
-- **web / admin**: TanStack Start (full-stack React framework with SSR) using file-based routing — routes live in `src/routes/`, and the router config in `src/router.tsx` consumes the generated `src/routeTree.gen.ts`. Never hand-edit `routeTree.gen.ts`; add route files and regenerate. Imports use the `#/*` alias which maps to `./src/*` (defined in each `package.json` `imports` field).
-- **mobile**: uni-app — one Vue 3 codebase targeting WeChat/Alipay/etc. mini-programs, H5, and native apps. Pages are registered in `src/pages.json`; app-level config in `src/manifest.json`. Platform selection happens entirely through npm scripts (`dev:mp-*` / `build:mp-*`).
+<!--VITE PLUS END-->
