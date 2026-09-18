@@ -38,6 +38,7 @@
 | V20 | 满减 | `promotion_activity`、`promotion_activity_ladder`、`promotion_activity_scope` + 订单增列 | V2/V6/V9 |
 | V21 | 风控 | `risk_rule`、`risk_record` | V1 |
 | V22 | 评审修复 | 满减全场行唯一性加固（生成列归一键）+ 关联列索引补齐 | V20 |
+| V23 | 业务评审修复 | 地址区划码 / 售后数量 / 秒杀关联 / 包邮例外 / 关系链锁定 / 规格组合唯一 / 枚举扩位 | V22 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -86,6 +87,17 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - **佣金防重复计佣**：由应用层承担（冲销负记录需要同键多行，数据库唯一键不可表达——契约 R5）。
 - **关系链校验义务**：两级封顶是结构强制的"层级"约束；自邀（user_id=inviter_id）与 A↔B 互环需应用层拒绝（契约 R6）。
 - V22 补齐关联列索引：`trade_order.promotion_activity_id`、`product_review.order_no`+`sku_id`、`user_message.biz_no`、`group_buy_team.leader_user_id`、`commission_record` 冲销双列、`user_footprint.spu_id`。
+
+### 业务评审修订（V23，PM+技术双视角评审）
+
+- **P0-① 地址区划代码**：`user_address` 增 `province_code/city_code/district_code CHAR(6)`（名称=展示快照、代码=匹配口径）——修复运费 `region_codes` 按代码匹配而地址只有名称的断裂。
+- **P0-② 售后数量**：`after_sale_order.quantity`（默认 1）——买 3 退 1 的退款摊算/库存回补/佣金冲销依据。
+- **P0-③ 秒杀关联**：`trade_order_item.flash_sale_item_id`（可空+索引）——限购校验与秒杀订单识别的数据落点。
+- **P1-④ 包邮区域例外**：`freight_template.free_exclude_codes JSON`（不参与满额包邮的省份）。
+- **P1-⑤ 关系链锁定**：`user_relation.locked/lock_time`——绑定窗口（保护期可换绑、期满锁定）的承载；换绑=UPDATE 本行，`UNIQUE(user_id)` 不受影响。
+- **P1-⑦ 规格组合唯一**：`product_sku.specs_hash CHAR(64) AS (SHA2(specs,256)) STORED` + `UNIQUE(spu_id, specs_hash)`。**实证（2026-09-18）：MySQL JSON 存储层先规范化键序再参与生成列计算——键序不同的同组合同样被 1062 拒绝，属语义级唯一**（强于 V23 文件注释所述"依赖应用序列化稳定"，以本条为准）。
+- 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
+- **评审遗留（待产品决策）**：拼团定价粒度（SPU 级单值 vs SKU 级，与秒杀不一致）；佣金余额是否可消费；账号合并流程；地区限售；积分有效期；通知模板表；运营位。
 
 ## 全局约定
 
