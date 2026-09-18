@@ -1,3 +1,9 @@
 spring:
   application:
     name: ecboot
+  datasource:
+    url: jdbc:mysql://localhost:13306/mydatabase?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: myuser
+    password: secret
+  flyway:
+    enabled: true
