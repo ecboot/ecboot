@@ -172,6 +172,7 @@ description: "Task list for 社交电商能力扩展——数据库 Schema 设�
 - [x] T027 完成文档同步三件套（契约 §5 逐项勾验）：`docs/schema-design.md` 按域增补决策/索引说明、文件清单扩至 V21、表总数 26→54；`CONTEXT.md` 增补 15 个术语（清单见契约 §5）；确认 `docs/adr/0003` 已在 ADR 索引可发现
 - [x] T028 全量回归：全新空库重放 V1~V21，跑 quickstart 场景一（flyway 21 行 success=1、业务表 54）与场景三恒等式终验，输出留证
 - [x] T029 收尾：`git status` 全量核对交付物（11 迁移 + 3 文档 + tasks/spec 系列），验证输出归档至特性目录，按宪法准备中文 Conventional Commits 分批提交（迁移与文档分批，如 `feat: 新增P0闭环域数据库迁移V11-V15`）
+- [x] T030 评审修复（b141db4 评审，0 Critical / 6 Important / 8 Minor）：新增 `V22__review_fixes.sql`（满减全场行唯一性生成列加固 + 关联列索引补齐）；quickstart 场景三 SQL 别名修复（WHERE→HAVING）；注销匿名化规则落 schema-design（墓碑哈希）并调和 ADR-0002 范围注记；V11 存量环境 runbook + contracts 硬性前置；拼团名额释放/收藏复活/恒等式增量边界声明；contracts 增 R5（佣金计佣幂等应用层）/R6（关系链环校验）；data-model 回写 reversal_of_id/frozen_after 与 level 依据；新增 ADR 索引页 `docs/adr/README.md`；V14/V15 头注释 FR 错号以 data-model 勘误为准（已应用迁移不可回改，Flyway checksum）
 
 ---
 

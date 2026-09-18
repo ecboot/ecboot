@@ -46,3 +46,9 @@ head_violations=0  item_violations=0  pay_violations=0
 ## 首轮重放的教训（留档）
 
 shell glob `V*.sql` 为字典序（V1, V10, …, V19, V2, V20…），V17/V19/V20 曾因先于 V6 执行而 ALTER 失败——**人工批量执行迁移必须 `sort -V`**；Flyway 自身无此问题。
+
+## 评审修复验证（V22，b141db4 评审后追加）
+
+- `mvnw test` → **BUILD SUCCESS**；flyway version=22 success=1
+- 满减全场行唯一性（评审 I2）：同活动插入第二条 `scope_type=1, target_id=NULL` 行 → **ERROR 1062**（生成列 `target_id_norm` 归一键拒绝）
+- 索引补齐抽查：`trade_order.idx_promotion_activity`、`commission_record.idx_reversal_of` 均存在（SHOW INDEX）

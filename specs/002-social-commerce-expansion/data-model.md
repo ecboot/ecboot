@@ -43,10 +43,10 @@
 - **user_relation**：`user_id BIGINT UNIQUE`（一人一条关系，FR-010）、`inviter_id BIGINT NOT NULL idx`、`bind_channel TINYINT 1分享链接 2邀请码`、`bind_time DATETIME`。**仅直接上级单列——结构上无法表达三级**（法规红线）。
 - **distribution_user**：`user_id UNIQUE`、`status TINYINT 1待审核 2通过 3冻结`、`apply_time`/`audit_time`、`deleted`。
 - **commission_rule**：`scope_type TINYINT 1分类 2商品`、`scope_id BIGINT`、`level1_rate DECIMAL(5,2)`、`level2_rate DECIMAL(5,2)`（百分数，0-100）、`status`、`deleted`；`UNIQUE(scope_type, scope_id)`；命中优先级 商品>分类（应用层）。
-- **commission_record**：`order_no VARCHAR(32) idx`、`order_item_id`、`beneficiary_user_id idx(user_id, status)`、`level TINYINT 1/2`、`base_amount DECIMAL(10,2)`（=订单项实付）、`rate DECIMAL(5,2)`、`amount DECIMAL(10,2)`、`status TINYINT 1待结算 2已结算 3已失效 4欠款冲销中`、`settle_time DATETIME`、`reversal_record_id BIGINT NULL`（冲销关联原记录）。
+- **commission_record**：`order_no VARCHAR(32) idx`、`order_item_id`、`beneficiary_user_id idx(user_id, status)`、`level TINYINT 1/2`、`base_amount DECIMAL(10,2)`（=订单项实付）、`rate DECIMAL(5,2)`、`amount DECIMAL(10,2)`、`status TINYINT 1待结算 2已结算 3已失效 4欠款冲销中`、`settle_time DATETIME`、`reversal_record_id BIGINT NULL`（原记录侧：被哪条冲销记录回指）+ `reversal_of_id BIGINT NULL`（冲销记录侧：冲销的原记录ID；双向关联，V22 补 idx）。
   - 状态机：1→2（确认收货+7 天保护期满）；1→3（保护期退款）；2→4（结算后退款，产生冲销负记录）。
 - **user_account**：`user_id UNIQUE`、`balance DECIMAL(10,2) NOT NULL DEFAULT 0`（**可负**——欠款抵扣）、`frozen DECIMAL(10,2) NOT NULL DEFAULT 0`（提现冻结）。
-- **account_log**（只追加）：`user_id idx(user_id, id)`、`biz_type TINYINT 1佣金入账 2提现冻结 3提现完成 4提现回退 5冲销`、`amount DECIMAL(10,2)`（有符号）、`balance_after DECIMAL(10,2)`、`biz_no VARCHAR(32)`（关联 commission_record/withdraw_order）。
+- **account_log**（只追加）：`user_id idx(user_id, id)`、`biz_type TINYINT 1佣金入账 2提现冻结 3提现完成 4提现回退 5冲销`、`amount DECIMAL(10,2)`（有符号）、`balance_after DECIMAL(10,2)` + `frozen_after DECIMAL(10,2)`（余额/冻结双快照，对账用）、`biz_no VARCHAR(32)`（关联 commission_record/withdraw_order）。
 - **withdraw_order**：`withdraw_no VARCHAR(32) UNIQUE`、`user_id idx`、`amount DECIMAL(10,2)`、`withdraw_channel TINYINT 1微信商家转账`、`channel_order_no VARCHAR(64) NULL`、`UNIQUE(withdraw_channel, channel_order_no)`（幂等键，D11）、`status TINYINT 10待审核 20审核通过 30打款中 40成功 50审核拒绝 60打款失败已回退`、`audit_time`/`pay_time`/`fail_reason`。
   - 状态机：10→20/50；20→30（冻结余额）；30→40（解冻扣减，条件更新 `WHERE status=30`）/60（解冻回退）。
 - **invite_record**：`new_user_id BIGINT UNIQUE`（一人仅被激励一次，FR-014）、`inviter_id idx`、`reward_type TINYINT 1优惠券`、`reward_ref BIGINT`（如 user_coupon.id）、`status TINYINT 1已发放`。
@@ -71,7 +71,7 @@
 - **point_account**：`user_id UNIQUE`、`balance INT NOT NULL DEFAULT 0`（**可负**——回退欠款，FR-017）。
 - **point_log**（只追加）：`user_id idx(user_id, id)`、`biz_type TINYINT 1签到 2消费获得 3下单消耗 4退款回退 5分享获得`、`points INT`（有符号）、`balance_after INT`、`order_no VARCHAR(32)`。
 - **user_level_rule**：`name VARCHAR(32)`、`growth_threshold INT UNSIGNED UNIQUE`（门槛唯一递增，FR-019）、`benefits JSON`（权益配置）、`status`、`deleted`。
-- **user 增列**：`growth_value INT UNSIGNED NOT NULL DEFAULT 0`（只增不减）、`level TINYINT NULL`（未启等级为 NULL）。
+- **user 增列**：`growth_value INT UNSIGNED NOT NULL DEFAULT 0`（只增不减）、`level TINYINT NULL`（未启等级为 NULL；存 `user_level_rule.id`，TINYINT 为有意取舍——等级数现实上限远低于 127，占位最小化）。
 - **trade_order 增列**：`point_amount DECIMAL(10,2) NOT NULL DEFAULT 0`、`point_used INT UNSIGNED NOT NULL DEFAULT 0`。
 - **trade_order_item 增列**：`point_amount DECIMAL(10,2) NOT NULL DEFAULT 0`（行分摊）。
 
@@ -118,3 +118,10 @@ withdraw_order 1─N account_log；flash_sale_activity 1─N flash_sale_item
 | group_buy_team.status | 1拼团中→2已成团（人齐）/3已解散（超时，联动订单取消退款） |
 | product_review.audit_status | 0待审→1通过/2驳回 |
 | risk_record.appeal_status | 0无→1申诉中→2通过/3驳回 |
+
+## 评审修订（V22，b141db4 评审后）
+
+- `promotion_activity_scope` 增生成列 `target_id_norm = IFNULL(target_id,0) STORED`，唯一键改为 `(activity_id, scope_type, target_id_norm)`——"每活动至多一条全场行"由数据库强制（原三元组键对 NULL 放行）。
+- 关联列索引补齐：`trade_order.promotion_activity_id`、`product_review.order_no`+`sku_id`、`user_message.biz_no`、`group_buy_team.leader_user_id`、`commission_record.reversal_record_id`/`reversal_of_id`、`user_footprint.spu_id`。
+- 边界声明（恒等式仅约束增量订单、拼团名额释放编排、收藏复活语义、佣金计佣幂等 R5、关系链环/自邀 R6）移至 `docs/schema-design.md` §评审修复与边界声明及 contracts §3。
+- 磁勘误：`V14__notify.sql` 头注释"FR-012"应为 FR-008、`V15__logistics_company.sql`"FR-015"应为 FR-009——已应用迁移文件不可回改（Flyway checksum），以本勘误为准。

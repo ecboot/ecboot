@@ -64,7 +64,7 @@ SELECT order_no,
        coupon_amount + full_reduction_amount + point_amount AS detail_sum,
        promotion_amount
 FROM trade_order
-WHERE detail_sum <> promotion_amount;   -- 预期：空结果集（恒等成立）
+HAVING detail_sum <> promotion_amount;   -- 预期：空结果集（恒等成立；MySQL WHERE 不可引用别名，故用 HAVING）
 SELECT order_id,
        SUM(coupon_amount) c, SUM(full_reduction_amount) f, SUM(point_amount) p
 FROM trade_order_item GROUP BY order_id

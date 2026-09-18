@@ -37,6 +37,7 @@
 | V19 | 积分等级 | `point_account`、`point_log`、`user_level_rule` + `user`/`trade_order`/`trade_order_item` 增列 | V1/V6 |
 | V20 | 满减 | `promotion_activity`、`promotion_activity_ladder`、`promotion_activity_scope` + 订单增列 | V2/V6/V9 |
 | V21 | 风控 | `risk_rule`、`risk_record` | V1 |
+| V22 | 评审修复 | 满减全场行唯一性加固（生成列归一键）+ 关联列索引补齐 | V20 |
 
 执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
 
@@ -53,13 +54,46 @@
 
 表总数：**54**（V1~V10 基线 26 + V11~V21 新增 28）；`user`/`trade_order`/`trade_order_item` 为增列改造。
 
+### 注销匿名化规则（FR-003 / 合规红线 2）
+
+注销 = 校验无进行中订单/售后/提现、佣金余额处理完毕 → 二次确认 → 匿名化落库：
+
+| 列 | 处理 |
+|---|---|
+| `nickname` / `avatar` | 置 `'已注销用户'` / `''` |
+| `phone` | 密文替换为占位密文（不再参与登录检索） |
+| `phone_hash` | 墓碑值 `SHA256('deleted:' + user_id)`（确定性、全局唯一、不可反推原号）→ **原手机号可重新注册** |
+| `password_hash` / `wx_openid` | 置 NULL（`uk_wx_openid` 唯一索引允许多 NULL） |
+| 交易数据（订单/佣金/流水/日志） | **一律保留**（单据不可删，ADR-0002） |
+
+墓碑唯一性由 `uk_phone_hash` 承载：反复注销/注册产生含 user_id 的不同墓碑，永不冲突。与 ADR-0002"严格唯一"的关系见该 ADR 的范围注记（普通软删≠注销）。
+
+### V11 在存量数据环境的执行顺序（runbook，评审 I1）
+
+V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证）。任何含明文手机号存量的环境**必须**按序执行：
+
+1. 应用侧密文化任务：逐行生成 `phone` 密文与加盐 `phone_hash`（应用管理的影子流程，不在迁移链内）；
+2. 前置自检通过：库内不存在未密文化的 `user` 行；
+3. 执行 V11——其 `ADD COLUMN phone_hash NOT NULL`（无默认值）在未完成步骤 1-2 的非空表上会以隐式空串回填并在建唯一索引时**失败**，这是有意的防呆：迁移失败 = 前置未满足，环境被拒绝而非被污染。
+
+（如未来需要无损形态，另起影子列三段式迁移；当前无此需求。）
+
+### 评审修复与边界声明（V22）
+
+- **恒等式仅约束增量订单**：V19/V20 之前创建的订单（`promotion_amount>0` 而三构成列=0）天然违反恒等式；数据巡检须按 V19 应用时间过滤增量。
+- **拼团名额释放编排**：成员订单在待付款阶段取消（用户/超时）→ **物理删除团员行 + `member_count` 同事务递减**；留痕由 `trade_order_log` 承载，参团历史可经订单反查。支付后取消属售后域，不释放名额。
+- **收藏复活语义**：取消收藏（软删）后再次收藏 = 复活原行（`deleted` 置 0），援引 ADR-0002 严格唯一，不产生第二行。
+- **佣金防重复计佣**：由应用层承担（冲销负记录需要同键多行，数据库唯一键不可表达——契约 R5）。
+- **关系链校验义务**：两级封顶是结构强制的"层级"约束；自邀（user_id=inviter_id）与 A↔B 互环需应用层拒绝（契约 R6）。
+- V22 补齐关联列索引：`trade_order.promotion_activity_id`、`product_review.order_no`+`sku_id`、`user_message.biz_no`、`group_buy_team.leader_user_id`、`commission_record` 冲销双列、`user_footprint.spu_id`。
+
 ## 全局约定
 
 - **引擎/字符集**：InnoDB，`utf8mb4` / `utf8mb4_0900_ai_ci`。
 - **主键**：`id BIGINT UNSIGNED AUTO_INCREMENT`（库存表例外：以 `sku_id` 为主键）。业务单号（`order_no`/`pay_no`/`after_sale_no`）独立生成、加唯一约束，为分库分表预留路由空间。
 - **命名**：`领域前缀_snake_case`（如 `trade_order`、`pay_order`），规避 `order`/`user` 等关键字歧义。
 - **时间**：`created_at` / `updated_at` 由数据库默认值维护；日志类表只有 `created_at`，只追加不修改。
-- **软删除**：只有主数据（用户、地址、商品、分类、品牌、运费模板、优惠券、后台账号/角色/权限）有 `deleted TINYINT(0/1)`（MyBatis Plus `@TableLogic`）。**交易单据与审计日志永不删除**——取消是状态迁移，不是删除。
+- **软删除**：只有主数据（用户、地址、商品、分类、品牌、运费模板、优惠券、后台账号/角色/权限，以及 V11~V21 新增的物流公司、推广员、佣金规则、拼团活动、秒杀活动、等级规则、满减活动、风控规则、收藏）有 `deleted TINYINT(0/1)`（MyBatis Plus `@TableLogic`）；`product_review` 带软删属例外定位（用户内容，用户可删自己的评价）。**交易单据与审计日志永不删除**——取消是状态迁移，不是删除。
 - **外键**：不建物理外键（分库演进友好、减少写入开销与死锁面），关联完整性由服务层事务 + 索引保证；关联列一律建索引。
 - **金额与币种**：金额全部 `DECIMAL(10,2)`；币种 `currency CHAR(3)`（ISO 4217），落在资金头表（`trade_order`/`pay_order`/`after_sale_order`），明细继承头表；**优惠券仅 CNY**（多币种抵扣涉及汇率折算，明确不支持）。**禁止 float/double 存金额；应用层统一 `BigDecimal`，比较用 `compareTo`，禁止 `equals`/`==`**（已写入根 `AGENTS.md`，对所有 AI 会话生效）。
 - **枚举**：`TINYINT` + 注释穷举取值，应用层常量/枚举类映射（MP `@EnumValue`）。
