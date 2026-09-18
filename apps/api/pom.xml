@@ -27,12 +27,14 @@
 		<enforcer.banned.6>org.juling.ecboot:__none__</enforcer.banned.6>
 		<enforcer.banned.7>org.juling.ecboot:__none__</enforcer.banned.7>
 		<enforcer.banned.8>org.juling.ecboot:__none__</enforcer.banned.8>
+		<enforcer.banned.9>org.juling.ecboot:__none__</enforcer.banned.9>
 	</properties>
 	<modules>
 		<module>ecboot-api-admin</module>
 		<module>ecboot-api-common</module>
 		<module>ecboot-api-shop</module>
 		<module>ecboot-api-user</module>
+		<module>ecboot-api-webmvc</module>
 		<module>ecboot-common</module>
 		<module>ecboot-dependencies</module>
 		<module>ecboot-infra-core</module>
@@ -87,6 +89,7 @@
 											<exclude>${enforcer.banned.6}</exclude>
 											<exclude>${enforcer.banned.7}</exclude>
 											<exclude>${enforcer.banned.8}</exclude>
+											<exclude>${enforcer.banned.9}</exclude>
 										</excludes>
 										<!-- 仅检查本 POM 声明的直接依赖：传递依赖属下游模块的契约责任，
 										     否则合规的 apps→services 接线会在 start 的传递图中被误禁 -->

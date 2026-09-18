@@ -18,7 +18,8 @@
 		<enforcer.banned.5>org.juling.ecboot:ecboot-api-user</enforcer.banned.5>
 		<enforcer.banned.6>org.juling.ecboot:ecboot-api-shop</enforcer.banned.6>
 		<enforcer.banned.7>org.juling.ecboot:ecboot-api-admin</enforcer.banned.7>
-		<enforcer.banned.8>org.juling.ecboot:ecboot-start</enforcer.banned.8>
+		<enforcer.banned.8>org.juling.ecboot:ecboot-api-webmvc</enforcer.banned.8>
+		<enforcer.banned.9>org.juling.ecboot:ecboot-start</enforcer.banned.9>
 	</properties>
 	<dependencies>
 		<!-- 通用 DTO/响应对象最小闭集，不引任何运行时容器 -->

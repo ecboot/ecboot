@@ -17,7 +17,8 @@
 		<enforcer.banned.4>org.juling.ecboot:ecboot-api-user</enforcer.banned.4>
 		<enforcer.banned.5>org.juling.ecboot:ecboot-api-shop</enforcer.banned.5>
 		<enforcer.banned.6>org.juling.ecboot:ecboot-api-admin</enforcer.banned.6>
-		<enforcer.banned.7>org.juling.ecboot:ecboot-start</enforcer.banned.7>
+		<enforcer.banned.7>org.juling.ecboot:ecboot-api-webmvc</enforcer.banned.7>
+		<enforcer.banned.8>org.juling.ecboot:ecboot-start</enforcer.banned.8>
 	</properties>
 	<dependencies>
 		<!-- 技术组件容器基座（Redis/ES/序列化等自动配置后续在此扩展） -->

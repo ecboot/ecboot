@@ -9,16 +9,17 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<artifactId>ecboot-api-shop</artifactId>
-	<!-- 分层禁令（enforcer 仅精确 GA 匹配，组级通配实测无效）：禁令 = 内部构件全集 − 白名单{ecboot-api-common、ecboot-service-user、ecboot-service-shop、ecboot-common、ecboot-infra-core}；矩阵见 specs/001-maven-module-deps/contracts/module-contracts.md -->
+	<!-- 商城渠道（小程序前台）：商品/购物/交易 REST API；四渠道互不编译依赖 -->
 	<properties>
-		<enforcer.banned.1>org.juling.ecboot:ecboot-api-user</enforcer.banned.1>
-		<enforcer.banned.2>org.juling.ecboot:ecboot-api-admin</enforcer.banned.2>
-		<enforcer.banned.3>org.juling.ecboot:ecboot-start</enforcer.banned.3>
+		<enforcer.banned.1>org.juling.ecboot:ecboot-api-common</enforcer.banned.1>
+		<enforcer.banned.2>org.juling.ecboot:ecboot-api-user</enforcer.banned.2>
+		<enforcer.banned.3>org.juling.ecboot:ecboot-api-admin</enforcer.banned.3>
+		<enforcer.banned.4>org.juling.ecboot:ecboot-start</enforcer.banned.4>
 	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.juling.ecboot</groupId>
-			<artifactId>ecboot-api-common</artifactId>
+			<artifactId>ecboot-api-webmvc</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

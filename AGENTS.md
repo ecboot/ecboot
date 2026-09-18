@@ -50,7 +50,7 @@ ECBOOT is an e-commerce platform monorepo (`org.juling.ecboot`) in early scaffol
 
 - `apps/api/` — the Java backend. `apps/api/pom.xml` (`ecboot-parent`) is the Maven aggregator + parent (inherits `spring-boot-starter-parent`); modules are flat beneath it:
   - `ecboot-start` — the single runnable Spring Boot application (`EcbootApplication`); depends on the three channel API modules.
-  - `ecboot-api-user` / `ecboot-api-shop` / `ecboot-api-admin` / `ecboot-api-common` — channel API modules (empty `src/` skeletons).
+  - Channel API modules (all siblings, mutually isolated): `ecboot-api-user` (mini-program member center), `ecboot-api-shop` (mini-program storefront), `ecboot-api-admin` (admin console), `ecboot-api-common` (public APIs: SMS / image captcha), plus `ecboot-api-webmvc` — the shared web foundation (unified response/exception handling) all four depend on.
   - `ecboot-service-user` / `ecboot-service-shop` — domain services (placeholder POMs).
   - `ecboot-common` / `ecboot-infra-core` — shared libraries (placeholder POMs).
   - `ecboot-dependencies` — BOM; the single version-arbitration point.

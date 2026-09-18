@@ -103,3 +103,25 @@
   api-user/shop=api-common+对应 service+starter-test(test)；api-admin=api-common+双 service+test；
   start=依赖清单不变（12 starter + flyway-mysql + mysql 驱动 + devtools/docker-compose + lombok + test starters）。
 - 模块 POM 不再冗余声明 `java.version`（继承父级）。
+
+## 矩阵修订 v2（2026-09-18，渠道重定位与 Web 基座）
+
+用户澄清后的现行权威矩阵（内部构件全集 10）：
+
+- **渠道定位**：`ecboot-api-common`=公共 API 渠道（短信/图形验证码等 REST API）；
+  `ecboot-api-user`=小程序前台·会员中心；`ecboot-api-shop`=小程序前台·商城；
+  `ecboot-api-admin`=管理后台。四者**同级渠道、互不编译依赖**
+  （需要发码等能力时复用 infra-core 组件，不依赖 api-common 渠道；运行时四渠道并存于同一进程）。
+- **新增 `ecboot-api-webmvc`（Web 基座）**：四渠道共同依赖的 web 基础——统一响应/异常/通用配置；
+  纯技术基座，白名单={common, infra-core}，禁全部领域服务与渠道；技术依赖=webmvc、validation。
+- **start 四渠道全装配**（user/shop/admin/common——api-common 是 REST API 渠道，不装配则公共 API 不存在）；
+  白名单={四渠道}，service/infra/common/webmvc 直连禁入。
+- 白名单：common=∅；infra-core={common}；service-*={common,infra-core}（兄弟互禁）；
+  api-webmvc={common,infra-core}；api-common={api-webmvc,common,infra-core}；
+  api-user/shop={api-webmvc,service-*,common,infra-core}；api-admin 同左；start={四渠道}。
+- **依赖源变更**：三业务渠道与 api-common 的 web 基础（webmvc/validation/统一响应）一律经 `ecboot-api-webmvc`
+  传递，不再直接声明 web starter。
+- **services 演进预告**：`ecboot-service-*` 下一步按领域拆分、内部 DDD 分层实现
+  （interfaces/application/domain/infrastructure 分包）——模块边界与对外契约不变。
+- 注入实证（2026-09-18）：api-webmvc←service-user、api-user←api-common 均
+  `banned via the exclude/include list` 拦截。
