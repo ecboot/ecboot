@@ -1,6 +1,7 @@
 // Package routes 路由注册：四渠道分组（契约见 specs/004-api-surface/contracts/）。
-// 鉴权级别按组承载——Auth 中间件当前为占位（认证实现在 003/后续特性），
-// 其白名单语义：公开路径直通，会员组校验 Bearer，管理组校验凭证+权限点。
+// 中间件链：TraceId → Recovery → AccessLog → Response（统一三段式包装与错误映射）。
+// 鉴权级别按组承载——Auth 中间件白名单直通公开路径；会员组校验 Bearer（003 实现真实校验）；
+// 管理组校验凭证+权限点（后台特性落地）。
 package routes
 
 import (
@@ -18,8 +19,10 @@ import (
 func RouterGroup(s *ghttp.Server) {
 	// 根组：全局中间件 + 健康探针
 	s.Group("/", func(group *ghttp.RouterGroup) {
+		group.Middleware(middleware.TraceId)
+		group.Middleware(middleware.Recovery)
 		group.Middleware(middleware.AccessLog)
-		group.Middleware(ghttp.MiddlewareHandlerResponse)
+		group.Middleware(middleware.Response)
 		group.GET("/health", healthHandler)
 
 		// 公共渠道（全部公开：验证码/门店/探针/分享上报）
