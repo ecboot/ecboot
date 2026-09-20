@@ -94,6 +94,17 @@ func TestAuthFlow(t *testing.T) {
 		t.Assert(out3.IsNew, false)
 		t.Assert(out3.UserId, out.UserId)
 
+		// ---- ⑨ 休眠分级: 拨表 91 天 → 微信静默路径被拒（FR-013） ----
+		_, _ = g.DB().Exec(ctx, "UPDATE `user` SET last_active_at=DATE_SUB(NOW(), INTERVAL 91 DAY) WHERE id=?", out.UserId)
+		_, err = WxLogin(ctx, "dev001", "", "", 1) // openid 已绑定, 静默登录
+		t.Assert(err != nil, true)
+		t.Assert(errCode(err) == 10001 || errCode(err) == 10002, true) // 拒绝并引导短信通道
+
+		// 短信码通道 = 完整核验, 放行
+		out4, err := smsLoginReplay(ctx, phone)
+		t.AssertNil(err)
+		t.Assert(out4.UserId, out.UserId)
+
 		// 清理测试数据
 		_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE id=?", out.UserId)
 		_, _ = g.DB().Exec(ctx, "DELETE FROM user_login_log WHERE user_id=?", out.UserId)
