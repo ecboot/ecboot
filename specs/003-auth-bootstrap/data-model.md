@@ -1,8 +1,8 @@
-# Data Model: 认证引导纵切片（Phase 1，Go 版）
+# Data Model: 认证引导纵切片（Phase 1）
 
 **表结构零变更**——数据形态 = 既有表的读写（经 gf gen dao）+ Redis 键模型 + 1 个配置种子迁移。
 
-## 一、Redis 键模型（gredis，与 Java 版设计一致）
+## 一、Redis 键模型（gredis）
 
 | 键 | 值 | TTL | 语义 |
 |---|---|---|---|
@@ -21,7 +21,7 @@
 - `internal/service/user/repo.go` 在 dao 之上做领域封装：`FindByPhoneHash` / `FindByOpenid` / `CreateLogin`（密文+哈希+share_code 生成）/`TouchLoginTimes`（last_login_at/last_active_at）/`AppendLoginLog`。
 - **明文手机号只存在于请求结构体与内存**：进入 repo 前必经 `PhoneCipher`（密文+哈希），entity 字段即库列（无明文字段）。
 
-## 三、状态与规则（service/user/auth.go 决策树，语义同 Java 版）
+## 三、状态与规则（service 层决策树）
 
 **注册即登录**：短信码 GETDEL 校验通过 → `phone_hash` 查询 → 命中：status 校验（禁用→20003）+ 休眠分级（`last_active_at` ≥ 阈值 → 强制完整核验，本切片短信码登录天然满足；微信静默路径被拒引导手机号通道）→ 更新时间戳+写日志+发 token；未命中：创建（密文/哈希/渠道/share_code）→ 即登录。
 

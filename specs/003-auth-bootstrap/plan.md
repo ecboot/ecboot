@@ -2,8 +2,6 @@
 
 **Branch**: `003-auth-bootstrap` | **Date**: 2026-09-20 | **Spec**: [spec.md](./spec.md)
 
-> 技术栈变更（宪法 2.0.0）：本 plan 为 Go + GoFrame v2 版本，替代 2026-09-18 的 Java 版技术方案（业务 spec 不变）。
-
 ## Summary
 
 打通首个业务纵切片（Go 版）：统一响应/全局异常基座（common+web）→ 图形/短信验证码组件（infra，短信 mock）→ 验证码端点（api/commonc）→ 手机号注册即登录/微信归并/休眠核身（service/user + api/user）→ 会话凭证（opaque token + gredis）。**新迁移仅 1 个**（000032：7 条 system_config 种子），70 表结构零变更。
@@ -24,7 +22,7 @@
 
 **Performance Goals**: 登录链路三接口 p95 < 500ms（本地容器口径）
 
-**Constraints**: depguard 分层矩阵（.golangci.yml）；手机号库内零明文；阈值全走 `system_config`（30 分钟生效）；B2C 严守（无 seller 交互面）；生成物勿手改
+**Constraints**: 分层方向遵循工程既有 GoFrame 结构（api 定义 → controller → service → repository/dao）；手机号库内零明文；阈值全走 `system_config`（30 分钟生效）；B2C 定位（无商户/商家概念）；生成物勿手改
 
 **Scale/Scope**: 新增约 25 个 Go 文件、8 端点、1 个迁移；六个 internal 包首次落业务代码
 
@@ -34,12 +32,12 @@
 
 | 原则/约束（2.0.0） | 结论 | 依据 |
 |---|---|---|
-| I 模块化单体 | ✅ | 全部落位既有 internal 包；分层方向/渠道互禁/兄弟互禁由 depguard 机器强制（矩阵已配置） |
+| I 模块化单体 | ✅ | 全部落位既有 GoFrame 分层包；分层方向遵循工程约定（api 定义 → controller → service → repository/dao） |
 | II 统一技术栈 | ✅ | Go+GoFrame 栈内组件（gdb/gredis/gtest）；唯一新依赖 `golang.org/x/image`（半官方，验证码字体）已说明用途 |
 | III 中文优先 | ✅ | 文档/注释中文；标识符英文 |
 | IV 可验证交付 | ✅ | `make test`/`make build`/`make lint` 为证；dao/model 生成物勿手改；quickstart 可复制命令 |
 | V 简单优先 | ✅ | 70 表零变更（仅 1 配置种子迁移）；opaque token 而非 JWT；会话/验证码收敛 gredis |
-| 工程约束 | ✅ | 迁移位置/格式合规；多商户预留（B2C 严守）：用户域无 seller 交互面（显式声明） |
+| 工程约束 | ✅ | 迁移位置/格式合规；B2C + 多门店定位：用户域无门店/商户交互面（显式声明） |
 
 **Phase 1 复查**：✅ research/data-model/contracts/quickstart 无越界。
 
@@ -54,30 +52,20 @@ specs/003-auth-bootstrap/{plan,research,data-model,quickstart}.md, contracts/api
 ### Source Code (apps/server)
 
 ```text
+api/
+├── common/v1/captcha.go      验证码接口定义（image/verify/sms + mock 取码，条件注册）
+└── user/v1/auth.go           登录接口定义（sms-login/wx-login/logout/me）
 internal/
-├── common/           api.go(Response/错误码) exception.go paging.go
-├── infra/
-│   ├── captcha/      service.go(生成/校验/频控) image.go(自绘) ticket.go
-│   ├── sms/          sender.go(接口) mock_sender.go
-│   ├── security/     phone_cipher.go(AES-GCM+盐哈希) session.go(token/续期/登出) keys.go
-│   └── config/       sysconfig.go(system_config 读取,缓存≤30min)
-├── web/
-│   ├── response.go   统一响应写出
-│   ├── exception.go  全局恢复/错误映射中间件
-│   ├── traceid.go    追踪号中间件
-│   └── auth.go       Bearer 认证中间件 + CurrentUser 上下文注入
-├── api/
-│   ├── commonc/captcha_handler.go   (+mock 取码路由,条件注册)
-│   └── user/auth_handler.go
-├── service/user/
-│   ├── auth.go       应用服务(注册即登录/归并/休眠核身决策树)
-│   ├── wx.go         WxClient 接口 + mock 实现(配置开关)
-│   └── repo.go       仓储(gf gen dao 之上的领域封装)
-main.go                路由装配 + 中间件挂载
+├── controller/{common,user}  控制器（参数绑定→service 调用→响应组装）
+├── service/user              业务接口 + 实现（注册即登录/微信归并/休眠核身决策树；WxClient mock）
+├── repository/               数据访问封装（gf gen dao 之上）
+├── middleware/               认证（Bearer token 校验/续期）与统一响应/恢复
+├── library/                  技术组件（验证码/短信 mock/手机号加密/会话）实现时定
+└── {app,bootstrap,routes,...} 既有装配
 migrations/000032_auth_config.up.sql   7 条 system_config 种子
 ```
 
-**Structure Decision**: 领域逻辑集中 `service/user`（DDD 细分随域成长展开）；渠道 handler 只做参数绑定与组装；跨包依赖经接口（WxClient 在领域内定义，mock 同包）。
+**Structure Decision**: 遵循工程既有 GoFrame 分层（api 定义 / controller / service / repository）；业务逻辑集中 service/user，控制器薄组装；跨包依赖经接口（WxClient 在领域内定义，mock 同包）。
 
 ## Complexity Tracking
 

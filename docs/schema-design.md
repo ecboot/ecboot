@@ -1,24 +1,24 @@
 # ECBOOT 数据库 Schema 设计（MVP v1）
 
 社交电商平台第一版数据库设计。目标规模：初期 1 万用户、日订单 500。
-技术栈：Go + GoFrame v2（宪法 2.0.0，2026-09-20 自 Java/Spring 迁移——业务代码为零窗口期的资产平移）+ MySQL 8.4 + Redis + **golang-migrate**。
+技术栈：Go + GoFrame v2（宪法 2.1.0）+ MySQL 8.4 + Redis + **golang-migrate**。
 
-迁移脚本位于 `apps/server/migrations/`（golang-migrate 格式 `NNNNNN_name.up/down.sql`）。历史 Flyway 命名 `V{n}__{name}.sql` 已一次性转换为 `{n:06}_{name}.up.sql`（语义零变更，序号一一对应；空库全量重放 31 个迁移全部成功）；本文各表的"V 编号"即对应序号。**迁移为纯前进式**（down 仅占位，恢复以备份重放为准）。
+迁移脚本位于 `apps/server/migrations/`（golang-migrate 格式 `NNNNNN_name.up/down.sql`，000001~000031；空库全量重放验证通过）。本文各表的"V 编号"为叙述简称，即迁移文件序号。**迁移为纯前进式**（down 仅占位，恢复以备份重放为准）。
 
 ## 文件清单
 
 | 文件 | 领域 | 表 |
 |---|---|---|
-| `V1__user_domain.sql` | 用户 | `user`、`user_address` |
-| `V2__product_domain.sql` | 商品 | `product_category`、`product_brand`、`product_spu`、`product_sku` |
-| `V3__inventory_domain.sql` | 库存 | `inventory`、`inventory_log` |
-| `V4__cart_domain.sql` | 购物车 | `cart_item` |
-| `V5__freight_domain.sql` | 运费 | `freight_template`、`freight_rule` |
-| `V6__order_domain.sql` | 订单 | `trade_order`、`trade_order_item`、`trade_order_log` |
-| `V7__payment_domain.sql` | 支付 | `pay_order`、`pay_callback_log` |
-| `V8__after_sale_domain.sql` | 售后 | `after_sale_order` |
-| `V9__promotion_domain.sql` | 促销 | `coupon`、`user_coupon` |
-| `V10__admin_domain.sql` | 后台 | `admin_user`、`admin_role`、`admin_user_role`、`admin_permission`、`admin_role_permission`、`admin_login_log`、`admin_operation_log` |
+| `000001_user_domain.up.sql` | 用户 | `user`、`user_address` |
+| `000002_product_domain.up.sql` | 商品 | `product_category`、`product_brand`、`product_spu`、`product_sku` |
+| `000003_inventory_domain.up.sql` | 库存 | `inventory`、`inventory_log` |
+| `000004_cart_domain.up.sql` | 购物车 | `cart_item` |
+| `000005_freight_domain.up.sql` | 运费 | `freight_template`、`freight_rule` |
+| `000006_order_domain.up.sql` | 订单 | `trade_order`、`trade_order_item`、`trade_order_log` |
+| `000007_payment_domain.up.sql` | 支付 | `pay_order`、`pay_callback_log` |
+| `000008_after_sale_domain.up.sql` | 售后 | `after_sale_order` |
+| `000009_promotion_domain.up.sql` | 促销 | `coupon`、`user_coupon` |
+| `00010_admin_domain.up.sql` | 后台 | `admin_user`、`admin_role`、`admin_user_role`、`admin_permission`、`admin_role_permission`、`admin_login_log`、`admin_operation_log` |
 
 共 26 张表。
 
@@ -46,11 +46,9 @@
 | V28 | 分享归因 | `share_record` 表 + `trade_order` 归因双列与卖家备注 + `user.share_code` + `invite_record.reward_trigger` | V1/V6 |
 | V29 | 砍价/助力/分销规则 | 砍价 4 表 + 助力 3 表 + `trade_order.bargain_record_id` + `distribution_user.level`（自购返佣为规则级） | V6/V16 |
 | V30 | 系统配置 | `system_config`（code 唯一）+ 6 条种子（等级阈值/归因窗口/订单超时/自动收货/结算保护期/余额消费开关）；停用回退代码默认值 | V16 |
-| V31 | 店铺体系 | `merchant`（管钱）/`seller`（管交易）/`shop`（管门面）三表 + 自营种子行 + 商品/订单/售后/运费注入 `seller_id` 维度（默认 1=自营） | V2/V5/V6/V8 |
+| V31 | 门店体系 | `store`（线下门店：自提/核销/附近门店；B2C 多门店定位） | — |
 
-执行契约与唯一性清单见 `specs/002-social-commerce-expansion/contracts/schema-contracts.md`。
-
-**域设计要点**（详细字段与状态机见 `specs/002-social-commerce-expansion/data-model.md`）：
+**域设计要点**：
 
 - **隐私安全（V11）**：`user.phone` 密文 + `phone_hash` 唯一盲索引，仅完整手机号精确检索（个保法最小化）；登录日志只追加。
 - **评价（V12）**：`UNIQUE(order_item_id)` 一项一评；商品快照列（spu_name/sku_specs）让评价不随商品软删漂移。
@@ -61,7 +59,7 @@
 - **积分/满减（V19/V20）**：双账本（积分可负消耗、成长值只增）；订单优惠三构成恒等式 `promotion_amount ≡ coupon_amount + full_reduction_amount + point_amount`（头/项两层成立，尾差记末行）；满减范围用关系表支撑热路径命中查询。
 - **风控（V21）**：规则与事件分离，事件多态关联业务对象、申诉四态；**站内搜索零建表**（商品既有结构足够）。
 
-表总数勘误（2026-09-20）：此前滚动计数漏算 V24 的 `group_buy_item`，**正确总数 70**（golang-migrate 空库重放实测与逐表清单双重确认）；`user`/`trade_order`/`trade_order_item` 为增列改造。
+表总数勘误（2026-09-20）：此前滚动计数漏算 V24 的 `group_buy_item`，**当前总数 68**（2026-09-20 定位收敛为 B2C+多门店：移除 merchant/seller/shop 三表，新增 store；空库重放实测确认）；`user`/`trade_order`/`trade_order_item` 为增列改造。
 
 ### 注销匿名化规则（FR-003 / 合规红线 2）
 
@@ -107,21 +105,11 @@ V11 假定 `user` 为空表或已密文化（脚手架期即空库，已验证�
 - 附：`point_log.biz_type` 枚举扩位（6 评价获得 / 7 注册赠送 / 8 邀请奖励）。
 - **评审遗留（全部已决策，2026-09-18）**：~~拼团定价粒度~~→V24 SKU 级；~~佣金余额消费~~→V25；~~账号合并~~→登录时手机号优先归并（零 DDL，规则见 `ecboot-service-user/README.md`，不做迁移式合并）；~~地区限售~~→V26 SPU 黑名单；~~积分有效期~~→V26 滚动 12 个月（批次制为升级路径，触发条件：积分商城/兑换比例变化/财务审计要求）；~~通知模板~~→V26 `notify_template`（平台模板 ID + 参数契约建模）；~~运营位~~→V26 轻量两表。
 
-### 店铺体系（V31，预留式多商家，产品决策落地）
+### 门店体系（V31，B2C + 多门店，产品定档 2026-09-20）
 
-**统一语言三分**（详见 `CONTEXT.md`，三词不可互换）：
-
-| 概念 | 职责 | 表 | V1 |
-|---|---|---|---|
-| 商户 Merchant | **管钱**：结算/资质主体（支付商户号、进件、分账） | `merchant` | 自营种子行 |
-| 商家 Seller | **管交易**：商品/订单/售后的归属方 | `seller` | 自营种子行 |
-| 店铺 Shop | **管门面**：C 端店铺页/装修/公告/客服 | `shop` | 自营旗舰店种子行 |
-
-- 关系 **1:1:1 三视角**（V1 自营单主体）；`seller.merchant_id` / `shop.seller_id` 关系列就位，多商家开放时可放宽。
-- **维度注入一律指向 seller**（交易归属）：`product_spu`/`trade_order`/`after_sale_order`/`freight_template` 的 `seller_id NOT NULL DEFAULT 1`——既有业务零感知。
-- V1 不拆单（全自营）；多商家上线时购物车按商家分组结算。
-- 商家商品**参与分销**：`commission_rule` 按分类/商品粒度天然支持按商家差异化。
-- B 形态演进清单（届时再建）：入驻审核流、保证金、`seller_user` 商家端账号、平台-商家分账结算、店铺级装修配置、商家自营销。
+- **定位**：纯 B2C + 多门店社交电商——平台统一经营商品与交易，门店（store）是线下载体：自提点、到店核销、附近门店。**无多租户、无多商户/商家概念**（B2B2C 需求另立独立项目）。
+- **`store` 表**：编码（唯一）/名称/三级区划码（对齐 V23 收货地址口径）/详细地址/经纬度（GCJ-02，附近门店检索）/营业时间/联系电话/自提开关/营业状态（营业/歇业）。
+- 索引：`uk_store_no`、`idx_district_status`（按区县查营业门店）、`idx_location`（经纬度范围检索）。
 
 ### 砍价/助力与分销规则（V29，产品决策落地）
 

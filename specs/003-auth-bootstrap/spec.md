@@ -8,8 +8,6 @@
 
 **Input**: User description: "首个业务纵切片：ecboot-common 基础对象与 ecboot-api-webmvc 统一响应/全局异常基座；infra-core 图形验证码组件；api-common 验证码 REST 端点；ecboot-service-user 手机号+验证码注册登录（登录时手机号优先归并、登录日志、休眠分级核身）、微信登录（开发态 mock）；登录态 token 会话"
 
-> **技术栈变更注记（2026-09-20）**：本 spec 的业务内容（WHAT）不变；实现载体由 Java/Spring 迁移为 **Go + GoFrame v2**（宪法 2.0.0），原模块名对应 Go 包——ecboot-common→`internal/common`、ecboot-infra-core→`internal/infra`、ecboot-api-webmvc→`internal/web`、ecboot-api-common→`internal/api/commonc`、ecboot-service-user→`internal/service/user`。技术方案见 plan/research 的 Go 版。
-
 ## User Scenarios & Testing *(mandatory)*
 
 > 纵切片（walking skeleton）：从基础对象到登录可用的一条完整链路。此后所有业务特性都生长在这条骨架上。
