@@ -9,6 +9,7 @@ import (
 	"ecboot/api/admin/v1"
 )
 
-func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error) {
+// AdminConfigList 系统配置列表
+func (c *ControllerV1) AdminConfigList(ctx context.Context, req *v1.AdminConfigListReq) (res *v1.AdminConfigListRes, err error) {
 	return nil, gerror.NewCode(gcode.CodeNotImplemented)
 }
