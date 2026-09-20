@@ -16,7 +16,7 @@ gen:
 
 # 迁移：应用到本地库（golang-migrate CLI）
 migrate-up:
-	migrate -path migrations -database "mysql://myuser:secret@tcp(127.0.0.1:13306)/mydatabase" up
+	migrate -path migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/ecboot" up
 
 # 空库全量重放验证（危险：drop 后重建）
 migrate-fresh:
