@@ -3,6 +3,11 @@
 // 6xxxx 分销域；7xxxx 门店域；8xxxx 后台治理域。
 package errcode
 
+import (
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
+)
+
 // 通用（1xxxx）
 const (
 	CodeOK           = 0
@@ -76,3 +81,8 @@ const (
 	CodeAdminBadCredential = 80001 // 后台凭证错误
 	CodeOldPasswordWrong   = 80002 // 原密码错误
 )
+
+// New 构造带契约错误码的业务错误（统一响应中间件映射为三段式）。
+func New(code int, msg string) error {
+	return gerror.NewCode(gcode.New(code, msg, nil))
+}

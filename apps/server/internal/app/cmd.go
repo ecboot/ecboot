@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+
+	_ "ecboot/internal/bootstrap"
 	"ecboot/internal/routes"
 
 	"github.com/gogf/gf/v2/frame/g"
