@@ -20,6 +20,7 @@ type (
 	}
 
 	// 修改配置
+	// 权限: system:config:update
 	AdminConfigUpdateReq struct {
 		g.Meta `path:"/configs/{code}" method:"PUT" summary:"修改系统配置"`
 		Code   string `json:"code" v:"required" dc:"配置编码"`

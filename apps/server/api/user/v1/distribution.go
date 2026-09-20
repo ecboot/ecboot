@@ -38,9 +38,9 @@ type (
 
 	// 可见佣金比例（按商品查询: 商品覆盖 > 分类默认）
 	DistRuleItem struct {
-		ScopeDesc   string `json:"scopeDesc" dc:"作用域描述(商品名/分类名)"`
-		Level1Rate  string `json:"level1Rate" dc:"一级比例%"`
-		Level2Rate  string `json:"level2Rate" dc:"二级比例%"`
+		ScopeDesc  string `json:"scopeDesc" dc:"作用域描述(商品名/分类名)"`
+		Level1Rate string `json:"level1Rate" dc:"一级比例%"`
+		Level2Rate string `json:"level2Rate" dc:"二级比例%"`
 	}
 	DistRuleQueryReq struct {
 		g.Meta `path:"/distribution/commission-rules" method:"GET" summary:"佣金比例查询"`
@@ -60,8 +60,8 @@ type (
 		CreatedAt  string `json:"createdAt"`
 	}
 	DistRecordListReq struct {
-		g.Meta  `path:"/distribution/records" method:"GET" summary:"佣金记录"`
-		Status  int `json:"status" dc:"状态筛选"`
+		g.Meta `path:"/distribution/records" method:"GET" summary:"佣金记录"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	DistRecordListRes struct {
@@ -112,8 +112,8 @@ type (
 		CreatedAt  string `json:"createdAt"`
 	}
 	WithdrawListReq struct {
-		g.Meta  `path:"/distribution/withdraws" method:"GET" summary:"提现列表"`
-		Status  int `json:"status" dc:"状态筛选"`
+		g.Meta `path:"/distribution/withdraws" method:"GET" summary:"提现列表"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	WithdrawListRes struct {
@@ -123,10 +123,10 @@ type (
 
 	// 邀请激励记录
 	InviteRecordItem struct {
-		NewUser   string `json:"newUser" dc:"新用户(脱敏昵称)"`
+		NewUser    string `json:"newUser" dc:"新用户(脱敏昵称)"`
 		RewardDesc string `json:"rewardDesc" dc:"奖励说明"`
-		Status    int    `json:"status" dc:"1已发放"`
-		CreatedAt string `json:"createdAt"`
+		Status     int    `json:"status" dc:"1已发放"`
+		CreatedAt  string `json:"createdAt"`
 	}
 	InviteRecordListReq struct {
 		g.Meta `path:"/distribution/invite-records" method:"GET" summary:"邀请激励记录"`

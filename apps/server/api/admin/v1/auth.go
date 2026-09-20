@@ -5,10 +5,10 @@ import "github.com/gogf/gf/v2/frame/g"
 type (
 	// 后台登录（含登录审计）
 	AdminLoginReq struct {
-		g.Meta `path:"/login" tags:"Admin" method:"POST" summary:"后台登录"`
-		Username string `json:"username" v:"required" dc:"登录名"`
-		Password string `json:"password" v:"required" dc:"密码"`
-		CaptchaKey string `json:"captchaKey" dc:"图形验证码key"`
+		g.Meta      `path:"/login" tags:"Admin" method:"POST" summary:"后台登录"`
+		Username    string `json:"username" v:"required" dc:"登录名"`
+		Password    string `json:"password" v:"required" dc:"密码"`
+		CaptchaKey  string `json:"captchaKey" dc:"图形验证码key"`
 		CaptchaCode string `json:"captchaCode" dc:"图形验证码"`
 	}
 	AdminLoginRes struct {
@@ -19,7 +19,7 @@ type (
 	}
 
 	AdminTokenRefreshReq struct {
-		g.Meta `path:"/token/refresh" tags:"Admin" method:"POST" summary:"刷新后台凭证"`
+		g.Meta       `path:"/token/refresh" tags:"Admin" method:"POST" summary:"刷新后台凭证"`
 		RefreshToken string `json:"refreshToken" v:"required" dc:"刷新凭证"`
 	}
 	AdminTokenRefreshRes struct {
@@ -44,7 +44,7 @@ type (
 	}
 
 	AdminChangePasswordReq struct {
-		g.Meta `path:"/profile/password" tags:"Admin" method:"PUT" summary:"修改密码"`
+		g.Meta      `path:"/profile/password" tags:"Admin" method:"PUT" summary:"修改密码"`
 		OldPassword string `json:"oldPassword" v:"required" dc:"原密码"`
 		NewPassword string `json:"newPassword" v:"required" dc:"新密码"`
 	}

@@ -30,12 +30,12 @@
 - `inventory:{read,adjust}`
 - `order:{read,deliver,cancel,update}`
 - `aftersale:{read,audit,refund}`
-- `promotion:{coupon,fullreduction,groupbuy,flashsale,bargain,assist}:{read,create,update,delete}`
-- `operation:{banner,floor}:{read,create,update,delete}`；`store:manage:{...}`；`logistics:company:{...}`
+- `promotion:coupon:{read,create,update,delete}`；`promotion:{fullreduction,groupbuy,flashsale,bargain,assist}:manage`（**合并语义**：活动类管理不细分四动作，读含于 manage——实现取 manage 单码，data-model/契约/代码三者以此为准）
+- `operation:{banner,floor}:read|manage`；`store:manage:{read,create,update,delete}`；`logistics:company:{read,manage}`
 - `distribution:{read,audit,rule:*,withdraw:read,withdraw:audit,withdraw:pay}`
 - `member:{read,update}`
 - `risk:{rule:*,record:read,record:appeal}`
-- `system:{role:*,admin:*,audit:read,config:read,config:update}`
+- `system:{role:{read,manage,assign},admin:{read,manage,assign},audit:read,config:{read,update}}`
 - `dashboard:read`
 
 ## 四、错误码登记表（本特性新增段位；具体码值随实现登记 errcode 包）

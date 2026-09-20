@@ -5,7 +5,7 @@ import "github.com/gogf/gf/v2/frame/g"
 type (
 	// 轮播管理
 	AdminBannerListReq struct {
-		g.Meta `path:"/banners" method:"GET" summary:"轮播列表"`
+		g.Meta   `path:"/banners" method:"GET" summary:"轮播列表"`
 		Position int `json:"position" dc:"位置筛选"`
 		PageReq
 	}
@@ -24,33 +24,36 @@ type (
 		List []AdminBannerItem `json:"list"`
 	}
 
+	// 权限: operation:banner:manage
 	AdminBannerCreateReq struct {
-		g.Meta   `path:"/banners" method:"POST" summary:"新增轮播"`
-		Position int    `json:"position" v:"required|in:1,2" dc:"位置"`
-		ImageUrl string `json:"imageUrl" v:"required" dc:"图片"`
-		LinkUrl  string `json:"linkUrl" dc:"跳转"`
-		Sort     int    `json:"sort" dc:"排序"`
+		g.Meta    `path:"/banners" method:"POST" summary:"新增轮播"`
+		Position  int    `json:"position" v:"required|in:1,2" dc:"位置"`
+		ImageUrl  string `json:"imageUrl" v:"required" dc:"图片"`
+		LinkUrl   string `json:"linkUrl" dc:"跳转"`
+		Sort      int    `json:"sort" dc:"排序"`
 		StartTime string `json:"startTime" dc:"投放起"`
-		EndTime  string `json:"endTime" dc:"投放止"`
+		EndTime   string `json:"endTime" dc:"投放止"`
 	}
 	AdminBannerCreateRes struct {
 		Id string `json:"id"`
 	}
 
+	// 权限: operation:banner:manage
 	AdminBannerUpdateReq struct {
-		g.Meta   `path:"/banners/{id}" method:"PUT" summary:"修改轮播"`
-		Id       string `json:"id" v:"required" dc:"ID"`
-		ImageUrl string `json:"imageUrl" dc:"图片"`
-		LinkUrl  string `json:"linkUrl" dc:"跳转"`
-		Sort     int    `json:"sort" dc:"排序"`
+		g.Meta    `path:"/banners/{id}" method:"PUT" summary:"修改轮播"`
+		Id        string `json:"id" v:"required" dc:"ID"`
+		ImageUrl  string `json:"imageUrl" dc:"图片"`
+		LinkUrl   string `json:"linkUrl" dc:"跳转"`
+		Sort      int    `json:"sort" dc:"排序"`
 		StartTime string `json:"startTime" dc:"投放起"`
-		EndTime  string `json:"endTime" dc:"投放止"`
-		Status   int    `json:"status" dc:"状态"`
+		EndTime   string `json:"endTime" dc:"投放止"`
+		Status    int    `json:"status" dc:"状态"`
 	}
 	AdminBannerUpdateRes struct {
 		Success bool `json:"success"`
 	}
 
+	// 权限: operation:banner:manage
 	AdminBannerDeleteReq struct {
 		g.Meta `path:"/banners/{id}" method:"DELETE" summary:"删除轮播(软删)"`
 		Id     string `json:"id" v:"required" dc:"ID"`
@@ -77,29 +80,32 @@ type (
 		List []AdminFloorItem `json:"list"`
 	}
 
+	// 权限: operation:floor:manage
 	AdminFloorCreateReq struct {
-		g.Meta   `path:"/floors" method:"POST" summary:"新增楼层"`
+		g.Meta    `path:"/floors" method:"POST" summary:"新增楼层"`
 		FloorType int            `json:"floorType" v:"required|in:1,2,3" dc:"类型"`
-		Title    string         `json:"title" dc:"标题"`
-		Config   map[string]any `json:"config" dc:"配置"`
-		Sort     int            `json:"sort" dc:"排序"`
+		Title     string         `json:"title" dc:"标题"`
+		Config    map[string]any `json:"config" dc:"配置"`
+		Sort      int            `json:"sort" dc:"排序"`
 	}
 	AdminFloorCreateRes struct {
 		Id string `json:"id"`
 	}
 
+	// 权限: operation:floor:manage
 	AdminFloorUpdateReq struct {
-		g.Meta   `path:"/floors/{id}" method:"PUT" summary:"修改楼层"`
-		Id       string         `json:"id" v:"required" dc:"ID"`
-		Title    string         `json:"title" dc:"标题"`
-		Config   map[string]any `json:"config" dc:"配置"`
-		Sort     int            `json:"sort" dc:"排序"`
-		Status   int            `json:"status" dc:"状态"`
+		g.Meta `path:"/floors/{id}" method:"PUT" summary:"修改楼层"`
+		Id     string         `json:"id" v:"required" dc:"ID"`
+		Title  string         `json:"title" dc:"标题"`
+		Config map[string]any `json:"config" dc:"配置"`
+		Sort   int            `json:"sort" dc:"排序"`
+		Status int            `json:"status" dc:"状态"`
 	}
 	AdminFloorUpdateRes struct {
 		Success bool `json:"success"`
 	}
 
+	// 权限: operation:floor:manage
 	AdminFloorDeleteReq struct {
 		g.Meta `path:"/floors/{id}" method:"DELETE" summary:"删除楼层(软删)"`
 		Id     string `json:"id" v:"required" dc:"ID"`

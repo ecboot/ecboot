@@ -27,7 +27,7 @@ type (
 	}
 	AfterSaleListReq struct {
 		g.Meta `path:"/after-sales" method:"GET" summary:"售后列表"`
-		Status int  `json:"status" dc:"状态筛选"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	AfterSaleListRes struct {
@@ -40,18 +40,18 @@ type (
 		AfterSaleNo string `json:"afterSaleNo" v:"required" dc:"售后单号"`
 	}
 	AfterSaleDetailRes struct {
-		AfterSaleNo         string   `json:"afterSaleNo"`
-		Status              int      `json:"status"`
-		Type                int      `json:"type"`
-		Quantity            int      `json:"quantity"`
-		Reason              string   `json:"reason"`
-		Description         string   `json:"description"`
-		VoucherImages       []string `json:"voucherImages"`
-		RefundAmount        string   `json:"refundAmount"`
-		ReturnLogisticsNo   string   `json:"returnLogisticsNo" dc:"寄回单号"`
-		RejectReason        string   `json:"rejectReason" dc:"拒绝原因"`
-		AuditTime           string   `json:"auditTime"`
-		RefundTime          string   `json:"refundTime"`
+		AfterSaleNo       string   `json:"afterSaleNo"`
+		Status            int      `json:"status"`
+		Type              int      `json:"type"`
+		Quantity          int      `json:"quantity"`
+		Reason            string   `json:"reason"`
+		Description       string   `json:"description"`
+		VoucherImages     []string `json:"voucherImages"`
+		RefundAmount      string   `json:"refundAmount"`
+		ReturnLogisticsNo string   `json:"returnLogisticsNo" dc:"寄回单号"`
+		RejectReason      string   `json:"rejectReason" dc:"拒绝原因"`
+		AuditTime         string   `json:"auditTime"`
+		RefundTime        string   `json:"refundTime"`
 	}
 
 	AfterSaleCancelReq struct {
@@ -63,8 +63,8 @@ type (
 	}
 
 	AfterSaleLogisticsReq struct {
-		g.Meta      `path:"/after-sales/{afterSaleNo}/logistics" method:"POST" summary:"填写寄回单号(退货退款)"`
-		AfterSaleNo string `json:"afterSaleNo" v:"required" dc:"售后单号"`
+		g.Meta            `path:"/after-sales/{afterSaleNo}/logistics" method:"POST" summary:"填写寄回单号(退货退款)"`
+		AfterSaleNo       string `json:"afterSaleNo" v:"required" dc:"售后单号"`
 		ReturnLogisticsNo string `json:"returnLogisticsNo" v:"required" dc:"寄回物流单号"`
 	}
 	AfterSaleLogisticsRes struct {

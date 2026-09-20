@@ -5,8 +5,8 @@ package base
 
 // PageReq 分页请求嵌入结构。
 type PageReq struct {
-	Page     int `json:"page" dc:"页码,默认1" d:"1"`
-	PageSize int `json:"pageSize" dc:"每页数量,默认10,上限100" d:"10"`
+	Page     int `json:"page" dc:"页码,默认1" v:"min:1" d:"1"`
+	PageSize int `json:"pageSize" dc:"每页数量,默认10,上限100" v:"min:1|max:100" d:"10"`
 }
 
 // PageRes 分页响应嵌入结构。

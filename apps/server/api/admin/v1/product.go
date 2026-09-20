@@ -21,6 +21,7 @@ type (
 		Tree []AdminCategoryNode `json:"tree"`
 	}
 
+	// 权限: product:category:create
 	AdminCategoryCreateReq struct {
 		g.Meta   `path:"/categories" method:"POST" summary:"新增分类"`
 		ParentId string `json:"parentId" dc:"父ID,0为根" d:"0"`
@@ -33,6 +34,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: product:category:update
 	AdminCategoryUpdateReq struct {
 		g.Meta `path:"/categories/{id}" method:"PUT" summary:"修改分类"`
 		Id     string `json:"id" v:"required" dc:"分类ID"`
@@ -45,6 +47,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: product:category:delete
 	AdminCategoryDeleteReq struct {
 		g.Meta `path:"/categories/{id}" method:"DELETE" summary:"删除分类(软删,有商品禁删)"`
 		Id     string `json:"id" v:"required" dc:"分类ID"`
@@ -72,6 +75,7 @@ type (
 		List []AdminBrandItem `json:"list"`
 	}
 
+	// 权限: product:brand:create
 	AdminBrandCreateReq struct {
 		g.Meta      `path:"/brands" method:"POST" summary:"新增品牌"`
 		Name        string `json:"name" v:"required" dc:"名称"`
@@ -83,6 +87,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: product:brand:update
 	AdminBrandUpdateReq struct {
 		g.Meta      `path:"/brands/{id}" method:"PUT" summary:"修改品牌"`
 		Id          string `json:"id" v:"required" dc:"品牌ID"`
@@ -96,6 +101,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: product:brand:delete
 	AdminBrandDeleteReq struct {
 		g.Meta `path:"/brands/{id}" method:"DELETE" summary:"删除品牌(软删)"`
 		Id     string `json:"id" v:"required" dc:"品牌ID"`
@@ -128,18 +134,19 @@ type (
 	}
 
 	// 创建 SPU（含规格定义/图文/运费模板）
+	// 权限: product:spu:create
 	AdminSpuCreateReq struct {
-		g.Meta          `path:"/products" method:"POST" summary:"创建商品SPU"`
-		Name            string            `json:"name" v:"required" dc:"商品名称"`
-		SubTitle        string            `json:"subTitle" dc:"副标题"`
-		CategoryId      string            `json:"categoryId" v:"required" dc:"三级分类"`
-		BrandId         string            `json:"brandId" dc:"品牌"`
-		FreightTemplateId string          `json:"freightTemplateId" dc:"运费模板(空=包邮)"`
-		Images          []string          `json:"images" v:"required" dc:"图集"`
-		VideoUrl        string            `json:"videoUrl" dc:"视频"`
-		Description     string            `json:"description" dc:"图文详情"`
-		SpecDefinitions []map[string]any  `json:"specDefinitions" dc:"规格定义"`
-		Attributes      map[string]string `json:"attributes" dc:"非销售属性"`
+		g.Meta            `path:"/products" method:"POST" summary:"创建商品SPU"`
+		Name              string            `json:"name" v:"required" dc:"商品名称"`
+		SubTitle          string            `json:"subTitle" dc:"副标题"`
+		CategoryId        string            `json:"categoryId" v:"required" dc:"三级分类"`
+		BrandId           string            `json:"brandId" dc:"品牌"`
+		FreightTemplateId string            `json:"freightTemplateId" dc:"运费模板(空=包邮)"`
+		Images            []string          `json:"images" v:"required" dc:"图集"`
+		VideoUrl          string            `json:"videoUrl" dc:"视频"`
+		Description       string            `json:"description" dc:"图文详情"`
+		SpecDefinitions   []map[string]any  `json:"specDefinitions" dc:"规格定义"`
+		Attributes        map[string]string `json:"attributes" dc:"非销售属性"`
 	}
 	AdminSpuCreateRes struct {
 		SpuId string `json:"spuId"`
@@ -162,41 +169,43 @@ type (
 		Status    int               `json:"status" dc:"1启用 0禁用"`
 	}
 	AdminSpuDetailRes struct {
-		SpuId           string            `json:"spuId"`
-		SpuNo           string            `json:"spuNo"`
-		Name            string            `json:"name"`
-		SubTitle        string            `json:"subTitle"`
-		CategoryId      string            `json:"categoryId"`
-		BrandId         string            `json:"brandId"`
-		FreightTemplateId string          `json:"freightTemplateId"`
-		Images          []string          `json:"images"`
-		VideoUrl        string            `json:"videoUrl"`
-		Description     string            `json:"description"`
-		SpecDefinitions []map[string]any  `json:"specDefinitions"`
-		Attributes      map[string]string `json:"attributes"`
-		SaleRestrictCodes []string        `json:"saleRestrictCodes" dc:"限售省级代码(空=不限)"`
-		Status          int               `json:"status"`
-		Skus            []AdminSkuAdminItem `json:"skus"`
+		SpuId             string              `json:"spuId"`
+		SpuNo             string              `json:"spuNo"`
+		Name              string              `json:"name"`
+		SubTitle          string              `json:"subTitle"`
+		CategoryId        string              `json:"categoryId"`
+		BrandId           string              `json:"brandId"`
+		FreightTemplateId string              `json:"freightTemplateId"`
+		Images            []string            `json:"images"`
+		VideoUrl          string              `json:"videoUrl"`
+		Description       string              `json:"description"`
+		SpecDefinitions   []map[string]any    `json:"specDefinitions"`
+		Attributes        map[string]string   `json:"attributes"`
+		SaleRestrictCodes []string            `json:"saleRestrictCodes" dc:"限售省级代码(空=不限)"`
+		Status            int                 `json:"status"`
+		Skus              []AdminSkuAdminItem `json:"skus"`
 	}
 
+	// 权限: product:spu:update
 	AdminSpuUpdateReq struct {
-		g.Meta          `path:"/products/{spuId}" method:"PUT" summary:"修改商品SPU"`
-		SpuId           string            `json:"spuId" v:"required" dc:"SPU ID"`
-		Name            string            `json:"name" dc:"名称"`
-		SubTitle        string            `json:"subTitle" dc:"副标题"`
-		CategoryId      string            `json:"categoryId" dc:"分类"`
-		BrandId         string            `json:"brandId" dc:"品牌"`
-		FreightTemplateId string          `json:"freightTemplateId" dc:"运费模板"`
-		Images          []string          `json:"images" dc:"图集"`
-		VideoUrl        string            `json:"videoUrl" dc:"视频"`
-		Description     string            `json:"description" dc:"图文详情"`
-		SpecDefinitions []map[string]any  `json:"specDefinitions" dc:"规格定义"`
-		Attributes      map[string]string `json:"attributes" dc:"属性"`
+		g.Meta            `path:"/products/{spuId}" method:"PUT" summary:"修改商品SPU"`
+		SpuId             string            `json:"spuId" v:"required" dc:"SPU ID"`
+		Name              string            `json:"name" dc:"名称"`
+		SubTitle          string            `json:"subTitle" dc:"副标题"`
+		CategoryId        string            `json:"categoryId" dc:"分类"`
+		BrandId           string            `json:"brandId" dc:"品牌"`
+		FreightTemplateId string            `json:"freightTemplateId" dc:"运费模板"`
+		Images            []string          `json:"images" dc:"图集"`
+		VideoUrl          string            `json:"videoUrl" dc:"视频"`
+		Description       string            `json:"description" dc:"图文详情"`
+		SpecDefinitions   []map[string]any  `json:"specDefinitions" dc:"规格定义"`
+		Attributes        map[string]string `json:"attributes" dc:"属性"`
 	}
 	AdminSpuUpdateRes struct {
 		Success bool `json:"success"`
 	}
 
+	// 权限: product:spu:delete
 	AdminSpuDeleteReq struct {
 		g.Meta `path:"/products/{spuId}" method:"DELETE" summary:"删除商品(软删)"`
 		SpuId  string `json:"spuId" v:"required" dc:"SPU ID"`
@@ -206,6 +215,7 @@ type (
 	}
 
 	// SPU 上下架（无启用 SKU 禁上架）
+	// 权限: product:spu:update
 	AdminSpuStatusReq struct {
 		g.Meta `path:"/products/{spuId}/status" method:"POST" summary:"商品上下架"`
 		SpuId  string `json:"spuId" v:"required" dc:"SPU ID"`
@@ -216,6 +226,7 @@ type (
 	}
 
 	// 限售区域设置
+	// 权限: product:spu:update
 	AdminSpuRestrictReq struct {
 		g.Meta            `path:"/products/{spuId}/restrict-codes" method:"PUT" summary:"限售区域设置"`
 		SpuId             string   `json:"spuId" v:"required" dc:"SPU ID"`
@@ -226,37 +237,40 @@ type (
 	}
 
 	// 新增 SKU
+	// 权限: product:sku:create
 	AdminSkuCreateReq struct {
-		g.Meta     `path:"/products/{spuId}/skus" method:"POST" summary:"新增SKU"`
-		SpuId      string            `json:"spuId" v:"required" dc:"SPU ID"`
-		Specs      map[string]string `json:"specs" v:"required" dc:"规格组合"`
-		Price      string            `json:"price" v:"required" dc:"售价"`
-		LinePrice  string            `json:"linePrice" dc:"划线价"`
-		CostPrice  string            `json:"costPrice" dc:"成本价"`
-		Image      string            `json:"image" dc:"SKU图"`
-		Weight     string            `json:"weight" dc:"重量克"`
-		Barcode    string            `json:"barcode" dc:"条码"`
+		g.Meta    `path:"/products/{spuId}/skus" method:"POST" summary:"新增SKU"`
+		SpuId     string            `json:"spuId" v:"required" dc:"SPU ID"`
+		Specs     map[string]string `json:"specs" v:"required" dc:"规格组合"`
+		Price     string            `json:"price" v:"required" dc:"售价"`
+		LinePrice string            `json:"linePrice" dc:"划线价"`
+		CostPrice string            `json:"costPrice" dc:"成本价"`
+		Image     string            `json:"image" dc:"SKU图"`
+		Weight    string            `json:"weight" dc:"重量克"`
+		Barcode   string            `json:"barcode" dc:"条码"`
 	}
 	AdminSkuCreateRes struct {
 		SkuId string `json:"skuId"`
 		SkuNo string `json:"skuNo" dc:"SKU编码"`
 	}
 
+	// 权限: product:sku:update
 	AdminSkuUpdateReq struct {
-		g.Meta     `path:"/skus/{skuId}" method:"PUT" summary:"修改SKU"`
-		SkuId      string            `json:"skuId" v:"required" dc:"SKU ID"`
-		Specs      map[string]string `json:"specs" dc:"规格组合"`
-		Price      string            `json:"price" dc:"售价"`
-		LinePrice  string            `json:"linePrice" dc:"划线价"`
-		CostPrice  string            `json:"costPrice" dc:"成本价"`
-		Image      string            `json:"image" dc:"SKU图"`
-		Weight     string            `json:"weight" dc:"重量克"`
-		Barcode    string            `json:"barcode" dc:"条码"`
+		g.Meta    `path:"/skus/{skuId}" method:"PUT" summary:"修改SKU"`
+		SkuId     string            `json:"skuId" v:"required" dc:"SKU ID"`
+		Specs     map[string]string `json:"specs" dc:"规格组合"`
+		Price     string            `json:"price" dc:"售价"`
+		LinePrice string            `json:"linePrice" dc:"划线价"`
+		CostPrice string            `json:"costPrice" dc:"成本价"`
+		Image     string            `json:"image" dc:"SKU图"`
+		Weight    string            `json:"weight" dc:"重量克"`
+		Barcode   string            `json:"barcode" dc:"条码"`
 	}
 	AdminSkuUpdateRes struct {
 		Success bool `json:"success"`
 	}
 
+	// 权限: product:sku:delete
 	AdminSkuDeleteReq struct {
 		g.Meta `path:"/skus/{skuId}" method:"DELETE" summary:"删除SKU(软删)"`
 		SkuId  string `json:"skuId" v:"required" dc:"SKU ID"`
@@ -265,6 +279,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: product:sku:update
 	AdminSkuStatusReq struct {
 		g.Meta `path:"/skus/{skuId}/status" method:"POST" summary:"SKU启停"`
 		SkuId  string `json:"skuId" v:"required" dc:"SKU ID"`

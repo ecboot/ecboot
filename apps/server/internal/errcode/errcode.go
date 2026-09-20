@@ -5,12 +5,12 @@ package errcode
 
 // 通用（1xxxx）
 const (
-	CodeOK            = 0
-	CodeInvalidParam  = 10001 // 参数校验失败
-	CodeSystemError   = 10002 // 系统错误（附追踪号）
-	CodeUnauthorized  = 10003 // 未登录/凭证失效
-	CodeTooFrequent   = 10004 // 操作过于频繁
-	CodeForbidden     = 10005 // 无权限
+	CodeOK           = 0
+	CodeInvalidParam = 10001 // 参数校验失败
+	CodeSystemError  = 10002 // 系统错误（附追踪号）
+	CodeUnauthorized = 10003 // 未登录/凭证失效
+	CodeTooFrequent  = 10004 // 操作过于频繁
+	CodeForbidden    = 10005 // 无权限
 )
 
 // 用户域（2xxxx）
@@ -23,13 +23,13 @@ const (
 
 // 商品域（3xxxx）
 const (
-	CodeProductNotFound   = 30001 // 商品不存在/已下架
-	CodeSkuUnsellable     = 30002 // SKU 不可售
-	CodeProductInvalid    = 30003 // 商品失效（结算项）
-	CodeCategoryInUse     = 30004 // 分类有商品引用
-	CodeNoEnableSku       = 30005 // 无启用 SKU 禁止上架
-	CodeSpecDup           = 30006 // 规格组合重复
-	CodeInventoryAdjust   = 30007 // 库存调整非法
+	CodeProductNotFound = 30001 // 商品不存在/已下架
+	CodeSkuUnsellable   = 30002 // SKU 不可售
+	CodeProductInvalid  = 30003 // 商品失效（结算项）
+	CodeCategoryInUse   = 30004 // 分类有商品引用
+	CodeNoEnableSku     = 30005 // 无启用 SKU 禁止上架
+	CodeSpecDup         = 30006 // 规格组合重复
+	CodeInventoryAdjust = 30007 // 库存调整非法
 )
 
 // 交易域（4xxxx）
@@ -49,21 +49,21 @@ const (
 
 // 促销域（5xxxx）
 const (
-	CodeCouponSoldOut   = 50001 // 券已领完/超限
-	CodeActivityInvalid = 50002 // 活动无效
+	CodeCouponSoldOut    = 50001 // 券已领完/超限
+	CodeActivityInvalid  = 50002 // 活动无效
 	CodeActivityNotFound = 50003 // 活动/参与单不存在
-	CodeAlreadyCut      = 50004 // 已帮砍过
-	CodeFloorReached    = 50005 // 已到底价
-	CodeAssistUsedUp    = 50006 // 发起次数用尽
-	CodeAlreadyAssisted = 50007 // 已助力
-	CodeLadderDup       = 50008 // 档位门槛重复
+	CodeAlreadyCut       = 50004 // 已帮砍过
+	CodeFloorReached     = 50005 // 已到底价
+	CodeAssistUsedUp     = 50006 // 发起次数用尽
+	CodeAlreadyAssisted  = 50007 // 已助力
+	CodeLadderDup        = 50008 // 档位门槛重复
 )
 
 // 分销域（6xxxx）
 const (
-	CodeDistAlreadyApplied = 60001 // 已申请/已是推广员
-	CodeBalanceInsufficent = 60002 // 余额不足
-	CodeWithdrawOngoing    = 60003 // 存在进行中的提现单
+	CodeDistAlreadyApplied  = 60001 // 已申请/已是推广员
+	CodeBalanceInsufficient = 60002 // 余额不足
+	CodeWithdrawOngoing     = 60003 // 存在进行中的提现单
 )
 
 // 门店域（7xxxx）

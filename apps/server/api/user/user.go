@@ -40,6 +40,7 @@ type IUserV1 interface {
 	FavoriteRemove(ctx context.Context, req *v1.FavoriteRemoveReq) (res *v1.FavoriteRemoveRes, err error)
 	FootprintList(ctx context.Context, req *v1.FootprintListReq) (res *v1.FootprintListRes, err error)
 	FootprintClear(ctx context.Context, req *v1.FootprintClearReq) (res *v1.FootprintClearRes, err error)
+	LoginLogList(ctx context.Context, req *v1.LoginLogListReq) (res *v1.LoginLogListRes, err error)
 	MessageList(ctx context.Context, req *v1.MessageListReq) (res *v1.MessageListRes, err error)
 	MessageRead(ctx context.Context, req *v1.MessageReadReq) (res *v1.MessageReadRes, err error)
 	MessageReadAll(ctx context.Context, req *v1.MessageReadAllReq) (res *v1.MessageReadAllRes, err error)

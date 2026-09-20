@@ -20,9 +20,9 @@ type (
 
 	// 微信登录（手机号优先归并; 开发态 mock）
 	WxLoginReq struct {
-		g.Meta `path:"/login/wx" tags:"User" method:"POST" summary:"微信登录接口"`
-		WxCode string `json:"wxCode" v:"required" dc:"微信授权码"`
-		Phone  string `json:"phone" dc:"手机号(mock模式显式传入用于归并)"`
+		g.Meta  `path:"/login/wx" tags:"User" method:"POST" summary:"微信登录接口"`
+		WxCode  string `json:"wxCode" v:"required" dc:"微信授权码"`
+		Phone   string `json:"phone" dc:"手机号(mock模式显式传入用于归并)"`
 		SmsCode string `json:"smsCode" dc:"短信验证码(归并核验)"`
 		Channel int    `json:"channel" dc:"注册渠道" d:"1"`
 	}
@@ -35,7 +35,7 @@ type (
 
 	// 刷新访问凭证（双凭证会话）
 	TokenRefreshReq struct {
-		g.Meta `path:"/token/refresh" tags:"User" method:"POST" summary:"刷新访问凭证"`
+		g.Meta       `path:"/token/refresh" tags:"User" method:"POST" summary:"刷新访问凭证"`
 		RefreshToken string `json:"refreshToken" v:"required" dc:"刷新凭证"`
 	}
 	TokenRefreshRes struct {

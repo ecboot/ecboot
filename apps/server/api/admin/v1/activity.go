@@ -27,6 +27,7 @@ type (
 		List []AdminGroupBuyItem `json:"list"`
 	}
 
+	// 权限: promotion:groupbuy:manage
 	AdminGroupBuyCreateReq struct {
 		g.Meta    `path:"/group-buys" method:"POST" summary:"创建拼团活动"`
 		Name      string `json:"name" v:"required" dc:"名称"`
@@ -40,6 +41,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: promotion:groupbuy:manage
 	AdminGroupBuyUpdateReq struct {
 		g.Meta    `path:"/group-buys/{id}" method:"PUT" summary:"修改拼团活动"`
 		Id        string `json:"id" v:"required" dc:"活动ID"`
@@ -54,6 +56,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:groupbuy:manage
 	AdminGroupBuyDeleteReq struct {
 		g.Meta `path:"/group-buys/{id}" method:"DELETE" summary:"删除拼团活动(软删)"`
 		Id     string `json:"id" v:"required" dc:"活动ID"`
@@ -63,20 +66,21 @@ type (
 	}
 
 	// 拼团场次商品（SKU 级成团价; 全量替换）
+	// 权限: promotion:groupbuy:manage
 	AdminGroupBuyItemsReq struct {
 		g.Meta `path:"/group-buys/{id}/items" method:"PUT" summary:"拼团场次商品设置"`
-		Id     string               `json:"id" v:"required" dc:"活动ID"`
-		Items  []AdminActivitySku   `json:"items" dc:"场次商品列表"`
+		Id     string             `json:"id" v:"required" dc:"活动ID"`
+		Items  []AdminActivitySku `json:"items" dc:"场次商品列表"`
 	}
 	AdminActivitySku struct {
-		SkuId       string `json:"skuId" v:"required" dc:"SKU ID"`
-		GroupPrice  string `json:"groupPrice" dc:"拼团:成团价"`
-		FlashPrice  string `json:"flashPrice" dc:"秒杀:秒杀价"`
-		StockCount  int    `json:"stockCount" dc:"秒杀:活动限量"`
-		PerLimit    int    `json:"perLimit" dc:"秒杀:每人限购"`
+		SkuId         string `json:"skuId" v:"required" dc:"SKU ID"`
+		GroupPrice    string `json:"groupPrice" dc:"拼团:成团价"`
+		FlashPrice    string `json:"flashPrice" dc:"秒杀:秒杀价"`
+		StockCount    int    `json:"stockCount" dc:"秒杀:活动限量"`
+		PerLimit      int    `json:"perLimit" dc:"秒杀:每人限购"`
 		OriginalPrice string `json:"originalPrice" dc:"砍价:起始价"`
-		FloorPrice  string `json:"floorPrice" dc:"砍价:底价"`
-		MaxCutCount int    `json:"maxCutCount" dc:"砍价:最大刀数,0不限"`
+		FloorPrice    string `json:"floorPrice" dc:"砍价:底价"`
+		MaxCutCount   int    `json:"maxCutCount" dc:"砍价:最大刀数,0不限"`
 	}
 	AdminGroupBuyItemsRes struct {
 		Success bool `json:"success"`
@@ -100,6 +104,7 @@ type (
 		List []AdminFlashSaleItem `json:"list"`
 	}
 
+	// 权限: promotion:flashsale:manage
 	AdminFlashSaleCreateReq struct {
 		g.Meta    `path:"/flash-sales" method:"POST" summary:"创建秒杀活动"`
 		Name      string `json:"name" v:"required" dc:"名称"`
@@ -110,6 +115,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: promotion:flashsale:manage
 	AdminFlashSaleUpdateReq struct {
 		g.Meta    `path:"/flash-sales/{id}" method:"PUT" summary:"修改秒杀活动"`
 		Id        string `json:"id" v:"required" dc:"活动ID"`
@@ -122,6 +128,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:flashsale:manage
 	AdminFlashSaleDeleteReq struct {
 		g.Meta `path:"/flash-sales/{id}" method:"DELETE" summary:"删除秒杀活动(软删)"`
 		Id     string `json:"id" v:"required" dc:"活动ID"`
@@ -130,6 +137,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:flashsale:manage
 	AdminFlashSaleItemsReq struct {
 		g.Meta `path:"/flash-sales/{id}/items" method:"PUT" summary:"秒杀场次商品设置"`
 		Id     string             `json:"id" v:"required" dc:"活动ID"`
@@ -158,6 +166,7 @@ type (
 		List []AdminBargainItem `json:"list"`
 	}
 
+	// 权限: promotion:bargain:manage
 	AdminBargainCreateReq struct {
 		g.Meta    `path:"/bargains" method:"POST" summary:"创建砍价活动"`
 		Name      string `json:"name" v:"required" dc:"名称"`
@@ -169,6 +178,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: promotion:bargain:manage
 	AdminBargainUpdateReq struct {
 		g.Meta    `path:"/bargains/{id}" method:"PUT" summary:"修改砍价活动"`
 		Id        string `json:"id" v:"required" dc:"活动ID"`
@@ -181,6 +191,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:bargain:manage
 	AdminBargainDeleteReq struct {
 		g.Meta `path:"/bargains/{id}" method:"DELETE" summary:"删除砍价活动(软删)"`
 		Id     string `json:"id" v:"required" dc:"活动ID"`
@@ -189,6 +200,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:bargain:manage
 	AdminBargainItemsReq struct {
 		g.Meta `path:"/bargains/{id}/items" method:"PUT" summary:"砍价场次商品设置"`
 		Id     string             `json:"id" v:"required" dc:"活动ID"`
@@ -220,6 +232,7 @@ type (
 		List []AdminAssistItem `json:"list"`
 	}
 
+	// 权限: promotion:assist:manage
 	AdminAssistCreateReq struct {
 		g.Meta        `path:"/assists" method:"POST" summary:"创建助力活动"`
 		Name          string `json:"name" v:"required" dc:"名称"`
@@ -235,6 +248,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: promotion:assist:manage
 	AdminAssistUpdateReq struct {
 		g.Meta        `path:"/assists/{id}" method:"PUT" summary:"修改助力活动"`
 		Id            string `json:"id" v:"required" dc:"活动ID"`
@@ -249,6 +263,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:assist:manage
 	AdminAssistDeleteReq struct {
 		g.Meta `path:"/assists/{id}" method:"DELETE" summary:"删除助力活动(软删)"`
 		Id     string `json:"id" v:"required" dc:"活动ID"`

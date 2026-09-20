@@ -20,6 +20,7 @@ type (
 		List []AdminRoleItem `json:"list"`
 	}
 
+	// 权限: system:role:manage
 	AdminRoleCreateReq struct {
 		g.Meta      `path:"/roles" method:"POST" summary:"新增角色"`
 		Name        string `json:"name" v:"required" dc:"名称"`
@@ -30,6 +31,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: system:role:manage
 	AdminRoleUpdateReq struct {
 		g.Meta      `path:"/roles/{id}" method:"PUT" summary:"修改角色"`
 		Id          string `json:"id" v:"required" dc:"角色ID"`
@@ -41,6 +43,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: system:role:manage
 	AdminRoleDeleteReq struct {
 		g.Meta `path:"/roles/{id}" method:"DELETE" summary:"删除角色(软删)"`
 		Id     string `json:"id" v:"required" dc:"角色ID"`
@@ -68,6 +71,7 @@ type (
 	}
 
 	// 角色-权限全量替换
+	// 权限: system:role:assign
 	AdminRoleAssignPermReq struct {
 		g.Meta        `path:"/roles/{id}/permissions" method:"PUT" summary:"角色权限分配"`
 		Id            string   `json:"id" v:"required" dc:"角色ID"`
@@ -99,6 +103,7 @@ type (
 	}
 
 	// 创建后台账号
+	// 权限: system:admin:manage
 	AdminUserCreateReq struct {
 		g.Meta   `path:"/admin-users" method:"POST" summary:"创建后台账号"`
 		Username string `json:"username" v:"required" dc:"登录名"`
@@ -109,6 +114,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: system:admin:manage
 	AdminUserUpdateReq struct {
 		g.Meta   `path:"/admin-users/{id}" method:"PUT" summary:"修改后台账号"`
 		Id       string `json:"id" v:"required" dc:"账号ID"`
@@ -119,6 +125,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: system:admin:manage
 	AdminUserDeleteReq struct {
 		g.Meta `path:"/admin-users/{id}" method:"DELETE" summary:"删除后台账号(软删)"`
 		Id     string `json:"id" v:"required" dc:"账号ID"`
@@ -128,6 +135,7 @@ type (
 	}
 
 	// 账号-角色分配
+	// 权限: system:admin:assign
 	AdminUserAssignRolesReq struct {
 		g.Meta  `path:"/admin-users/{id}/roles" method:"PUT" summary:"账号角色分配"`
 		Id      string   `json:"id" v:"required" dc:"账号ID"`
@@ -135,5 +143,34 @@ type (
 	}
 	AdminUserAssignRolesRes struct {
 		Success bool `json:"success"`
+	}
+
+	// 角色详情
+	AdminRoleDetailReq struct {
+		g.Meta `path:"/roles/{id}" method:"GET" summary:"角色详情"`
+		Id     string `json:"id" v:"required" dc:"角色ID"`
+	}
+	AdminRoleDetailRes struct {
+		Id            string   `json:"id"`
+		Name          string   `json:"name"`
+		Code          string   `json:"code"`
+		Description   string   `json:"description"`
+		Status        int      `json:"status"`
+		PermissionIds []string `json:"permissionIds" dc:"已分配权限ID"`
+	}
+
+	// 后台账号详情
+	AdminUserDetailReq struct {
+		g.Meta `path:"/admin-users/{id}" method:"GET" summary:"后台账号详情"`
+		Id     string `json:"id" v:"required" dc:"账号ID"`
+	}
+	AdminUserDetailRes struct {
+		Id            string   `json:"id"`
+		Username      string   `json:"username"`
+		RealName      string   `json:"realName"`
+		IsSuper       bool     `json:"isSuper"`
+		Roles         []string `json:"roles" dc:"角色编码"`
+		Status        int      `json:"status"`
+		LastLoginTime string   `json:"lastLoginTime"`
 	}
 )

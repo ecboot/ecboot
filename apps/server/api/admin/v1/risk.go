@@ -5,8 +5,8 @@ import "github.com/gogf/gf/v2/frame/g"
 type (
 	// 风控规则列表
 	AdminRiskRuleListReq struct {
-		g.Meta  `path:"/risk-rules" method:"GET" summary:"风控规则列表"`
-		Status  int `json:"status" dc:"状态筛选"`
+		g.Meta `path:"/risk-rules" method:"GET" summary:"风控规则列表"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	AdminRiskRuleItem struct {
@@ -22,6 +22,7 @@ type (
 		List []AdminRiskRuleItem `json:"list"`
 	}
 
+	// 权限: risk:rule:manage
 	AdminRiskRuleCreateReq struct {
 		g.Meta        `path:"/risk-rules" method:"POST" summary:"新增风控规则"`
 		Name          string `json:"name" v:"required" dc:"名称"`
@@ -33,6 +34,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: risk:rule:manage
 	AdminRiskRuleUpdateReq struct {
 		g.Meta        `path:"/risk-rules/{id}" method:"PUT" summary:"修改风控规则"`
 		Id            string `json:"id" v:"required" dc:"规则ID"`
@@ -45,6 +47,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: risk:rule:manage
 	AdminRiskRuleDeleteReq struct {
 		g.Meta `path:"/risk-rules/{id}" method:"DELETE" summary:"删除风控规则(软删)"`
 		Id     string `json:"id" v:"required" dc:"规则ID"`
@@ -77,6 +80,7 @@ type (
 	}
 
 	// 申诉处理
+	// 权限: risk:record:appeal
 	AdminRiskAppealReq struct {
 		g.Meta `path:"/risk-records/{id}/appeal" method:"POST" summary:"申诉处理"`
 		Id     string `json:"id" v:"required" dc:"事件ID"`
@@ -85,5 +89,19 @@ type (
 	}
 	AdminRiskAppealRes struct {
 		Success bool `json:"success"`
+	}
+
+	// 风控规则详情
+	AdminRiskRuleDetailReq struct {
+		g.Meta `path:"/risk-rules/{id}" method:"GET" summary:"风控规则详情"`
+		Id     string `json:"id" v:"required" dc:"规则ID"`
+	}
+	AdminRiskRuleDetailRes struct {
+		Id            string `json:"id"`
+		Name          string `json:"name"`
+		RuleType      int    `json:"ruleType"`
+		ConditionExpr string `json:"conditionExpr"`
+		Action        int    `json:"action"`
+		Status        int    `json:"status"`
 	}
 )

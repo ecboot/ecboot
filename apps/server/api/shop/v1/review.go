@@ -19,8 +19,8 @@ type (
 	// 追评（一次, 90 天内）
 	ReviewExtraReq struct {
 		g.Meta   `path:"/reviews/{reviewId}/extra" method:"POST" summary:"追加评价"`
-		ReviewId string `json:"reviewId" v:"required" dc:"评价ID"`
-		Content  string `json:"content" v:"required" dc:"追评内容"`
+		ReviewId string   `json:"reviewId" v:"required" dc:"评价ID"`
+		Content  string   `json:"content" v:"required" dc:"追评内容"`
 		Images   []string `json:"images" dc:"追评图片"`
 	}
 	ReviewExtraRes struct {
@@ -33,14 +33,14 @@ type (
 		PageReq
 	}
 	MyReviewItem struct {
-		ReviewId  string `json:"reviewId"`
-		SpuName   string `json:"spuName"`
-		Score     int    `json:"score"`
-		Content   string `json:"content"`
-		AuditStatus int  `json:"auditStatus" dc:"0待审 1通过 2驳回"`
-		Extra     string `json:"extra" dc:"追评"`
-		Reply     string `json:"reply" dc:"商家回复"`
-		CreatedAt string `json:"createdAt"`
+		ReviewId    string `json:"reviewId"`
+		SpuName     string `json:"spuName"`
+		Score       int    `json:"score"`
+		Content     string `json:"content"`
+		AuditStatus int    `json:"auditStatus" dc:"0待审 1通过 2驳回"`
+		Extra       string `json:"extra" dc:"追评"`
+		Reply       string `json:"reply" dc:"商家回复"`
+		CreatedAt   string `json:"createdAt"`
 	}
 	MyReviewListRes struct {
 		PageRes

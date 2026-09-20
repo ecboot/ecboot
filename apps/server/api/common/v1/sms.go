@@ -13,6 +13,6 @@ type (
 	}
 
 	GetSmsCodeRes struct {
-		SmsCodeKey string `json:"smsCodeKey" v:"required" dc:"短信验证码key"`	
+		SmsCodeKey string `json:"smsCodeKey" v:"required" dc:"短信验证码key"`
 	}
 )

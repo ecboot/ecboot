@@ -10,40 +10,42 @@ type (
 		PageReq
 	}
 	AdminCouponItem struct {
-		Id             string `json:"id"`
-		Name           string `json:"name"`
-		Type           int    `json:"type" dc:"1满减 2无门槛"`
-		Threshold      string `json:"threshold"`
-		Discount       string `json:"discount"`
-		TotalCount     int    `json:"totalCount" dc:"发放总量,0不限"`
-		ReceivedCount  int    `json:"receivedCount" dc:"已领"`
-		PerLimit       int    `json:"perLimit" dc:"每人限领"`
-		ValidType      int    `json:"validType" dc:"1固定区间 2领取后N天"`
-		ValidDesc      string `json:"validDesc" dc:"有效期描述"`
-		Status         int    `json:"status"`
+		Id            string `json:"id"`
+		Name          string `json:"name"`
+		Type          int    `json:"type" dc:"1满减 2无门槛"`
+		Threshold     string `json:"threshold"`
+		Discount      string `json:"discount"`
+		TotalCount    int    `json:"totalCount" dc:"发放总量,0不限"`
+		ReceivedCount int    `json:"receivedCount" dc:"已领"`
+		PerLimit      int    `json:"perLimit" dc:"每人限领"`
+		ValidType     int    `json:"validType" dc:"1固定区间 2领取后N天"`
+		ValidDesc     string `json:"validDesc" dc:"有效期描述"`
+		Status        int    `json:"status"`
 	}
 	AdminCouponListRes struct {
 		PageRes
 		List []AdminCouponItem `json:"list"`
 	}
 
+	// 权限: promotion:coupon:create
 	AdminCouponCreateReq struct {
-		g.Meta         `path:"/coupons" method:"POST" summary:"创建券模板"`
-		Name           string `json:"name" v:"required" dc:"名称"`
-		Type           int    `json:"type" v:"required|in:1,2" dc:"类型"`
-		Threshold      string `json:"threshold" dc:"门槛"`
-		Discount       string `json:"discount" v:"required" dc:"抵扣"`
-		TotalCount     int    `json:"totalCount" dc:"总量,0不限"`
-		PerLimit       int    `json:"perLimit" dc:"每人限领"`
-		ValidType      int    `json:"validType" v:"required|in:1,2" dc:"有效期方式"`
-		ValidStartAt   string `json:"validStartAt" dc:"固定区间开始"`
-		ValidEndAt     string `json:"validEndAt" dc:"固定区间结束"`
-		ValidDays      int    `json:"validDays" dc:"领取后N天"`
+		g.Meta       `path:"/coupons" method:"POST" summary:"创建券模板"`
+		Name         string `json:"name" v:"required" dc:"名称"`
+		Type         int    `json:"type" v:"required|in:1,2" dc:"类型"`
+		Threshold    string `json:"threshold" dc:"门槛"`
+		Discount     string `json:"discount" v:"required" dc:"抵扣"`
+		TotalCount   int    `json:"totalCount" dc:"总量,0不限"`
+		PerLimit     int    `json:"perLimit" dc:"每人限领"`
+		ValidType    int    `json:"validType" v:"required|in:1,2" dc:"有效期方式"`
+		ValidStartAt string `json:"validStartAt" dc:"固定区间开始"`
+		ValidEndAt   string `json:"validEndAt" dc:"固定区间结束"`
+		ValidDays    int    `json:"validDays" dc:"领取后N天"`
 	}
 	AdminCouponCreateRes struct {
 		Id string `json:"id"`
 	}
 
+	// 权限: promotion:coupon:update
 	AdminCouponUpdateReq struct {
 		g.Meta     `path:"/coupons/{id}" method:"PUT" summary:"修改券模板"`
 		Id         string `json:"id" v:"required" dc:"券ID"`
@@ -58,6 +60,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:coupon:delete
 	AdminCouponDeleteReq struct {
 		g.Meta `path:"/coupons/{id}" method:"DELETE" summary:"删除券模板(软删)"`
 		Id     string `json:"id" v:"required" dc:"券ID"`
@@ -110,13 +113,14 @@ type (
 		List []AdminFullReductionItem `json:"list"`
 	}
 
+	// 权限: promotion:fullreduction:manage
 	AdminFullReductionCreateReq struct {
-		g.Meta  `path:"/full-reductions" method:"POST" summary:"创建满减活动"`
-		Name    string                      `json:"name" v:"required" dc:"名称"`
-		StartTime string                    `json:"startTime" v:"required" dc:"开始"`
-		EndTime string                      `json:"endTime" v:"required" dc:"结束"`
-		Ladders []AdminFullReductionLadder  `json:"ladders" v:"required" dc:"档位"`
-		Scopes  []AdminFullReductionScope   `json:"scopes" dc:"范围(空=全场)"`
+		g.Meta    `path:"/full-reductions" method:"POST" summary:"创建满减活动"`
+		Name      string                     `json:"name" v:"required" dc:"名称"`
+		StartTime string                     `json:"startTime" v:"required" dc:"开始"`
+		EndTime   string                     `json:"endTime" v:"required" dc:"结束"`
+		Ladders   []AdminFullReductionLadder `json:"ladders" v:"required" dc:"档位"`
+		Scopes    []AdminFullReductionScope  `json:"scopes" dc:"范围(空=全场)"`
 	}
 	AdminFullReductionCreateRes struct {
 		Id string `json:"id"`
@@ -136,25 +140,45 @@ type (
 		Scopes    []AdminFullReductionScope  `json:"scopes"`
 	}
 
+	// 权限: promotion:fullreduction:manage
 	AdminFullReductionUpdateReq struct {
-		g.Meta  `path:"/full-reductions/{id}" method:"PUT" summary:"修改满减活动"`
-		Id      string                      `json:"id" v:"required" dc:"活动ID"`
-		Name    string                      `json:"name" dc:"名称"`
-		StartTime string                    `json:"startTime" dc:"开始"`
-		EndTime string                      `json:"endTime" dc:"结束"`
-		Status  int                         `json:"status" dc:"状态"`
-		Ladders []AdminFullReductionLadder  `json:"ladders" dc:"档位(全量替换)"`
-		Scopes  []AdminFullReductionScope   `json:"scopes" dc:"范围(全量替换)"`
+		g.Meta    `path:"/full-reductions/{id}" method:"PUT" summary:"修改满减活动"`
+		Id        string                     `json:"id" v:"required" dc:"活动ID"`
+		Name      string                     `json:"name" dc:"名称"`
+		StartTime string                     `json:"startTime" dc:"开始"`
+		EndTime   string                     `json:"endTime" dc:"结束"`
+		Status    int                        `json:"status" dc:"状态"`
+		Ladders   []AdminFullReductionLadder `json:"ladders" dc:"档位(全量替换)"`
+		Scopes    []AdminFullReductionScope  `json:"scopes" dc:"范围(全量替换)"`
 	}
 	AdminFullReductionUpdateRes struct {
 		Success bool `json:"success"`
 	}
 
+	// 权限: promotion:fullreduction:manage
 	AdminFullReductionDeleteReq struct {
 		g.Meta `path:"/full-reductions/{id}" method:"DELETE" summary:"删除满减活动(软删)"`
 		Id     string `json:"id" v:"required" dc:"活动ID"`
 	}
 	AdminFullReductionDeleteRes struct {
 		Success bool `json:"success"`
+	}
+
+	// 券模板详情
+	AdminCouponDetailReq struct {
+		g.Meta `path:"/coupons/{id}" method:"GET" summary:"券模板详情"`
+		Id     string `json:"id" v:"required" dc:"券ID"`
+	}
+	AdminCouponDetailRes struct {
+		Id         string `json:"id"`
+		Name       string `json:"name"`
+		Type       int    `json:"type"`
+		Threshold  string `json:"threshold"`
+		Discount   string `json:"discount"`
+		TotalCount int    `json:"totalCount"`
+		PerLimit   int    `json:"perLimit"`
+		ValidType  int    `json:"validType"`
+		ValidDesc  string `json:"validDesc"`
+		Status     int    `json:"status"`
 	}
 )

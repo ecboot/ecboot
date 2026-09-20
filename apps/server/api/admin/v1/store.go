@@ -28,6 +28,7 @@ type (
 		List []AdminStoreItem `json:"list"`
 	}
 
+	// 权限: store:manage:create
 	AdminStoreCreateReq struct {
 		g.Meta        `path:"/stores" method:"POST" summary:"新增门店"`
 		Name          string  `json:"name" v:"required" dc:"名称"`
@@ -45,6 +46,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: store:manage:update
 	AdminStoreUpdateReq struct {
 		g.Meta        `path:"/stores/{id}" method:"PUT" summary:"修改门店"`
 		Id            string  `json:"id" v:"required" dc:"门店ID"`
@@ -64,11 +66,33 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: store:manage:delete
 	AdminStoreDeleteReq struct {
 		g.Meta `path:"/stores/{id}" method:"DELETE" summary:"删除门店(软删)"`
 		Id     string `json:"id" v:"required" dc:"门店ID"`
 	}
 	AdminStoreDeleteRes struct {
 		Success bool `json:"success"`
+	}
+
+	// 门店详情（管理）
+	AdminStoreDetailReq struct {
+		g.Meta `path:"/stores/{id}" method:"GET" summary:"门店详情"`
+		Id     string `json:"id" v:"required" dc:"门店ID"`
+	}
+	AdminStoreDetailRes struct {
+		Id            string  `json:"id"`
+		StoreNo       string  `json:"storeNo"`
+		Name          string  `json:"name"`
+		ProvinceCode  string  `json:"provinceCode"`
+		CityCode      string  `json:"cityCode"`
+		DistrictCode  string  `json:"districtCode"`
+		DetailAddress string  `json:"detailAddress"`
+		Longitude     float64 `json:"longitude"`
+		Latitude      float64 `json:"latitude"`
+		BusinessHours string  `json:"businessHours"`
+		ContactPhone  string  `json:"contactPhone"`
+		PickupEnabled bool    `json:"pickupEnabled"`
+		Status        int     `json:"status"`
 	}
 )

@@ -11,13 +11,13 @@ type (
 		PageReq
 	}
 	AdminInventoryItem struct {
-		SkuId      string `json:"skuId"`
-		SkuNo      string `json:"skuNo"`
-		SkuName    string `json:"skuName"`
-		Total      int    `json:"total" dc:"总库存"`
-		Locked     int    `json:"locked" dc:"锁定"`
-		Available  int    `json:"available" dc:"可售=total-locked"`
-		WarnCount  int    `json:"warnCount" dc:"预警阈值"`
+		SkuId     string `json:"skuId"`
+		SkuNo     string `json:"skuNo"`
+		SkuName   string `json:"skuName"`
+		Total     int    `json:"total" dc:"总库存"`
+		Locked    int    `json:"locked" dc:"锁定"`
+		Available int    `json:"available" dc:"可售=total-locked"`
+		WarnCount int    `json:"warnCount" dc:"预警阈值"`
 	}
 	AdminInventoryListRes struct {
 		PageRes
@@ -25,6 +25,7 @@ type (
 	}
 
 	// 库存调整（留痕 inventory_log）
+	// 权限: inventory:adjust
 	AdminInventoryAdjustReq struct {
 		g.Meta `path:"/inventories/{skuId}/adjust" method:"POST" summary:"库存调整"`
 		SkuId  string `json:"skuId" v:"required" dc:"SKU ID"`

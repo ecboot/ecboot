@@ -32,8 +32,8 @@ type (
 		g.Meta `path:"/point-account" method:"GET" summary:"积分账户"`
 	}
 	PointAccountRes struct {
-		Balance       int    `json:"balance" dc:"积分余额(可为负)"`
-		LastEarnedAt  string `json:"lastEarnedAt" dc:"最后获得时间(滚动有效期口径)"`
+		Balance      int    `json:"balance" dc:"积分余额(可为负)"`
+		LastEarnedAt string `json:"lastEarnedAt" dc:"最后获得时间(滚动有效期口径)"`
 	}
 
 	PointLogListReq struct {

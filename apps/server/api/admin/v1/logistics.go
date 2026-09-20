@@ -5,8 +5,8 @@ import "github.com/gogf/gf/v2/frame/g"
 type (
 	// 物流公司字典列表
 	AdminLogisticsListReq struct {
-		g.Meta  `path:"/logistics-companies" method:"GET" summary:"物流公司列表"`
-		Status  int    `json:"status" dc:"状态筛选"`
+		g.Meta `path:"/logistics-companies" method:"GET" summary:"物流公司列表"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	AdminLogisticsItem struct {
@@ -21,6 +21,7 @@ type (
 		List []AdminLogisticsItem `json:"list"`
 	}
 
+	// 权限: logistics:company:manage
 	AdminLogisticsCreateReq struct {
 		g.Meta       `path:"/logistics-companies" method:"POST" summary:"新增物流公司"`
 		Code         string `json:"code" v:"required" dc:"编码"`
@@ -31,6 +32,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: logistics:company:manage
 	AdminLogisticsUpdateReq struct {
 		g.Meta       `path:"/logistics-companies/{id}" method:"PUT" summary:"修改物流公司"`
 		Id           string `json:"id" v:"required" dc:"ID"`
@@ -42,11 +44,25 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: logistics:company:manage
 	AdminLogisticsDeleteReq struct {
 		g.Meta `path:"/logistics-companies/{id}" method:"DELETE" summary:"删除物流公司(软删)"`
 		Id     string `json:"id" v:"required" dc:"ID"`
 	}
 	AdminLogisticsDeleteRes struct {
 		Success bool `json:"success"`
+	}
+
+	// 物流公司详情
+	AdminLogisticsDetailReq struct {
+		g.Meta `path:"/logistics-companies/{id}" method:"GET" summary:"物流公司详情"`
+		Id     string `json:"id" v:"required" dc:"ID"`
+	}
+	AdminLogisticsDetailRes struct {
+		Id           string `json:"id"`
+		Code         string `json:"code"`
+		Name         string `json:"name"`
+		TrackingRule string `json:"trackingRule"`
+		Status       int    `json:"status"`
 	}
 )

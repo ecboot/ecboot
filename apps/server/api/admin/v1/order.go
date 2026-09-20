@@ -27,21 +27,21 @@ type AdminOrderStatusLog struct {
 type (
 	// 订单列表（多条件筛选）
 	AdminOrderListReq struct {
-		g.Meta  `path:"/orders" method:"GET" summary:"订单列表"`
-		Status  int    `json:"status" dc:"状态筛选"`
-		OrderNo string `json:"orderNo" dc:"订单号"`
+		g.Meta      `path:"/orders" method:"GET" summary:"订单列表"`
+		Status      int    `json:"status" dc:"状态筛选"`
+		OrderNo     string `json:"orderNo" dc:"订单号"`
 		UserKeyword string `json:"userKeyword" dc:"用户ID/手机号(精确)"`
-		StartTime  string `json:"startTime" dc:"下单起 RFC3339"`
-		EndTime    string `json:"endTime" dc:"下单止"`
+		StartTime   string `json:"startTime" dc:"下单起 RFC3339"`
+		EndTime     string `json:"endTime" dc:"下单止"`
 		PageReq
 	}
 	AdminOrderItem struct {
-		OrderNo   string           `json:"orderNo"`
-		UserId    string           `json:"userId"`
-		Status    int              `json:"status"`
-		PayAmount string           `json:"payAmount"`
+		OrderNo   string                `json:"orderNo"`
+		UserId    string                `json:"userId"`
+		Status    int                   `json:"status"`
+		PayAmount string                `json:"payAmount"`
 		Items     []AdminOrderItemBrief `json:"items" dc:"商品摘要"`
-		CreatedAt string           `json:"createdAt"`
+		CreatedAt string                `json:"createdAt"`
 	}
 	AdminOrderListRes struct {
 		PageRes
@@ -54,25 +54,26 @@ type (
 		OrderNo string `json:"orderNo" v:"required" dc:"订单号"`
 	}
 	AdminOrderDetailRes struct {
-		OrderNo      string            `json:"orderNo"`
-		UserId       string            `json:"userId"`
-		Status       int               `json:"status"`
-		RefundStatus int               `json:"refundStatus"`
+		OrderNo      string                `json:"orderNo"`
+		UserId       string                `json:"userId"`
+		Status       int                   `json:"status"`
+		RefundStatus int                   `json:"refundStatus"`
 		Amount       AdminOrderAmountBrief `json:"amount"`
 		Items        []AdminOrderItemBrief `json:"items"`
-		Receiver     map[string]string `json:"receiver" dc:"收货快照"`
-		UserRemark   string            `json:"userRemark" dc:"买家留言"`
-		SellerRemark string            `json:"sellerRemark" dc:"卖家备注"`
-		Pay          map[string]string `json:"pay" dc:"支付摘要(payNo/channel/paidAt)"`
-		Deliver      map[string]string `json:"deliver" dc:"物流信息"`
+		Receiver     map[string]string     `json:"receiver" dc:"收货快照"`
+		UserRemark   string                `json:"userRemark" dc:"买家留言"`
+		SellerRemark string                `json:"sellerRemark" dc:"卖家备注"`
+		Pay          map[string]string     `json:"pay" dc:"支付摘要(payNo/channel/paidAt)"`
+		Deliver      map[string]string     `json:"deliver" dc:"物流信息"`
 		StatusLogs   []AdminOrderStatusLog `json:"statusLogs"`
-		CreatedAt    string            `json:"createdAt"`
+		CreatedAt    string                `json:"createdAt"`
 	}
 
 	// 发货
+	// 权限: order:deliver
 	AdminOrderDeliverReq struct {
-		g.Meta   `path:"/orders/{orderNo}/deliver" method:"POST" summary:"订单发货"`
-		OrderNo  string `json:"orderNo" v:"required" dc:"订单号"`
+		g.Meta        `path:"/orders/{orderNo}/deliver" method:"POST" summary:"订单发货"`
+		OrderNo       string `json:"orderNo" v:"required" dc:"订单号"`
 		LogisticsCode string `json:"logisticsCode" v:"required" dc:"物流公司编码"`
 		DeliverNo     string `json:"deliverNo" v:"required" dc:"运单号"`
 	}
@@ -81,6 +82,7 @@ type (
 	}
 
 	// 管理员取消（待付款）
+	// 权限: order:cancel
 	AdminOrderCancelReq struct {
 		g.Meta  `path:"/orders/{orderNo}/cancel" method:"POST" summary:"管理员取消订单"`
 		OrderNo string `json:"orderNo" v:"required" dc:"订单号"`
@@ -91,9 +93,10 @@ type (
 	}
 
 	// 卖家备注
+	// 权限: order:update
 	AdminOrderRemarkReq struct {
-		g.Meta  `path:"/orders/{orderNo}/seller-remark" method:"PUT" summary:"卖家备注"`
-		OrderNo string `json:"orderNo" v:"required" dc:"订单号"`
+		g.Meta       `path:"/orders/{orderNo}/seller-remark" method:"PUT" summary:"卖家备注"`
+		OrderNo      string `json:"orderNo" v:"required" dc:"订单号"`
 		SellerRemark string `json:"sellerRemark" v:"required" dc:"备注内容"`
 	}
 	AdminOrderRemarkRes struct {

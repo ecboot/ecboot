@@ -13,16 +13,16 @@ type (
 		PageReq
 	}
 	AdminOperationLogItem struct {
-		Id            string `json:"id"`
-		Username      string `json:"username" dc:"操作人"`
-		Module        string `json:"module" dc:"模块"`
-		Operation     string `json:"operation" dc:"操作"`
-		Method        string `json:"method" dc:"HTTP方法"`
-		RequestUri    string `json:"requestUri" dc:"请求路径"`
-		ResultStatus  int    `json:"resultStatus" dc:"1成功 0失败"`
-		Ip            string `json:"ip"`
-		CostMs        int    `json:"costMs" dc:"耗时毫秒"`
-		CreatedAt     string `json:"createdAt"`
+		Id           string `json:"id"`
+		Username     string `json:"username" dc:"操作人"`
+		Module       string `json:"module" dc:"模块"`
+		Operation    string `json:"operation" dc:"操作"`
+		Method       string `json:"method" dc:"HTTP方法"`
+		RequestUri   string `json:"requestUri" dc:"请求路径"`
+		ResultStatus int    `json:"resultStatus" dc:"1成功 0失败"`
+		Ip           string `json:"ip"`
+		CostMs       int    `json:"costMs" dc:"耗时毫秒"`
+		CreatedAt    string `json:"createdAt"`
 	}
 	AdminOperationLogListRes struct {
 		PageRes
@@ -31,7 +31,7 @@ type (
 
 	// 后台登录审计
 	AdminLoginLogListReq struct {
-		g.Meta  `path:"/admin-login-logs" method:"GET" summary:"后台登录审计"`
+		g.Meta   `path:"/admin-login-logs" method:"GET" summary:"后台登录审计"`
 		Username string `json:"username" dc:"用户名"`
 		PageReq
 	}

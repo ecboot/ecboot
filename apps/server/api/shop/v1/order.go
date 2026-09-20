@@ -5,19 +5,19 @@ import "github.com/gogf/gf/v2/frame/g"
 type (
 	// 创建订单（幂等; 玩法上下文二选一见字段）
 	OrderCreateReq struct {
-		g.Meta        `path:"/orders" method:"POST" summary:"创建订单"`
-		RequestToken  string `json:"requestToken" v:"required" dc:"下单幂等凭证"`
-		AddressId     string `json:"addressId" v:"required" dc:"收货地址ID"`
-		UserCouponId  string `json:"userCouponId" dc:"使用的用户券"`
-		UsePoint      bool   `json:"usePoint" dc:"积分抵扣"`
-		UseAccount    bool   `json:"useAccount" dc:"佣金余额抵扣"`
-		UserRemark    string `json:"userRemark" dc:"买家留言"`
-		CartItemIds   []string `json:"cartItemIds" dc:"普通下单:购物车项ID列表"`
-		GroupBuyTeamId string `json:"groupBuyTeamId" dc:"拼团下单:团ID"`
-		SkuId         string `json:"skuId" dc:"秒杀/直购:SKU ID"`
-		Quantity      int    `json:"quantity" dc:"秒杀/直购数量"`
-		FlashSaleItemId string `json:"flashSaleItemId" dc:"秒杀下单:场次商品ID"`
-		BargainRecordId string `json:"bargainRecordId" dc:"砍价下单:砍价单ID"`
+		g.Meta          `path:"/orders" method:"POST" summary:"创建订单"`
+		RequestToken    string   `json:"requestToken" v:"required" dc:"下单幂等凭证"`
+		AddressId       string   `json:"addressId" v:"required" dc:"收货地址ID"`
+		UserCouponId    string   `json:"userCouponId" dc:"使用的用户券"`
+		UsePoint        bool     `json:"usePoint" dc:"积分抵扣"`
+		UseAccount      bool     `json:"useAccount" dc:"佣金余额抵扣"`
+		UserRemark      string   `json:"userRemark" dc:"买家留言"`
+		CartItemIds     []string `json:"cartItemIds" dc:"普通下单:购物车项ID列表"`
+		GroupBuyTeamId  string   `json:"groupBuyTeamId" dc:"拼团下单:团ID"`
+		SkuId           string   `json:"skuId" dc:"秒杀/直购:SKU ID"`
+		Quantity        int      `json:"quantity" dc:"秒杀/直购数量"`
+		FlashSaleItemId string   `json:"flashSaleItemId" dc:"秒杀下单:场次商品ID"`
+		BargainRecordId string   `json:"bargainRecordId" dc:"砍价下单:砍价单ID"`
 	}
 	OrderCreateRes struct {
 		OrderNo   string `json:"orderNo" dc:"订单号"`
@@ -67,17 +67,17 @@ type (
 		OrderNo string `json:"orderNo" v:"required" dc:"订单号"`
 	}
 	OrderDetailRes struct {
-		OrderNo        string           `json:"orderNo"`
-		Status         int              `json:"status"`
-		RefundStatus   int              `json:"refundStatus" dc:"0无 1部分退款 2全额退款"`
-		Amount         OrderAmountBrief `json:"amount"`
-		Items          []OrderItemBrief `json:"items"`
-		Receiver       map[string]string `json:"receiver" dc:"收货快照"`
-		PayTime        string           `json:"payTime" dc:"支付时间"`
-		DeliverInfo    map[string]string `json:"deliverInfo" dc:"物流信息(发货后)"`
-		CancelInfo     map[string]string `json:"cancelInfo" dc:"取消信息(取消后)"`
-		StatusLogs     []OrderStatusLog `json:"statusLogs" dc:"状态时间线"`
-		CreatedAt      string           `json:"createdAt"`
+		OrderNo      string            `json:"orderNo"`
+		Status       int               `json:"status"`
+		RefundStatus int               `json:"refundStatus" dc:"0无 1部分退款 2全额退款"`
+		Amount       OrderAmountBrief  `json:"amount"`
+		Items        []OrderItemBrief  `json:"items"`
+		Receiver     map[string]string `json:"receiver" dc:"收货快照"`
+		PayTime      string            `json:"payTime" dc:"支付时间"`
+		DeliverInfo  map[string]string `json:"deliverInfo" dc:"物流信息(发货后)"`
+		CancelInfo   map[string]string `json:"cancelInfo" dc:"取消信息(取消后)"`
+		StatusLogs   []OrderStatusLog  `json:"statusLogs" dc:"状态时间线"`
+		CreatedAt    string            `json:"createdAt"`
 	}
 
 	OrderCancelReq struct {

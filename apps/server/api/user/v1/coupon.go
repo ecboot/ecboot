@@ -4,13 +4,13 @@ import "github.com/gogf/gf/v2/frame/g"
 
 type (
 	UsableCouponTemplate struct {
-		CouponId    string `json:"couponId"`
-		Name        string `json:"name" dc:"券名称"`
-		Type        int    `json:"type" dc:"1满减 2无门槛"`
-		Threshold   string `json:"threshold" dc:"门槛金额"`
-		Discount    string `json:"discount" dc:"抵扣金额"`
-		ValidDesc   string `json:"validDesc" dc:"有效期描述"`
-		CanReceive  bool   `json:"canReceive" dc:"是否可领(限领/存量)"`
+		CouponId   string `json:"couponId"`
+		Name       string `json:"name" dc:"券名称"`
+		Type       int    `json:"type" dc:"1满减 2无门槛"`
+		Threshold  string `json:"threshold" dc:"门槛金额"`
+		Discount   string `json:"discount" dc:"抵扣金额"`
+		ValidDesc  string `json:"validDesc" dc:"有效期描述"`
+		CanReceive bool   `json:"canReceive" dc:"是否可领(限领/存量)"`
 	}
 
 	// 可领模板列表
@@ -42,8 +42,8 @@ type (
 		Status       int    `json:"status" dc:"1未使用 2已使用 3已过期 4已退回"`
 	}
 	MyCouponListReq struct {
-		g.Meta  `path:"/coupons" method:"GET" summary:"我的优惠券"`
-		Status  int `json:"status" dc:"状态筛选" d:"1"`
+		g.Meta `path:"/coupons" method:"GET" summary:"我的优惠券"`
+		Status int `json:"status" dc:"状态筛选" d:"1"`
 		PageReq
 	}
 	MyCouponListRes struct {

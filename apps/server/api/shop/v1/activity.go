@@ -13,14 +13,14 @@ type (
 		GroupPrice string `json:"groupPrice" dc:"成团价(元)"`
 	}
 	GroupBuyItem struct {
-		ActivityId string         `json:"activityId"`
-		Name       string         `json:"name" dc:"活动名称"`
-		SpuId      string         `json:"spuId" dc:"商品SPU"`
-		SpuName    string         `json:"spuName" dc:"商品名称"`
-		Image      string         `json:"image" dc:"商品主图"`
-		Items      []GroupBuySku  `json:"items" dc:"SKU成团价"`
-		GroupSize  int            `json:"groupSize" dc:"成团人数"`
-		EndTime    string         `json:"endTime" dc:"活动截止"`
+		ActivityId string        `json:"activityId"`
+		Name       string        `json:"name" dc:"活动名称"`
+		SpuId      string        `json:"spuId" dc:"商品SPU"`
+		SpuName    string        `json:"spuName" dc:"商品名称"`
+		Image      string        `json:"image" dc:"商品主图"`
+		Items      []GroupBuySku `json:"items" dc:"SKU成团价"`
+		GroupSize  int           `json:"groupSize" dc:"成团人数"`
+		EndTime    string        `json:"endTime" dc:"活动截止"`
 	}
 	GroupBuyListRes struct {
 		PageRes
@@ -39,11 +39,11 @@ type (
 		PerLimit    int    `json:"perLimit" dc:"每人限购"`
 	}
 	FlashSaleItem struct {
-		ActivityId string          `json:"activityId"`
-		Name       string          `json:"name"`
-		StartTime  string          `json:"startTime"`
-		EndTime    string          `json:"endTime"`
-		Items      []FlashSaleSku  `json:"items" dc:"场次商品"`
+		ActivityId string         `json:"activityId"`
+		Name       string         `json:"name"`
+		StartTime  string         `json:"startTime"`
+		EndTime    string         `json:"endTime"`
+		Items      []FlashSaleSku `json:"items" dc:"场次商品"`
 	}
 	FlashSaleListRes struct {
 		PageRes
@@ -61,13 +61,13 @@ type (
 		FloorPrice    string `json:"floorPrice" dc:"底价"`
 	}
 	BargainActivityItem struct {
-		ActivityId string         `json:"activityId"`
-		Name       string         `json:"name"`
-		SpuId      string         `json:"spuId"`
-		SpuName    string         `json:"spuName"`
-		Image      string         `json:"image"`
-		Items      []BargainSku   `json:"items" dc:"SKU价格区间"`
-		EndTime    string         `json:"endTime"`
+		ActivityId string       `json:"activityId"`
+		Name       string       `json:"name"`
+		SpuId      string       `json:"spuId"`
+		SpuName    string       `json:"spuName"`
+		Image      string       `json:"image"`
+		Items      []BargainSku `json:"items" dc:"SKU价格区间"`
+		EndTime    string       `json:"endTime"`
 	}
 	BargainActivityListRes struct {
 		PageRes

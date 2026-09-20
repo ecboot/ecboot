@@ -12,12 +12,12 @@ type (
 		PageReq
 	}
 	AdminMemberItem struct {
-		UserId      string `json:"userId"`
-		Nickname    string `json:"nickname"`
-		Phone       string `json:"phone" dc:"手机号(脱敏)"`
-		Level       int    `json:"level" dc:"会员等级"`
-		Status      int    `json:"status" dc:"1正常 2禁用"`
-		CreatedAt   string `json:"createdAt" dc:"注册时间"`
+		UserId    string `json:"userId"`
+		Nickname  string `json:"nickname"`
+		Phone     string `json:"phone" dc:"手机号(脱敏)"`
+		Level     int    `json:"level" dc:"会员等级"`
+		Status    int    `json:"status" dc:"1正常 2禁用"`
+		CreatedAt string `json:"createdAt" dc:"注册时间"`
 	}
 	AdminMemberListRes struct {
 		PageRes
@@ -43,20 +43,22 @@ type (
 	}
 
 	// 禁用/启用（审计留痕）
+	// 权限: member:update
 	AdminMemberDisableReq struct {
-		g.Meta `path:"/members/{userId}/disable" method:"POST" summary:"禁用/启用会员"`
-		UserId string `json:"userId" v:"required" dc:"用户ID"`
-		Disable bool  `json:"disable" dc:"true禁用 false启用"`
-		Reason string `json:"reason" dc:"原因"`
+		g.Meta  `path:"/members/{userId}/disable" method:"POST" summary:"禁用/启用会员"`
+		UserId  string `json:"userId" v:"required" dc:"用户ID"`
+		Disable bool   `json:"disable" dc:"true禁用 false启用"`
+		Reason  string `json:"reason" dc:"原因"`
 	}
 	AdminMemberDisableRes struct {
 		Success bool `json:"success"`
 	}
 
 	// 改绑手机号（旧号解占; 审计留痕）
+	// 权限: member:update
 	AdminMemberRebindPhoneReq struct {
-		g.Meta  `path:"/members/{userId}/rebind-phone" method:"POST" summary:"改绑手机号"`
-		UserId  string `json:"userId" v:"required" dc:"用户ID"`
+		g.Meta   `path:"/members/{userId}/rebind-phone" method:"POST" summary:"改绑手机号"`
+		UserId   string `json:"userId" v:"required" dc:"用户ID"`
 		NewPhone string `json:"newPhone" v:"required" dc:"新手机号"`
 	}
 	AdminMemberRebindPhoneRes struct {

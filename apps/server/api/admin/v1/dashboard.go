@@ -10,10 +10,10 @@ type (
 		EndTime   string `json:"endTime" dc:"止"`
 	}
 	AdminDashboardTradeRes struct {
-		OrderCount    int64  `json:"orderCount" dc:"订单数"`
-		SalesAmount   string `json:"salesAmount" dc:"销售额(元)"`
-		RefundAmount  string `json:"refundAmount" dc:"退款额(元)"`
-		PendingDeliver int64 `json:"pendingDeliver" dc:"待发货单数"`
+		OrderCount     int64  `json:"orderCount" dc:"订单数"`
+		SalesAmount    string `json:"salesAmount" dc:"销售额(元)"`
+		RefundAmount   string `json:"refundAmount" dc:"退款额(元)"`
+		PendingDeliver int64  `json:"pendingDeliver" dc:"待发货单数"`
 	}
 
 	// 会员看板
@@ -23,8 +23,8 @@ type (
 		EndTime   string `json:"endTime" dc:"止"`
 	}
 	AdminDashboardMemberRes struct {
-		NewCount    int64 `json:"newCount" dc:"新增会员"`
-		ActiveCount int64 `json:"activeCount" dc:"活跃会员(口径:周期内有活动)"`
+		NewCount     int64 `json:"newCount" dc:"新增会员"`
+		ActiveCount  int64 `json:"activeCount" dc:"活跃会员(口径:周期内有活动)"`
 		DormantCount int64 `json:"dormantCount" dc:"休眠会员(≥90天)"`
 	}
 
@@ -33,8 +33,8 @@ type (
 		g.Meta `path:"/dashboard/product" method:"GET" summary:"商品看板"`
 	}
 	AdminDashboardProductRes struct {
-		OnSaleCount    int64 `json:"onSaleCount" dc:"在售商品"`
-		LowStockCount  int64 `json:"lowStockCount" dc:"低库存预警数"`
-		PendingReview  int64 `json:"pendingReview" dc:"待审核评价数"`
+		OnSaleCount   int64 `json:"onSaleCount" dc:"在售商品"`
+		LowStockCount int64 `json:"lowStockCount" dc:"低库存预警数"`
+		PendingReview int64 `json:"pendingReview" dc:"待审核评价数"`
 	}
 )

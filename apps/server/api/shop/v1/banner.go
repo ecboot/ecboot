@@ -28,11 +28,11 @@ type (
 		Price string `json:"price" dc:"价格(元)"`
 	}
 	FloorItem struct {
-		FloorId  string         `json:"floorId"`
+		FloorId   string         `json:"floorId"`
 		FloorType int            `json:"floorType" dc:"类型:1金刚区 2商品楼层 3专题"`
-		Title    string         `json:"title"`
-		Products []FloorProduct `json:"products" dc:"商品楼层装配"`
-		Config   map[string]any `json:"config" dc:"楼层配置(金刚区入口等)"`
+		Title     string         `json:"title"`
+		Products  []FloorProduct `json:"products" dc:"商品楼层装配"`
+		Config    map[string]any `json:"config" dc:"楼层配置(金刚区入口等)"`
 	}
 	FloorListRes struct {
 		List []FloorItem `json:"list"`

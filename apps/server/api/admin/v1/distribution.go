@@ -25,6 +25,7 @@ type (
 	}
 
 	// 推广员审核
+	// 权限: distribution:audit
 	AdminDistributorAuditReq struct {
 		g.Meta `path:"/distributors/{id}/audit" method:"POST" summary:"推广员审核"`
 		Id     string `json:"id" v:"required" dc:"推广员记录ID"`
@@ -35,6 +36,7 @@ type (
 	}
 
 	// 冻结/解冻
+	// 权限: distribution:audit
 	AdminDistributorFreezeReq struct {
 		g.Meta `path:"/distributors/{id}/freeze" method:"POST" summary:"冻结/解冻推广员"`
 		Id     string `json:"id" v:"required" dc:"推广员记录ID"`
@@ -46,7 +48,7 @@ type (
 
 	// 佣金规则列表
 	AdminDistRuleListReq struct {
-		g.Meta  `path:"/commission-rules" method:"GET" summary:"佣金规则列表"`
+		g.Meta `path:"/commission-rules" method:"GET" summary:"佣金规则列表"`
 		PageReq
 	}
 	AdminDistRuleItem struct {
@@ -63,6 +65,7 @@ type (
 	}
 
 	// 创建佣金规则（作用域唯一）
+	// 权限: distribution:rule:manage
 	AdminDistRuleCreateReq struct {
 		g.Meta     `path:"/commission-rules" method:"POST" summary:"创建佣金规则"`
 		ScopeType  int    `json:"scopeType" v:"required|in:1,2" dc:"1分类 2商品"`
@@ -74,6 +77,7 @@ type (
 		Id string `json:"id"`
 	}
 
+	// 权限: distribution:rule:manage
 	AdminDistRuleUpdateReq struct {
 		g.Meta     `path:"/commission-rules/{id}" method:"PUT" summary:"修改佣金规则"`
 		Id         string `json:"id" v:"required" dc:"规则ID"`
@@ -85,6 +89,7 @@ type (
 		Success bool `json:"success"`
 	}
 
+	// 权限: distribution:rule:manage
 	AdminDistRuleDeleteReq struct {
 		g.Meta `path:"/commission-rules/{id}" method:"DELETE" summary:"删除佣金规则(软删)"`
 		Id     string `json:"id" v:"required" dc:"规则ID"`
@@ -101,13 +106,13 @@ type (
 		PageReq
 	}
 	AdminDistRecordItem struct {
-		OrderNo      string `json:"orderNo"`
-		Beneficiary  string `json:"beneficiary" dc:"受益人(脱敏昵称)"`
-		Level        int    `json:"level" dc:"1一级 2二级"`
-		BaseAmount   string `json:"baseAmount" dc:"计佣基数"`
-		Amount       string `json:"amount"`
-		Status       int    `json:"status"`
-		SettleTime   string `json:"settleTime"`
+		OrderNo     string `json:"orderNo"`
+		Beneficiary string `json:"beneficiary" dc:"受益人(脱敏昵称)"`
+		Level       int    `json:"level" dc:"1一级 2二级"`
+		BaseAmount  string `json:"baseAmount" dc:"计佣基数"`
+		Amount      string `json:"amount"`
+		Status      int    `json:"status"`
+		SettleTime  string `json:"settleTime"`
 	}
 	AdminDistRecordListRes struct {
 		PageRes
@@ -116,8 +121,8 @@ type (
 
 	// 提现列表
 	AdminWithdrawListReq struct {
-		g.Meta  `path:"/withdraws" method:"GET" summary:"提现列表"`
-		Status  int `json:"status" dc:"状态筛选"`
+		g.Meta `path:"/withdraws" method:"GET" summary:"提现列表"`
+		Status int `json:"status" dc:"状态筛选"`
 		PageReq
 	}
 	AdminWithdrawItem struct {
@@ -133,17 +138,19 @@ type (
 	}
 
 	// 提现审核（通过→打款中冻结; 拒绝→回退）
+	// 权限: distribution:withdraw:audit
 	AdminWithdrawAuditReq struct {
-		g.Meta      `path:"/withdraws/{withdrawNo}/audit" method:"POST" summary:"提现审核"`
-		WithdrawNo  string `json:"withdrawNo" v:"required" dc:"提现单号"`
-		Pass        bool   `json:"pass" dc:"通过/拒绝"`
-		Reason      string `json:"reason" dc:"拒绝原因"`
+		g.Meta     `path:"/withdraws/{withdrawNo}/audit" method:"POST" summary:"提现审核"`
+		WithdrawNo string `json:"withdrawNo" v:"required" dc:"提现单号"`
+		Pass       bool   `json:"pass" dc:"通过/拒绝"`
+		Reason     string `json:"reason" dc:"拒绝原因"`
 	}
 	AdminWithdrawAuditRes struct {
 		Success bool `json:"success"`
 	}
 
 	// 打款结果登记（成功核销 / 失败回退）
+	// 权限: distribution:withdraw:pay
 	AdminWithdrawPayReq struct {
 		g.Meta         `path:"/withdraws/{withdrawNo}/pay" method:"POST" summary:"提现打款登记"`
 		WithdrawNo     string `json:"withdrawNo" v:"required" dc:"提现单号"`
