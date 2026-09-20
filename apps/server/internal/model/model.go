@@ -25,33 +25,27 @@ type FileTypeDTO struct {
 	Type string `json:"type" dc:"附件类型"`
 }
 
-type (
-	PageRequest struct {
-		PageNum  int
-		PageSize int
-	}
-
-	PageResult[T any] struct {
-		Records  []*T `json:"records"`
-		PageNum  int  `json:"pageNum"`
-		PageSize int  `json:"pageSize"`
-		Total    int  `json:"total"`
-	}
-)
-
-// api 层公共契约结构（自 api/base 迁入, 2026-09-20）。
-// 约定：ID/金额对外一律 string（int64 与十进制精度安全）；时间 RFC3339；
-// 分页请求 page 默认 1、pageSize 默认 10 上限 100；列表响应 total + list。
+// ---------- 分页（单一语义三件套, 2026-09-20 合并原 PageRequest/PageResult 双轨） ----------
+// 约定：字段统一 page/pageSize（契约 JSON 与内部参数同名，零转换）；
+// 默认与上限只在契约层声明（d/v 标签），仓储层做防御性兜底；
+// ID/金额对外一律 string（int64 与十进制精度安全）；时间 RFC3339。
 // 各渠道 api/{渠道}/v1 以类型别名引用（PageReq = model.PageReq）。
 
-// PageReq 分页请求嵌入结构。
+// PageReq 分页入参：嵌入 api 各列表 Req（契约结构），亦直接作为仓储查询参数。
 type PageReq struct {
 	Page     int `json:"page" dc:"页码,默认1" v:"min:1" d:"1"`
 	PageSize int `json:"pageSize" dc:"每页数量,默认10,上限100" v:"min:1|max:100" d:"10"`
 }
 
-// PageRes 分页响应嵌入结构。
+// PageRes 分页出参：嵌入 api 各列表 Res（total 之外的 list 字段由各接口自定义）。
 type PageRes struct {
+	Total int64 `json:"total" dc:"总条数"`
+}
+
+// PageResult 内部分页查询容器：repository 泛型返回（List + Total），
+// 页参数由调用方持有的 PageReq 承载，不再重复回传。
+type PageResult[T any] struct {
+	List  []T   `json:"list" dc:"数据列表"`
 	Total int64 `json:"total" dc:"总条数"`
 }
 

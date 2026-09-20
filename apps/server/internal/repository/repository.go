@@ -21,7 +21,7 @@ type IRepository[T, D any] interface {
 	ListByIds(ids []any) ([]*T, error)
 	List(where interface{}, args ...interface{}) ([]*T, error)
 	Count(where interface{}, args ...interface{}) (int, error)
-	Page(req model.PageRequest, where interface{}, args ...interface{}) (*model.PageResult[T], error)
+	Page(req model.PageReq, where interface{}, args ...interface{}) (*model.PageResult[T], error)
 }
 
 // Repository 是 IRepository 接口的一个泛型实现
@@ -124,20 +124,22 @@ func (s *Repository[T, D]) Count(where interface{}, args ...interface{}) (int, e
 	return s.Model().Where(where, args...).Count()
 }
 
-func (s *Repository[T, D]) Page(req model.PageRequest, where interface{}, args ...interface{}) (result *model.PageResult[T], err error) {
-	if req.PageNum <= 0 {
-		req.PageNum = 1
+// Page 通用分页查询：入参复用契约 PageReq（page/pageSize 单一语义），
+// 防御性兜底与契约默认值对齐（默认 10、上限 100）。
+func (s *Repository[T, D]) Page(req model.PageReq, where interface{}, args ...interface{}) (result *model.PageResult[T], err error) {
+	if req.Page <= 0 {
+		req.Page = 1
 	}
 	if req.PageSize <= 0 {
-		req.PageSize = 20
+		req.PageSize = 10
 	}
-	if req.PageSize > 200 {
-		req.PageSize = 200
+	if req.PageSize > 100 {
+		req.PageSize = 100
 	}
 
 	var (
 		total   int
-		records []*T
+		records []T
 	)
 
 	total, err = s.Count(where, args...)
@@ -146,19 +148,17 @@ func (s *Repository[T, D]) Page(req model.PageRequest, where interface{}, args .
 	}
 
 	if total == 0 {
-		return &model.PageResult[T]{Records: records, PageNum: req.PageNum, PageSize: req.PageSize, Total: 0}, nil
+		return &model.PageResult[T]{List: records, Total: 0}, nil
 	}
 
-	offset := (req.PageNum - 1) * req.PageSize
+	offset := (req.Page - 1) * req.PageSize
 	err = s.Model().Where(where, args...).Offset(offset).Limit(req.PageSize).Scan(&records)
 	if err != nil {
 		return nil, err
 	}
 
 	return &model.PageResult[T]{
-		Records:  records,
-		PageNum:  req.PageNum,
-		PageSize: req.PageSize,
-		Total:    total,
+		List:  records,
+		Total: int64(total),
 	}, nil
 }
