@@ -38,3 +38,20 @@ type (
 		Total    int  `json:"total"`
 	}
 )
+
+// api 层公共契约结构（自 api/base 迁入, 2026-09-20）。
+// 约定：ID/金额对外一律 string（int64 与十进制精度安全）；时间 RFC3339；
+// 分页请求 page 默认 1、pageSize 默认 10 上限 100；列表响应 total + list。
+// 各渠道 api/{渠道}/v1 以类型别名引用（PageReq = model.PageReq）。
+
+// PageReq 分页请求嵌入结构。
+type PageReq struct {
+	Page     int `json:"page" dc:"页码,默认1" v:"min:1" d:"1"`
+	PageSize int `json:"pageSize" dc:"每页数量,默认10,上限100" v:"min:1|max:100" d:"10"`
+}
+
+// PageRes 分页响应嵌入结构。
+type PageRes struct {
+	Total int64 `json:"total" dc:"总条数"`
+}
+

@@ -12,6 +12,8 @@ import (
 
 type ICommonV1 interface {
 	GetCaptcha(ctx context.Context, req *v1.GetCaptchaReq) (res *v1.GetCaptchaRes, err error)
+	VerifyCaptcha(ctx context.Context, req *v1.VerifyCaptchaReq) (res *v1.VerifyCaptchaRes, err error)
+	MockLatestSms(ctx context.Context, req *v1.MockLatestSmsReq) (res *v1.MockLatestSmsRes, err error)
 	Ping(ctx context.Context, req *v1.PingReq) (res *v1.PingRes, err error)
 	ShareReport(ctx context.Context, req *v1.ShareReportReq) (res *v1.ShareReportRes, err error)
 	GetSmsCode(ctx context.Context, req *v1.GetSmsCodeReq) (res *v1.GetSmsCodeRes, err error)

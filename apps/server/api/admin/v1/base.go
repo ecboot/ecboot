@@ -1,9 +1,9 @@
 package v1
 
-import "ecboot/api/base"
+import "ecboot/internal/model"
 
-// 公共契约结构别名（真源：api/base）。
+// 公共契约结构别名（真源：internal/model）。
 type (
-	PageReq = base.PageReq
-	PageRes = base.PageRes
+	PageReq = model.PageReq
+	PageRes = model.PageRes
 )

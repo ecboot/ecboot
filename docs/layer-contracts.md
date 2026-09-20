@@ -17,7 +17,10 @@ main.go / internal/app（装配与启动，bootstrap 初始化）
 
 - **渠道隔离**：`api/{common,user,shop,admin}` 四目录互不引用；公共渠道（common）不依赖任何领域业务。
 - **领域兄弟互禁**：`service/user` 与 `service/shop` 互不 import，经领域事件协作。
-- **生成物治理**：`internal/dao`、`internal/model` 由 `gf gen dao` 生成，禁止手改。
+- **生成物治理**：
+  - **控制器约定**：`internal/controller/*` 与 `api/{渠道}/{渠道}.go` 聚合接口由 **`gf gen ctrl`** 生成——修改 `api/{渠道}/v1` 接口定义后运行该命令同步；`*_new.go` 允许手工调整，`*_v1_*.go` 桩由业务特性填充实现。
+  - **数据访问约定**：`internal/dao`、`internal/model/entity`、`internal/model/do` 由 **`gf gen dao`** 更新（配置 `hack/config.yaml`）——表结构变更后运行；生成物禁止手改。
+  - `internal/model/model.go` 为手工维护的公共模型（含 api 契约分页结构 PageReq/PageRes），不属于 dao 生成范围。
 - 依赖方向若需机器强制（如 depguard），作为演进项在 `.golangci.yml` 落地并回填本文件。
 
 ## 系统定位
