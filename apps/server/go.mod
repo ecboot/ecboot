@@ -1,6 +1,6 @@
 module ecboot
 
-go 1.23.0
+go 1.25
 
 require github.com/gogf/gf/v2 v2.10.3
 

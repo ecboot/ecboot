@@ -1,9 +1,9 @@
 # ECBOOT 数据库 Schema 设计（MVP v1）
 
 社交电商平台第一版数据库设计。目标规模：初期 1 万用户、日订单 500。
-技术栈：Spring Boot 4 + MySQL 8.4 LTS + MyBatis Plus + Redis 8 + Flyway。
+技术栈：Go + GoFrame v2（宪法 2.0.0，2026-09-20 自 Java/Spring 迁移——业务代码为零窗口期的资产平移）+ MySQL 8.4 + Redis + **golang-migrate**。
 
-迁移脚本位于 `apps/api/ecboot-start/src/main/resources/db/migration/`（Flyway 默认位置，应用启动自动执行，零配置）。
+迁移脚本位于 `apps/server/migrations/`（golang-migrate 格式 `NNNNNN_name.up/down.sql`）。历史 Flyway 命名 `V{n}__{name}.sql` 已一次性转换为 `{n:06}_{name}.up.sql`（语义零变更，序号一一对应；空库全量重放 31 个迁移全部成功）；本文各表的"V 编号"即对应序号。**迁移为纯前进式**（down 仅占位，恢复以备份重放为准）。
 
 ## 文件清单
 
@@ -61,7 +61,7 @@
 - **积分/满减（V19/V20）**：双账本（积分可负消耗、成长值只增）；订单优惠三构成恒等式 `promotion_amount ≡ coupon_amount + full_reduction_amount + point_amount`（头/项两层成立，尾差记末行）；满减范围用关系表支撑热路径命中查询。
 - **风控（V21）**：规则与事件分离，事件多态关联业务对象、申诉四态；**站内搜索零建表**（商品既有结构足够）。
 
-表总数：**54**（V1~V10 基线 26 + V11~V21 新增 28）；`user`/`trade_order`/`trade_order_item` 为增列改造。
+表总数勘误（2026-09-20）：此前滚动计数漏算 V24 的 `group_buy_item`，**正确总数 70**（golang-migrate 空库重放实测与逐表清单双重确认）；`user`/`trade_order`/`trade_order_item` 为增列改造。
 
 ### 注销匿名化规则（FR-003 / 合规红线 2）
 
