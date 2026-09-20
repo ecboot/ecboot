@@ -34,6 +34,7 @@ Guidance for AI coding agents working in this repository.
 
 - Generate commit messages in Chinese, following Conventional Commits style, e.g. `feat: 新增用户登录`, `chore: 升级依赖`.
 - 金额（Money）一律使用 `DECIMAL(10,2)` 存储与 `CHAR(3)` ISO 4217 币种（默认 `CNY`）；应用层统一 `BigDecimal`，比较必须用 `compareTo`。禁止 `float`/`double` 存金额，禁止 `equals`/`==` 比较金额。
+- 多商户演进预留（B2C 严守）：设计上预留多商户迭代可能（归属维度指向 seller、平台级/商家级显式分层、merchant/seller/shop 术语三分），功能上严守 B2C 单商户——B2B2C 功能（商家端后台/平台-商家分账/商家选择）须修宪后才可做。
 
 ## 合规红线（中国，设计前必须知道）
 
