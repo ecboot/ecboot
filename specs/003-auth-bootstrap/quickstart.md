@@ -1,6 +1,6 @@
-# Quickstart: 认证引导纵切片验证指南
+# Quickstart: 认证引导纵切片验证指南（Go 版）
 
-前提：`cd apps/api && docker compose up -d`（MySQL/Redis/ES）；应用启动即 Flyway（V1~V32）。端到端用例可直接对运行中服务执行（或由 `@SpringBootTest` 覆盖同序列）。
+前提：`cd apps/server && docker compose up -d`（MySQL/Redis/ES）；`make migrate-up`（含 000032 配置种子）；`make run`（:8080）。端到端用例可直接对运行中服务执行（或由 gtest 端到端用例覆盖同序列）。
 
 ## 场景一：注册即登录全链路（SC-001）
 
@@ -62,5 +62,5 @@ UPDATE user SET last_active_at = DATE_SUB(NOW(), INTERVAL 91 DAY) WHERE id = <ui
 ## 宪法 IV 验证命令
 
 ```bash
-cd apps/api && ./mvnw test -pl ecboot-start -am   # BUILD SUCCESS + 切片测试全绿
+cd apps/server && make test    # go test ./... 全绿
 ```
