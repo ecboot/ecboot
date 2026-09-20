@@ -7,9 +7,17 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 
 	"ecboot/api/common/v1"
+	"ecboot/internal/errcode"
+	"ecboot/internal/library/captcha"
 )
 
-// VerifyCaptcha 图形验证码独立校验（一次性; 随 003 实现补齐逻辑）
 func (c *ControllerV1) VerifyCaptcha(ctx context.Context, req *v1.VerifyCaptchaReq) (res *v1.VerifyCaptchaRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	ok, err := captcha.Verify(ctx, req.CaptchaKey, req.CaptchaCode)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, gerror.NewCode(gcode.New(errcode.CodeCaptchaError, "验证码错误或已过期", nil))
+	}
+	return &v1.VerifyCaptchaRes{Success: true}, nil
 }
