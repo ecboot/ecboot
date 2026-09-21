@@ -22,12 +22,12 @@
 
 ## Phase 4: US4 支付（新写，P1）
 
-- [ ] T008 [P] [US4] `internal/service/shop/pay_impl_test.go`（红）：Create（应付<=0 拒绝）/Status；
+- [x] T008 [P] [US4] `internal/service/shop/pay_impl_test.go`（红）：Create（应付<=0 拒绝）/Status；
       **HandlePayNotify 幂等四层**（条件更新 affected=0 → 幂等应答；金额不符 → 拒绝+留档；订单已取消 → 不推进）；
       成功推进（支付单20/订单20/库存核销/余额消费完成）；HandleRefundNotify 幂等推进售后单
-- [ ] T009 [US4] `internal/service/shop/pay_impl.go`（新增）：5 方法（含 CloseExpired：过期支付单关闭）
-- [ ] T010 [US4] 连线 shop 支付 4 端点（桩清零 ×4；notify 两端点公开——白名单已有）
-- [ ] T011 `go test ./...` 绿
+- [x] T009 [US4] `internal/service/shop/pay_impl.go`（新增）：5 方法（含 CloseExpired：过期支付单关闭）
+- [x] T010 [US4] 连线 shop 支付 4 端点（桩清零 ×4；notify 两端点公开——白名单已有）
+- [x] T011 `go test ./...` 绿
 
 ## Phase 5: US5 后台订单（新写，P1）
 
