@@ -3,12 +3,20 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
+// NotifyPreferenceGet 通知偏好（未设置=默认全开）
 func (c *ControllerV1) NotifyPreferenceGet(ctx context.Context, req *v1.NotifyPreferenceGetReq) (res *v1.NotifyPreferenceGetRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	prefs, err := user.Preferences(ctx, middleware.CtxUserIdFrom(ctx))
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.NotifyPreferenceGetRes{List: make([]v1.NotifyPreference, 0, len(prefs))}
+	for _, p := range prefs {
+		res.List = append(res.List, v1.NotifyPreference{Channel: p.Channel, Enabled: p.Enabled})
+	}
+	return res, nil
 }

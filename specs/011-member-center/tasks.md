@@ -76,11 +76,11 @@
 
 **Independent Test**: 2 未读→计数 2→单条已读→全读→计数 0；偏好默认全开→关闭→再查
 
-- [ ] T016 [P] [US4] `notify_impl_test.go`（红）：消息列表**未读计数（全量非当前页）**与已读态筛选；
+- [x] T016 [P] [US4] `notify_impl_test.go`（红）：消息列表**未读计数（全量非当前页）**与已读态筛选；
       单条/全部已读；**偏好未设置=全开**；设置幂等（重复同值不重复行）；站内信不在偏好内
-- [ ] T017 [US4] `notify_impl.go`：消息 3 + 偏好 2 端点方法 + `Enqueue`/`DispatchTask`（内部, D6）
-- [ ] T018 [US4] 连线 5 端点（桩清零 ×5）
-- [ ] T019 [US4] `go test ./...` 绿
+- [x] T017 [US4] `notify_impl.go`：消息 3 + 偏好 2 端点方法 + `Enqueue`/`DispatchTask`（内部, D6）
+- [x] T018 [US4] 连线 5 端点（桩清零 ×5）
+- [x] T019 [US4] `go test ./...` 绿
 
 ---
 

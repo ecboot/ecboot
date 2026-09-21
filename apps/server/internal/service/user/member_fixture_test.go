@@ -71,3 +71,17 @@ func seedSpuForMember(ctx context.Context, t *gtest.T, suffix, price, image stri
 func cleanupSpuForMember(ctx context.Context, t *gtest.T, suffix string) {
 	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no=?", "UM-SPU-"+suffix)
 }
+
+// seedMessage 建站内信（isRead=true 时同时回填 read_time）。
+func seedMessage(ctx context.Context, t *gtest.T, userId int64, title string, isRead bool) int64 {
+	read, readTime := 0, "NULL"
+	if isRead {
+		read, readTime = 1, "NOW()"
+	}
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO user_message(user_id,title,content,biz_type,biz_no,is_read,read_time) "+
+			"VALUES(?,?,'内容',1,'',?,"+readTime+")", userId, title, read)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}

@@ -19,7 +19,7 @@ type (
 
 	MessageListReq struct {
 		g.Meta `path:"/messages" method:"GET" summary:"站内信列表"`
-		IsRead int `json:"isRead" dc:"已读筛选:0未读 1已读(空=全部)"`
+		IsRead int `json:"isRead" d:"-1" dc:"已读筛选:0未读 1已读 -1全部(默认)"`
 		model.PageReq
 	}
 	MessageListRes struct {

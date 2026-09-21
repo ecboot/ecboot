@@ -3,12 +3,15 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
+// MessageReadAll 全部已读
 func (c *ControllerV1) MessageReadAll(ctx context.Context, req *v1.MessageReadAllReq) (res *v1.MessageReadAllRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = user.MarkAllRead(ctx, middleware.CtxUserIdFrom(ctx)); err != nil {
+		return nil, err
+	}
+	return &v1.MessageReadAllRes{Success: true}, nil
 }
