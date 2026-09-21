@@ -95,8 +95,9 @@ func AdminUserCreate(ctx context.Context, in model.AdminUserInput) (int64, error
 
 // AdminUserUpdate 修改姓名/状态（FR-009）: 操作者禁用自己被拒（FR-012）。
 func AdminUserUpdate(ctx context.Context, id int64, in model.AdminUserUpdateInput) error {
-	if in.Status == 2 && currentAdminId(ctx) == id {
-		return errcode.New(errcode.CodeAdminSelfGuard, "禁止禁用自身账号")
+	// 操作者置为任何非启用状态被拒（FR-012; 评审 I2: 不限于 status=2, 域外值由 api 层枚举拦截）
+	if in.Status > 0 && in.Status != 1 && currentAdminId(ctx) == id {
+		return errcode.New(errcode.CodeAdminSelfGuard, "禁止停用自身账号")
 	}
 	data := do.AdminUser{}
 	if in.RealName != "" {
@@ -105,11 +106,16 @@ func AdminUserUpdate(ctx context.Context, id int64, in model.AdminUserUpdateInpu
 	if in.Status > 0 {
 		data.Status = in.Status
 	}
-	if _, err := dao.AdminUser.Ctx(ctx).
+	res, err := dao.AdminUser.Ctx(ctx).
 		Where(dao.AdminUser.Columns().Id, id).
 		Where(dao.AdminUser.Columns().Deleted, 0).
-		Data(data).Update(); err != nil {
+		Data(data).Update()
+	if err != nil {
 		return gerror.Wrap(err, "修改后台账号失败")
+	}
+	// 评审 I3: 0 行更新=目标不存在, 拒绝静默成功
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errcode.New(errcode.CodeNotFound, "账号不存在")
 	}
 	return nil
 }
@@ -148,6 +154,19 @@ func AdminUserDelete(ctx context.Context, id int64) error {
 
 // AssignRoles 账号-角色全量替换（FR-011）: 同事务删旧插新, 幂等。
 func AssignRoles(ctx context.Context, adminId int64, roleIds []int64) error {
+	// 评审 I3: 目标角色须存在且未删（表无外键, 防挂链幽灵 ID）
+	if len(roleIds) > 0 {
+		cnt, err := dao.AdminRole.Ctx(ctx).
+			Where(dao.AdminRole.Columns().Deleted, 0).
+			WhereIn(dao.AdminRole.Columns().Id, roleIds).
+			Count()
+		if err != nil {
+			return gerror.Wrap(err, "查询角色失败")
+		}
+		if cnt != len(roleIds) {
+			return errcode.New(errcode.CodeNotFound, "存在无效的角色ID")
+		}
+	}
 	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		_, err := dao.AdminUserRole.Ctx(ctx).
 			Where(dao.AdminUserRole.Columns().AdminId, adminId).
@@ -347,12 +366,15 @@ func RoleUpdate(ctx context.Context, id int64, in model.RoleInput) error {
 	if in.Status > 0 {
 		data.Status = in.Status
 	}
-	_, err := dao.AdminRole.Ctx(ctx).
+	res, err := dao.AdminRole.Ctx(ctx).
 		Where(dao.AdminRole.Columns().Id, id).
 		Where(dao.AdminRole.Columns().Deleted, 0).
 		Data(data).Update()
 	if err != nil {
 		return gerror.Wrap(err, "修改角色失败")
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errcode.New(errcode.CodeNotFound, "角色不存在")
 	}
 	return nil
 }
@@ -389,7 +411,7 @@ func RoleDetailView(ctx context.Context, id int64) (*model.RoleDetailView, error
 		return nil, gerror.Wrap(err, "查询角色失败")
 	}
 	if rec.IsEmpty() {
-		return nil, errcode.New(errcode.CodeActivityNotFound, "角色不存在")
+		return nil, errcode.New(errcode.CodeNotFound, "角色不存在")
 	}
 	var role entity.AdminRole
 	if err = rec.Struct(&role); err != nil {
@@ -418,6 +440,27 @@ func RoleDetailView(ctx context.Context, id int64) (*model.RoleDetailView, error
 
 // AssignPermissions 角色-权限全量替换（FR-016）: 同事务删旧插新, 幂等。
 func AssignPermissions(ctx context.Context, roleId int64, permissionIds []int64) error {
+	// 评审 I3: 目标角色与权限须存在且未删
+	if cnt, err := dao.AdminRole.Ctx(ctx).
+		Where(dao.AdminRole.Columns().Id, roleId).
+		Where(dao.AdminRole.Columns().Deleted, 0).
+		Count(); err != nil {
+		return gerror.Wrap(err, "查询角色失败")
+	} else if cnt == 0 {
+		return errcode.New(errcode.CodeNotFound, "角色不存在")
+	}
+	if len(permissionIds) > 0 {
+		cnt, err := dao.AdminPermission.Ctx(ctx).
+			Where(dao.AdminPermission.Columns().Deleted, 0).
+			WhereIn(dao.AdminPermission.Columns().Id, permissionIds).
+			Count()
+		if err != nil {
+			return gerror.Wrap(err, "查询权限失败")
+		}
+		if cnt != len(permissionIds) {
+			return errcode.New(errcode.CodeNotFound, "存在无效的权限ID")
+		}
+	}
 	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		_, err := dao.AdminRolePermission.Ctx(ctx).
 			Where(dao.AdminRolePermission.Columns().RoleId, roleId).
@@ -499,10 +542,14 @@ func HasPermission(ctx context.Context, adminId int64, code string) (bool, error
 	if rec["is_super"].Int() == 1 {
 		return true, nil
 	}
+	// 评审 I1: 挂链角色自身须启用未删——停用/软删角色立即回收全部权限（与 adminRoleCodes 展示口径一致）
 	cnt, err := dao.AdminUserRole.Ctx(ctx).As("ur").
+		InnerJoin(dao.AdminRole.Table()+" r", "r.id=ur.role_id").
 		InnerJoin(dao.AdminRolePermission.Table()+" rp", "rp.role_id=ur.role_id").
 		InnerJoin(dao.AdminPermission.Table()+" p", "p.id=rp.permission_id").
 		Where("ur.admin_id", adminId).
+		Where("r.status", 1).
+		Where("r.deleted", 0).
 		Where("p.code", code).
 		Where("p.status", 1).
 		Where("p.deleted", 0).

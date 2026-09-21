@@ -350,3 +350,80 @@ func TestHasPermission(t *testing.T) {
 		t.Assert(ok, false)
 	})
 }
+
+// TestHasPermissionRoleDisabled 评审 I1: 停用/软删角色立即回收权限（挂链仍在, 判定拒绝）。
+func TestHasPermissionRoleDisabled(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		plainId := seedAdmin(ctx, t, "t_rc_rd_p", 0)
+		defer cleanupAdmin(ctx, t, "t_rc_rd_p")
+		cleanRoles(ctx, t, "t_rc_rd")
+		rid := seedRole(ctx, t, "t_rc_rd", 1)
+		defer cleanRoles(ctx, t, "t_rc_rd")
+		p := seedPerm(ctx, t, "t_rc:rd", 1)
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM admin_permission WHERE id=?", p) }()
+
+		t.AssertNil(AssignRoles(ctx, plainId, []int64{rid}))
+		t.AssertNil(AssignPermissions(ctx, rid, []int64{p}))
+		ok, err := HasPermission(ctx, plainId, "t_rc:rd")
+		t.AssertNil(err)
+		t.Assert(ok, true)
+
+		// 停用角色 → false
+		_, err = g.DB().Exec(ctx, "UPDATE admin_role SET status=0 WHERE id=?", rid)
+		t.AssertNil(err)
+		ok, err = HasPermission(ctx, plainId, "t_rc:rd")
+		t.AssertNil(err)
+		t.Assert(ok, false)
+
+		// 软删角色 → false
+		_, err = g.DB().Exec(ctx, "UPDATE admin_role SET status=1, deleted=1 WHERE id=?", rid)
+		t.AssertNil(err)
+		ok, err = HasPermission(ctx, plainId, "t_rc:rd")
+		t.AssertNil(err)
+		t.Assert(ok, false)
+	})
+}
+
+// TestAssignValidation 评审 I3: 分配接口拒绝不存在的目标 ID。
+func TestAssignValidation(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		adminId := seedAdmin(ctx, t, "t_asv_a", 0)
+		defer cleanupAdmin(ctx, t, "t_asv_a")
+		cleanRoles(ctx, t, "t_asv_r")
+		rid := seedRole(ctx, t, "t_asv_r", 1)
+		defer cleanRoles(ctx, t, "t_asv_r")
+
+		// 不存在的角色 → 10006
+		err := AssignRoles(ctx, adminId, []int64{rid, 999999999})
+		t.Assert(errCode(err), errcode.CodeNotFound)
+
+		// 不存在的角色上挂权限 → 10006
+		err = AssignPermissions(ctx, 999999999, []int64{})
+		t.Assert(errCode(err), errcode.CodeNotFound)
+	})
+}
+
+// TestUpdateGuards 评审 I2/I3: 自禁泛化到非启用态; 更新 0 行=不存在。
+func TestUpdateGuards(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		id := seedAdmin(ctx, t, "t_ug_a", 0)
+		defer cleanupAdmin(ctx, t, "t_ug_a")
+
+		// 操作者传域外状态值(3)禁用自己 → 仍被守卫拦截（api 层另有 in:1,2 枚举）
+		err := AdminUserUpdate(opCtx(ctx, id), id, model.AdminUserUpdateInput{Status: 3})
+		t.Assert(errCode(err), errcode.CodeAdminSelfGuard)
+
+		// 更新不存在的账号 → 10006（拒绝静默成功）
+		err = AdminUserUpdate(opCtx(ctx, id), 999999999, model.AdminUserUpdateInput{RealName: "x"})
+		t.Assert(errCode(err), errcode.CodeNotFound)
+
+		// 角色同理
+		cleanRoles(ctx, t, "t_ug_r")
+		defer cleanRoles(ctx, t, "t_ug_r")
+		err = RoleUpdate(ctx, 999999999, model.RoleInput{Name: "x", Status: 1})
+		t.Assert(errCode(err), errcode.CodeNotFound)
+	})
+}

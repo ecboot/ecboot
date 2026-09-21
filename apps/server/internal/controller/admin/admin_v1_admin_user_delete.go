@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"strconv"
 
 	"ecboot/api/admin/v1"
 	"ecboot/internal/middleware"
@@ -14,7 +13,7 @@ func (c *ControllerV1) AdminUserDelete(ctx context.Context, req *v1.AdminUserDel
 	if err = middleware.RequirePerm(ctx, "system:admin:manage"); err != nil {
 		return nil, err
 	}
-	id, err := strconv.ParseInt(req.Id, 10, 64)
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, err
 	}

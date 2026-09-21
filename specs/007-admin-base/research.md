@@ -38,6 +38,9 @@ spec Assumptions 原写"无新增迁移"，按 PROGRESS 防偏离条款 4 在 sp
 
 **替代方案**：测试自建 + 生产引导 SQL 放 docs 由运维手工执行——部署面易遗漏，种子走迁移可被 `migrate-fresh` 全量重放验证；放弃。
 
+**评审 I4 补记**：初始密码哈希虽经 bcrypt，但种子 SQL 随 git 入库、注释含明文——生产部署 MUST 在首次部署后
+立即以超管登录改密（或由部署脚本生成哈希替换 migrations 后再执行）。挂入 deployments/deploy.sh 检查项（批次外跟进）。
+
 ## D4 MockLatestSms = 运行时环境判定
 
 **结论**：实现 MockLatestSms 控制器：读 Redis `mock:sms:{phone}`（`library/sms` 的 MockSender 落点）返回最近验证码；

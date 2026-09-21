@@ -14,7 +14,7 @@ func (c *ControllerV1) AdminUserAssignRoles(ctx context.Context, req *v1.AdminUs
 	if err = middleware.RequirePerm(ctx, "system:admin:assign"); err != nil {
 		return nil, err
 	}
-	id, err := strconv.ParseInt(req.Id, 10, 64)
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, err
 	}

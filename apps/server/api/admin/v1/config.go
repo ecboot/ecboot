@@ -25,7 +25,7 @@ type (
 		g.Meta `path:"/configs/{code}" method:"PUT" summary:"修改系统配置"`
 		Code   string `json:"code" v:"required" dc:"配置编码"`
 		Value  string `json:"value" v:"required" dc:"新值"`
-		Status int    `json:"status" dc:"状态"`
+		Status int    `json:"status" dc:"状态" v:"in:0,1"`
 	}
 	AdminConfigUpdateRes struct {
 		Success bool `json:"success"`

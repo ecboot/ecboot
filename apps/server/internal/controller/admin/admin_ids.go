@@ -1,10 +1,19 @@
 package admin
 
-import "strconv"
+import (
+	"strconv"
+
+	"ecboot/internal/errcode"
+)
 
 // parseID/fmtID api 层 ID 一律 string（防 JS 精度）, 与 service int64 的统一转换。
+// 非法 ID 走参数错误（评审 M2: 不落系统错误）。
 func parseID(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, errcode.New(errcode.CodeInvalidParam, "ID格式错误")
+	}
+	return id, nil
 }
 
 func fmtID(id int64) string {

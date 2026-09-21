@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"strconv"
 
 	"ecboot/api/admin/v1"
 	"ecboot/internal/service/system"
@@ -10,7 +9,7 @@ import (
 
 // AdminUserDetail 后台账号详情
 func (c *ControllerV1) AdminUserDetail(ctx context.Context, req *v1.AdminUserDetailReq) (res *v1.AdminUserDetailRes, err error) {
-	id, err := strconv.ParseInt(req.Id, 10, 64)
+	id, err := parseID(req.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +18,7 @@ func (c *ControllerV1) AdminUserDetail(ctx context.Context, req *v1.AdminUserDet
 		return nil, err
 	}
 	return &v1.AdminUserDetailRes{
-		Id:            strconv.FormatInt(it.Id, 10),
+		Id:            fmtID(it.Id),
 		Username:      it.Username,
 		RealName:      it.RealName,
 		IsSuper:       it.IsSuper,

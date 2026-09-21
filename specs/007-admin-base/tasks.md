@@ -178,3 +178,13 @@
   （禁用自身冒烟返回 10005 为正确分层语义: 权限门先于业务规则, 80006 由 service 层测试覆盖）
 - 已知环境事项: 本机 golangci-lint 旧二进制与 go.mod 1.26.0 错配, 已重装 @latest；测试库 mydatabase
   迁移账本遗留 dirty 标记已以 `migrate force 34` 修复后正常应用 000035
+
+## 评审修复轮（2026-09-21, With fixes → 已闭合）
+
+- **C1（必修）**: AccessLog 请求体/头部敏感字段脱敏（password/验证码/凭证对/Authorization）+ 单测——FR-007 日志禁令闭合
+- **I1**: HasPermission 联查补 admin_role(status=1, deleted=0)——停用/软删角色立即回收权限；data-model §三 图纸勘误 + 测试
+- **I2**: 状态值 api 层枚举（in:1,2 / in:0,1）+ 自禁守卫泛化为「任何非启用态」（域外值纵深防御）+ 测试
+- **I3**: AssignRoles/AssignPermissions 目标存在性校验；更新 0 行返回 10006（拒绝静默成功）+ 测试
+- **M1/M2/M4**: 角色不存在 10006 归位；parseID 非法 ID 走 10001 并统一 helper；admin token/refresh 加账号态校验
+- **记录在案**：M3 登录时序侧信道（用户名探测）属后续加固；M4-2 改密不吊销其他会话（需会话索引结构, 后续批次）；
+  M5 部署本批后全部旧会话失效（audience 改名），发布说明需公告；I4 种子密码生产首登必改（research D3 补记）

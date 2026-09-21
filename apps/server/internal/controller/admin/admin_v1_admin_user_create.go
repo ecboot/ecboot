@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"strconv"
 
 	"ecboot/api/admin/v1"
 	"ecboot/internal/middleware"
@@ -23,5 +22,5 @@ func (c *ControllerV1) AdminUserCreate(ctx context.Context, req *v1.AdminUserCre
 	if err != nil {
 		return nil, err
 	}
-	return &v1.AdminUserCreateRes{Id: strconv.FormatInt(id, 10)}, nil
+	return &v1.AdminUserCreateRes{Id: fmtID(id)}, nil
 }

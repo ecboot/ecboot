@@ -50,9 +50,14 @@ RequirePerm(ctx, code)
   → adminId = CtxUserIdFrom(ctx)
   → system.HasPermission(ctx, adminId, code)
       ├─ admin_user: deleted=0 且 status=1 且 is_super=1 → true（直通）
-      └─ JOIN admin_user_role → admin_role_permission → admin_permission(code, status=1, deleted=0) 命中 → true
+      └─ JOIN admin_user_role → admin_role(评审I1: status=1, deleted=0)
+             → admin_role_permission → admin_permission(code, status=1, deleted=0) 命中 → true
   → 否则 false → 统一权限不足错误码
 ```
+
+> 评审勘误（2026-09-21）：初版图纸漏画角色状态过滤——停用/软删角色若不回收权限，
+> 与 Profile 展示口径（adminRoleCodes 只列启用角色）不一致。实现已随勘误修正并补测试。
+> 同批评审加固：分配接口校验目标存在性（表无外键）、更新 0 行返回 10006、状态值 api 层枚举（in:1,2 / in:0,1）。
 
 ## 四、状态迁移（本批范围）
 

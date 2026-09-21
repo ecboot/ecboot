@@ -15,7 +15,7 @@ make migrate-up               # 应用迁移至 000035（含种子超管）
 ```bash
 make test                     # 全绿（含既有认证/交易回归 + 本批 service/system 新测试）
 make lint                     # 通过
-make check-stub               # admin 桩 129→107、common 桩 5→3（本批 22 清零）
+make check-stub               # admin 桩 129→109、common 桩 5→3（本批 22 清零）
 ```
 
 测试基座遵循 005/006 模式：`internal/service/system/*_test.go` 确定性配置注入 + 数据自建清理。

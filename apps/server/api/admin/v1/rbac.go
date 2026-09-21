@@ -41,7 +41,7 @@ type (
 		Id          string `json:"id" v:"required" dc:"角色ID"`
 		Name        string `json:"name" dc:"名称"`
 		Description string `json:"description" dc:"描述"`
-		Status      int    `json:"status" dc:"状态"`
+		Status      int    `json:"status" dc:"状态" v:"in:0,1"`
 	}
 	AdminRoleUpdateRes struct {
 		Success bool `json:"success"`
@@ -123,7 +123,7 @@ type (
 		g.Meta   `path:"/admin-users/{id}" method:"PUT" summary:"修改后台账号"`
 		Id       string `json:"id" v:"required" dc:"账号ID"`
 		RealName string `json:"realName" dc:"姓名"`
-		Status   int    `json:"status" dc:"1正常 2禁用"`
+		Status   int    `json:"status" dc:"1正常 2禁用" v:"in:1,2"`
 	}
 	AdminUserUpdateRes struct {
 		Success bool `json:"success"`

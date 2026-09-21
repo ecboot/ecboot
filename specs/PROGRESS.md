@@ -70,4 +70,5 @@
 | 2026-09-21 | — | 建表：13 批规划对账（210 桩 + 8 已连线 = 218），新增 `make check-stub` | 初始规划 | `688c08a` |
 | 2026-09-21 | 01 | spec 假设修订：允许新增纯数据种子迁移 000035_admin_seed（超管账号 1 个） | 勘察发现无种子管理员，后台无可登录入口；plan/research D3 | `2b0df43` |
 | 2026-09-21 | 01 | api 契约微扩：AdminLogoutReq 增加 refreshToken 可选字段 | FR-004 双凭证同毁需要；对齐 user 渠道 LogoutReq 既有形态 | `51b0b6b` |
-| 2026-09-21 | 01 | IRBACLogic 微扩 AdminUserDetail 方法 | api 有账号详情端点而接口漏定义；同 D6 模式 | |
+| 2026-09-21 | 01 | IRBACLogic 微扩 AdminUserDetail 方法 | api 有账号详情端点而接口漏定义；同 D6 模式 | `1ef20f5` |
+| 2026-09-21 | 01 | 评审修复轮（With fixes）：C1 访问日志脱敏（accesslog 既有文件，因本批登录/改密端点引入泄露面）；I1 HasPermission 补角色状态过滤（data-model §三 图纸同步勘误） | 代码评审发现，Critical/Important 合并前必修 | |
