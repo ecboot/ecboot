@@ -2,6 +2,7 @@ package shop
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -20,7 +21,7 @@ const (
 
 // seedStore 建测试门店, 返回 ID; lng/lat 同时为 0 表示未录入坐标（NULL, 不参与附近检索）。
 func seedStore(ctx context.Context, t *gtest.T, name, districtCode string, lng, lat float64, status int) int64 {
-	_, _ = g.DB().Exec(ctx, "DELETE FROM `store` WHERE name=?", name)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM `store` WHERE name=? OR store_no=?", name, "ST-T-"+name)
 	var lngVal, latVal any
 	if lng == 0 && lat == 0 {
 		lngVal, latVal = nil, nil
@@ -38,10 +39,10 @@ func seedStore(ctx context.Context, t *gtest.T, name, districtCode string, lng, 
 	return id
 }
 
-// cleanupStore 清理测试门店。
+// cleanupStore 清理测试门店（按 name 与测试编码双路——测试可能改名, name 不可靠）。
 func cleanupStore(ctx context.Context, t *gtest.T, names ...string) {
 	for _, n := range names {
-		_, _ = g.DB().Exec(ctx, "DELETE FROM `store` WHERE name=?", n)
+		_, _ = g.DB().Exec(ctx, "DELETE FROM `store` WHERE name=? OR store_no=?", n, "ST-T-"+n)
 	}
 }
 
@@ -55,9 +56,9 @@ func TestPublicListDistrict(t *testing.T) {
 			nC = "t_st_dC"
 		)
 		defer cleanupStore(ctx, t, nA, nB, nC)
-		seedStore(ctx, t, nA, "330108", tSearchLng, tSearchLat, 1)          // A 区营业
-		seedStore(ctx, t, nB, "330110", tSearchLng, tSearchLat, 1)          // B 区营业
-		seedStore(ctx, t, nC, "330108", tSearchLng, tSearchLat, 2)          // A 区歇业
+		seedStore(ctx, t, nA, "330108", tSearchLng, tSearchLat, 1) // A 区营业
+		seedStore(ctx, t, nB, "330110", tSearchLng, tSearchLat, 1) // B 区营业
+		seedStore(ctx, t, nC, "330108", tSearchLng, tSearchLat, 2) // A 区歇业
 
 		res, err := PublicList(ctx, model.StoreQuery{DistrictCode: "330108"})
 		t.AssertNil(err)
@@ -154,5 +155,155 @@ func TestPublicDetail(t *testing.T) {
 
 		_, err = PublicDetail(ctx, 999999999)
 		t.Assert(errCode(err), errcode.CodeNotFound)
+	})
+}
+
+// ---- US2 管理面 ----
+
+// TestAdminCreate 创建门店: 系统生成唯一编码 + 区划码校验（FR-007/008, 验收 1/2）。
+func TestAdminCreate(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const (
+			n1 = "t_adm_cr1"
+			n2 = "t_adm_cr2"
+		)
+		defer cleanupStore(ctx, t, n1, n2)
+
+		id, err := AdminCreate(ctx, model.StoreInput{
+			Name: n1, ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "测试路1号", Longitude: 120.123456, Latitude: 30.123456, PickupEnabled: true,
+		})
+		t.AssertNil(err)
+		t.AssertGT(id, 0)
+
+		d, err := AdminDetail(ctx, id)
+		t.AssertNil(err)
+		t.Assert(strings.HasPrefix(d.StoreNo, "ST"), true)
+		t.Assert(d.Name, n1)
+		t.Assert(d.PickupEnabled, true)
+		t.Assert(d.Longitude, 120.123456)
+		t.Assert(d.DistrictCode, "330108")
+
+		// 编码全局唯一（两次创建不同）
+		id2, err := AdminCreate(ctx, model.StoreInput{
+			Name: n2, ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "测试路2号",
+		})
+		t.AssertNil(err)
+		d2, err := AdminDetail(ctx, id2)
+		t.AssertNil(err)
+		t.AssertNE(d.StoreNo, d2.StoreNo)
+
+		// 区划码非 6 位数字 → 10001
+		_, err = AdminCreate(ctx, model.StoreInput{
+			Name: "t_adm_bad", ProvinceCode: "33", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "x",
+		})
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
+		_, err = AdminCreate(ctx, model.StoreInput{
+			Name: "t_adm_bad", ProvinceCode: "330000", CityCode: "33010X", DistrictCode: "330108",
+			DetailAddress: "x",
+		})
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
+	})
+}
+
+// TestAdminUpdateDelete 修改（含歇业切换）/软删/不存在语义（FR-009/010, 验收 3/5）。
+func TestAdminUpdateDelete(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const n = "t_adm_ud"
+		defer cleanupStore(ctx, t, n)
+		id := seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat, 1)
+
+		// 改名 + 歇业
+		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{Name: n + "_x", Status: 2}))
+		d, err := AdminDetail(ctx, id)
+		t.AssertNil(err)
+		t.Assert(d.Name, n+"_x")
+		t.Assert(d.Status, 2)
+		_ = d
+
+		// 关闭自提: 零值写入场景（do 的 omitempty 需显式 Fields 白名单才不吞零值）
+		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{
+			Name: n + "_x", ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "改后地址", PickupEnabled: false, Status: 2,
+		}))
+		dc, err := AdminDetail(ctx, id)
+		t.AssertNil(err)
+		t.Assert(dc.PickupEnabled, false)
+		t.Assert(dc.DetailAddress, "改后地址")
+
+		// 歇业后游客列表不含
+		res, err := PublicList(ctx, model.StoreQuery{DistrictCode: "330108"})
+		t.AssertNil(err)
+		for _, it := range res.List {
+			t.AssertNE(it.Id, id)
+		}
+
+		// 不存在 → 10006
+		err = AdminUpdate(ctx, 999999999, model.StoreInput{Name: "x"})
+		t.Assert(errCode(err), errcode.CodeNotFound)
+
+		// 软删 → 后台与游客均不可见
+		t.AssertNil(AdminDelete(ctx, id))
+		_, err = AdminDetail(ctx, id)
+		t.Assert(errCode(err), errcode.CodeNotFound)
+		_, err = PublicDetail(ctx, id)
+		t.Assert(errCode(err), errcode.CodeNotFound)
+
+		// 重复删除 → 10006
+		err = AdminDelete(ctx, id)
+		t.Assert(errCode(err), errcode.CodeNotFound)
+	})
+}
+
+// TestAdminListFilters 后台列表: 状态 + 关键词（名称/编码）+ 分页（FR-011, 验收 4）。
+func TestAdminListFilters(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const (
+			nA = "t_adm_lstA"
+			nB = "t_adm_lstB"
+		)
+		defer cleanupStore(ctx, t, nA, nB)
+		seedStore(ctx, t, nA, "330108", tSearchLng, tSearchLat, 1)
+		idB := seedStore(ctx, t, nB, "330108", tSearchLng, tSearchLat, 2)
+
+		// status=2 → 含 nB 不含 nA
+		res, err := AdminList(ctx, 2, "", model.PageReq{Page: 1, PageSize: 20})
+		t.AssertNil(err)
+		foundB, foundA := false, false
+		for _, it := range res.List {
+			if it.Name == nB {
+				foundB = true
+				t.Assert(it.Status, 2)
+			}
+			if it.Name == nA {
+				foundA = true
+			}
+		}
+		t.Assert(foundB, true)
+		t.Assert(foundA, false)
+
+		// keyword 命中名称
+		res, err = AdminList(ctx, 0, "t_adm_lst", model.PageReq{Page: 1, PageSize: 20})
+		t.AssertNil(err)
+		t.AssertGE(res.Total, 2)
+
+		// keyword 命中编码（取 nB 的真实编码）
+		db, err := AdminDetail(ctx, idB)
+		t.AssertNil(err)
+		res, err = AdminList(ctx, 0, db.StoreNo, model.PageReq{Page: 1, PageSize: 20})
+		t.AssertNil(err)
+		t.Assert(res.Total, 1)
+		t.Assert(res.List[0].Id, idB)
+
+		// 分页
+		res, err = AdminList(ctx, 0, "t_adm_lst", model.PageReq{Page: 1, PageSize: 1})
+		t.AssertNil(err)
+		t.Assert(len(res.List), 1)
+		t.Assert(res.Total, 2)
 	})
 }

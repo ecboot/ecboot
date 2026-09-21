@@ -125,3 +125,5 @@
 - `IStoreLogic` 缺 AdminDetail 方法——按批次 01 D6 模式微扩接口（复用 StoreItem 返回）。
 - 本批零表结构变更、零新迁移、零新 DTO（StoreQuery/StoreItem/StoreInput 已就位）。
 - 批次 DoD：admin 109→104、common 3→1；全量测试绿；本批文件 lint 零问题。
+- 门店修改采用**全量覆盖语义**（后台表单提交完整档案, 空值即清空）：显式字段白名单保证零值可写
+  （关闭自提/置歇业），消除 bool 字段"未传 vs 传 false"二义（research D6 实现期决策）。

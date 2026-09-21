@@ -7,13 +7,17 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 
 	"ecboot/internal/dao"
 	"ecboot/internal/errcode"
+	"ecboot/internal/library/idgen"
 	"ecboot/internal/model"
+	"ecboot/internal/model/do"
 )
 
 // storeBaseCols 门店列表/详情基础列（与 storeItemFromRecord 映射一致）。
@@ -112,7 +116,7 @@ func publicListNearby(ctx context.Context, q model.StoreQuery, page model.PageRe
 
 	expr := fmt.Sprintf(haversineDistanceSQL, lat, lat, lng)
 	recs, err := dao.Store.Ctx(ctx).
-		Fields(storeBaseCols + ", " + expr + " AS distance_m").
+		Fields(storeBaseCols+", "+expr+" AS distance_m").
 		Where(dao.Store.Columns().Status, 1).
 		Where(dao.Store.Columns().Deleted, 0).
 		Where("latitude BETWEEN ? AND ?", lat-deltaLat, lat+deltaLat).
@@ -155,4 +159,183 @@ func PublicDetail(ctx context.Context, storeId int64) (*model.StoreItem, error) 
 	}
 	it := storeItemFromRecord(rec)
 	return &it, nil
+}
+
+// ---- 管理面（US2） ----
+
+// isValidAreaCode 区划码 6 位数字（GB/T 2260）。
+func isValidAreaCode(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+	for i := 0; i < 6; i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// coordOrNull 坐标 0 视为未录入（写入 NULL, 不参与附近检索; spec 边界）。
+func coordOrNull(v float64) any {
+	if v == 0 {
+		return nil
+	}
+	return v
+}
+
+// AdminCreate 创建门店（FR-007/008）: 服务端生成全局唯一编码（sonyflake, research D2）;
+// 唯一键冲突重试 ≤3（概率极低, 不暴露给调用方）。
+func AdminCreate(ctx context.Context, in model.StoreInput) (int64, error) {
+	if in.Name == "" {
+		return 0, errcode.New(errcode.CodeInvalidParam, "门店名称必填")
+	}
+	if in.DetailAddress == "" {
+		return 0, errcode.New(errcode.CodeInvalidParam, "详细地址必填")
+	}
+	if !isValidAreaCode(in.ProvinceCode) || !isValidAreaCode(in.CityCode) || !isValidAreaCode(in.DistrictCode) {
+		return 0, errcode.New(errcode.CodeInvalidParam, "省/市/区县区划码须为6位数字")
+	}
+	status := in.Status
+	if status <= 0 {
+		status = 1
+	}
+	pickup := 0
+	if in.PickupEnabled {
+		pickup = 1
+	}
+	for attempt := 0; attempt < 3; attempt++ {
+		next, err := idgen.NextID()
+		if err != nil {
+			return 0, gerror.Wrap(err, "生成门店编码失败")
+		}
+		res, err := dao.Store.Ctx(ctx).Data(do.Store{
+			StoreNo:       "ST" + strconv.FormatInt(next, 10),
+			Name:          in.Name,
+			ProvinceCode:  in.ProvinceCode,
+			CityCode:      in.CityCode,
+			DistrictCode:  in.DistrictCode,
+			DetailAddress: in.DetailAddress,
+			Longitude:     coordOrNull(in.Longitude),
+			Latitude:      coordOrNull(in.Latitude),
+			BusinessHours: in.BusinessHours,
+			ContactPhone:  in.ContactPhone,
+			PickupEnabled: pickup,
+			Status:        status,
+		}).Insert()
+		if err == nil {
+			id, ierr := res.LastInsertId()
+			if ierr != nil {
+				return 0, gerror.Wrap(ierr, "读取门店ID失败")
+			}
+			return id, nil
+		}
+		if !strings.Contains(err.Error(), "Duplicate entry") {
+			return 0, gerror.Wrap(err, "创建门店失败")
+		}
+	}
+	return 0, errcode.New(errcode.CodeSystemError, "门店编码生成冲突, 请重试")
+}
+
+// AdminUpdate 修改门店（FR-009）: 全量覆盖语义（后台表单提交完整档案——显式 Fields 白名单
+// 保证零值可写: 自提关闭/歇业态不被 omitempty 吞掉）; 目标不存在返 10006。
+func AdminUpdate(ctx context.Context, id int64, in model.StoreInput) error {
+	if in.ProvinceCode != "" && !isValidAreaCode(in.ProvinceCode) {
+		return errcode.New(errcode.CodeInvalidParam, "省区划码须为6位数字")
+	}
+	if in.CityCode != "" && !isValidAreaCode(in.CityCode) {
+		return errcode.New(errcode.CodeInvalidParam, "市区划码须为6位数字")
+	}
+	if in.DistrictCode != "" && !isValidAreaCode(in.DistrictCode) {
+		return errcode.New(errcode.CodeInvalidParam, "区县区划码须为6位数字")
+	}
+	pickup := 0
+	if in.PickupEnabled {
+		pickup = 1
+	}
+	cols := dao.Store.Columns()
+	res, err := dao.Store.Ctx(ctx).
+		Where(cols.Id, id).
+		Where(cols.Deleted, 0).
+		Data(do.Store{
+			Name:          in.Name,
+			ProvinceCode:  in.ProvinceCode,
+			CityCode:      in.CityCode,
+			DistrictCode:  in.DistrictCode,
+			DetailAddress: in.DetailAddress,
+			Longitude:     coordOrNull(in.Longitude),
+			Latitude:      coordOrNull(in.Latitude),
+			BusinessHours: in.BusinessHours,
+			ContactPhone:  in.ContactPhone,
+			PickupEnabled: pickup,
+			Status:        in.Status,
+		}).
+		Fields(cols.Name, cols.ProvinceCode, cols.CityCode, cols.DistrictCode, cols.DetailAddress,
+			cols.Longitude, cols.Latitude, cols.BusinessHours, cols.ContactPhone,
+			cols.PickupEnabled, cols.Status).
+		Update()
+	if err != nil {
+		return gerror.Wrap(err, "修改门店失败")
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		// 目标不存在或档案无变化（两者均不构成成功语义, 以存在性优先判定）
+		if cnt, cerr := dao.Store.Ctx(ctx).
+			Where(cols.Id, id).Where(cols.Deleted, 0).Count(); cerr == nil && cnt == 0 {
+			return errcode.New(errcode.CodeNotFound, "门店不存在")
+		}
+	}
+	return nil
+}
+
+// AdminDelete 软删门店（FR-010）: 后台与游客均不可见; 目标不存在返 10006。
+func AdminDelete(ctx context.Context, id int64) error {
+	cols := dao.Store.Columns()
+	res, err := dao.Store.Ctx(ctx).
+		Where(cols.Id, id).
+		Where(cols.Deleted, 0).
+		Data(do.Store{Deleted: 1, Status: 2}).
+		Fields(cols.Deleted, cols.Status).
+		Update()
+	if err != nil {
+		return gerror.Wrap(err, "删除门店失败")
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errcode.New(errcode.CodeNotFound, "门店不存在")
+	}
+	return nil
+}
+
+// AdminList 后台门店列表（FR-011）: 状态筛选 + 名称/编码关键词模糊 + 分页。
+func AdminList(ctx context.Context, status int, keyword string, page model.PageReq) (*model.PageResult[model.StoreItem], error) {
+	page = page.Normalized()
+	m := dao.Store.Ctx(ctx).Where(dao.Store.Columns().Deleted, 0)
+	if status > 0 {
+		m = m.Where(dao.Store.Columns().Status, status)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		n, no := dao.Store.Columns().Name, dao.Store.Columns().StoreNo
+		m = m.Where(n+" LIKE ? OR "+no+" LIKE ?", like, like)
+	}
+	total, err := m.Count()
+	if err != nil {
+		return nil, gerror.Wrap(err, "统计门店失败")
+	}
+	recs, err := m.Fields(storeBaseCols).
+		Order("sort ASC, id ASC").
+		Page(page.Page, page.PageSize).
+		All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询门店失败")
+	}
+	list := make([]model.StoreItem, 0, len(recs))
+	for _, r := range recs {
+		list = append(list, storeItemFromRecord(r))
+	}
+	return &model.PageResult[model.StoreItem]{List: list, Total: int64(total)}, nil
+}
+
+// AdminDetail 后台门店详情（FR-012）: 字段口径与游客详情一致（后台含歇业店）。
+func AdminDetail(ctx context.Context, storeId int64) (*model.StoreItem, error) {
+	return PublicDetail(ctx, storeId)
 }

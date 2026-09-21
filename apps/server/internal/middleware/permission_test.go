@@ -72,3 +72,23 @@ func TestRequirePerm(t *testing.T) {
 		t.Assert(errCodeOf(err), errcode.CodeUnauthorized)
 	})
 }
+
+// TestRequirePermStoreCodes 门店权限码拦截（008-store US3, SC-003）:
+// 无权账号对 create/update/delete 三码均拒 10005; 超管全放行。
+func TestRequirePermStoreCodes(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		superId := seedMWAdmin(ctx, t, "t_mw_st_s", 1)
+		plainId := seedMWAdmin(ctx, t, "t_mw_st_p", 0)
+		defer cleanupMWAdmin(ctx, t, "t_mw_st_s")
+		defer cleanupMWAdmin(ctx, t, "t_mw_st_p")
+
+		superCtx := context.WithValue(ctx, consts.CtxUserId, superId)
+		plainCtx := context.WithValue(ctx, consts.CtxUserId, plainId)
+		for _, code := range []string{"store:manage:create", "store:manage:update", "store:manage:delete"} {
+			err := RequirePerm(plainCtx, code)
+			t.Assert(errCodeOf(err), errcode.CodeForbidden)
+			t.AssertNil(RequirePerm(superCtx, code))
+		}
+	})
+}

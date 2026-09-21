@@ -61,13 +61,13 @@
 
 ### Tests for US2（红先行）
 
-- [ ] T008 [P] [US2] `internal/service/shop/store_impl_test.go`（管理部分）：AdminCreate 生成 ST 前缀唯一编码/区划码非 6 位数字拒绝（10001）/AdminUpdate 含歇业切换与目标不存在 10006/AdminDelete 软删后各端点不可见/AdminList status+keyword（名称或编码）筛选分页/AdminDetail 返回编码与坐标
+- [x] T008 [P] [US2] `internal/service/shop/store_impl_test.go`（管理部分）：AdminCreate 生成 ST 前缀唯一编码/区划码非 6 位数字拒绝（10001）/AdminUpdate 含歇业切换与目标不存在 10006/AdminDelete 软删后各端点不可见/AdminList status+keyword（名称或编码）筛选分页/AdminDetail 返回编码与坐标
 
 ### Implementation for US2
 
-- [ ] T009 [US2] `internal/service/shop/store_impl.go`（管理部分）：`AdminCreate`（校验 + idgen 编码 + 冲突重试 ≤3）、`AdminUpdate`（0 行=10006）、`AdminDelete`（软删）、`AdminList`（status/keyword/分页, sort,id 排序）、`AdminDetail`
-- [ ] T010 [US2] 连线 `internal/controller/admin/admin_v1_admin_store_{list,create,update,delete,detail}.go`（桩清零 ×5；写操作挂 `middleware.RequirePerm(ctx, "store:manage:create/update/delete")`，见 contracts）
-- [ ] T011 [US2] `go test ./...` 绿（含批次 01 回归）
+- [x] T009 [US2] `internal/service/shop/store_impl.go`（管理部分）：`AdminCreate`（校验 + idgen 编码 + 冲突重试 ≤3）、`AdminUpdate`（0 行=10006）、`AdminDelete`（软删）、`AdminList`（status/keyword/分页, sort,id 排序）、`AdminDetail`
+- [x] T010 [US2] 连线 `internal/controller/admin/admin_v1_admin_store_{list,create,update,delete,detail}.go`（桩清零 ×5；写操作挂 `middleware.RequirePerm(ctx, "store:manage:create/update/delete")`，见 contracts）
+- [x] T011 [US2] `go test ./...` 绿（含批次 01 回归）
 
 **Checkpoint**: US1+US2 独立可用。
 
@@ -81,12 +81,12 @@
 
 ### Tests for US3（红先行）
 
-- [ ] T012 [P] [US3] `internal/middleware/permission_test.go` 补 store 码断言：无权账号对 `store:manage:create/update/delete` 均拒（10005）、超管放行（RequirePerm 语义级, 沿用批次 01 测试形态）
+- [x] T012 [P] [US3] `internal/middleware/permission_test.go` 补 store 码断言：无权账号对 `store:manage:create/update/delete` 均拒（10005）、超管放行（RequirePerm 语义级, 沿用批次 01 测试形态）
 
 ### Implementation for US3
 
-- [ ] T013 [US3] 确认 T010 挂点与 contracts 一致（create/update/delete 三处、查询不挂）；歇业语义由 T004/T008 断言覆盖核对（游客列表仅营业 + 详情 status 如实返回）
-- [ ] T014 [US3] `go test ./...` 绿
+- [x] T013 [US3] 确认 T010 挂点与 contracts 一致（create/update/delete 三处、查询不挂）；歇业语义由 T004/T008 断言覆盖核对（游客列表仅营业 + 详情 status 如实返回）
+- [x] T014 [US3] `go test ./...` 绿
 
 **Checkpoint**: 7 端点全部去桩且权限语义闭合。
 

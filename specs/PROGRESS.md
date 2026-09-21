@@ -75,3 +75,4 @@
 | 2026-09-21 | 02 | IStoreLogic 微扩 AdminDetail 方法 | api 有门店管理详情端点而接口缺定义；同批次 01 D6 模式 | |
 | 2026-09-21 | 02 | model.StoreItem 微扩 ProvinceCode/CityCode 字段 | 两渠道详情 Res 均需省市区全栈而 DTO 仅有 districtCode | |
 | 2026-09-21 | 02 | 环境修复：测试库补建缺失的 store 表（另有 merchant/seller/shop 废弃表残留，未删） | 000031 未真正应用（历史迁移改写致账本失真）；非破坏性补建（不做 DROP，废弃表待用户裁定） | |
+| 2026-09-21 | 02 | 门店修改定为全量覆盖语义（显式 Fields 白名单强制零值写入） | gf do 的 omitempty 吞零值致无法关闭自提/置歇业；research D6 | |
