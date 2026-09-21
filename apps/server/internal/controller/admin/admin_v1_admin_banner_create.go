@@ -3,12 +3,20 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/shop"
 )
 
+// AdminBannerCreate 新增轮播（新建默认启用）
 func (c *ControllerV1) AdminBannerCreate(ctx context.Context, req *v1.AdminBannerCreateReq) (res *v1.AdminBannerCreateRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, "operation:banner:manage"); err != nil {
+		return nil, err
+	}
+	id, err := shop.BannerCreate(ctx, bannerInputFromReq(
+		req.Position, req.ImageUrl, req.LinkUrl, req.Sort, req.StartTime, req.EndTime, 1))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AdminBannerCreateRes{Id: fmtID(id)}, nil
 }

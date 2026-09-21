@@ -59,13 +59,13 @@
 
 ### Tests for US2（红先行）
 
-- [ ] T009 [P] [US2] `operation_impl_test.go`（装修管理部分）：BannerCreate 成功/位置域外（service 兜底）/BannerList 位置筛选分页/修改含投放时段与启停/软删后管理端与 C 端均不可见；FloorCreate 成功（含 config JSON）/类型域外拒绝/修改 config 与启停/软删同理
+- [x] T009 [P] [US2] `operation_impl_test.go`（装修管理部分）：BannerCreate 成功/位置域外（service 兜底）/BannerList 位置筛选分页/修改含投放时段与启停/软删后管理端与 C 端均不可见；FloorCreate 成功（含 config JSON）/类型域外拒绝/修改 config 与启停/软删同理
 
 ### Implementation for US2
 
-- [ ] T010 [US2] `internal/service/shop/operation_impl.go`（管理部分）：`BannerList/BannerCreate/BannerUpdate/BannerDelete/FloorList/FloorCreate/FloorUpdate/FloorDelete`（位置与类型白名单校验, 0 行→10006, 软删）
-- [ ] T011 [US2] 连线 admin 8 端点：`admin_v1_admin_banner_{list,create,update,delete}.go`（挂 `operation:banner:manage`）、`admin_v1_admin_floor_{list,create,update,delete}.go`（挂 `operation:floor:manage`）（桩清零 ×8）
-- [ ] T012 [US2] `go test ./...` 绿（含批次 01/02 回归）
+- [x] T010 [US2] `internal/service/shop/operation_impl.go`（管理部分）：`BannerList/BannerCreate/BannerUpdate/BannerDelete/FloorList/FloorCreate/FloorUpdate/FloorDelete`（位置与类型白名单校验, 0 行→10006, 软删）
+- [x] T011 [US2] 连线 admin 8 端点：`admin_v1_admin_banner_{list,create,update,delete}.go`（挂 `operation:banner:manage`）、`admin_v1_admin_floor_{list,create,update,delete}.go`（挂 `operation:floor:manage`）（桩清零 ×8）
+- [x] T012 [US2] `go test ./...` 绿（含批次 01/02 回归）
 
 **Checkpoint**: 装修配置管理可用。
 
