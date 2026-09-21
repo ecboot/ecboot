@@ -40,17 +40,18 @@ const (
 
 // 交易域（4xxxx）
 const (
-	CodeStockInsufficient = 40001 // 库存不足
-	CodeCouponUnusable    = 40002 // 券不可用
-	CodeSoldOut           = 40003 // 已抢完
-	CodeBargainUnpayable  = 40004 // 砍价单不可下单
-	CodeOrderNotFound     = 40005 // 订单不存在
-	CodeStatusNotAllowed  = 40006 // 状态不允许该操作
-	CodePayCreateFailed   = 40007 // 支付单创建失败
-	CodeAfterSaleDenied   = 40008 // 不可售后
-	CodeAfterSaleNotFound = 40009 // 售后单不存在
-	CodeAlreadyReviewed   = 40010 // 已评价
-	CodeExtraReviewDenied = 40011 // 追评违规（已追评/超期）
+	CodeStockInsufficient  = 40001 // 库存不足
+	CodeCouponUnusable     = 40002 // 券不可用
+	CodeSoldOut            = 40003 // 已抢完
+	CodeBargainUnpayable   = 40004 // 砍价单不可下单
+	CodeOrderNotFound      = 40005 // 订单不存在
+	CodeStatusNotAllowed   = 40006 // 状态不允许该操作
+	CodePayCreateFailed    = 40007 // 支付单创建失败
+	CodeAfterSaleDenied    = 40008 // 不可售后
+	CodeAfterSaleNotFound  = 40009 // 售后单不存在
+	CodeAlreadyReviewed    = 40010 // 已评价
+	CodeExtraReviewDenied  = 40011 // 追评违规（已追评/超期）
+	CodeLogisticsCodeTaken = 40012 // 物流公司编码已存在（009-logistics-ops）
 )
 
 // 促销域（5xxxx）

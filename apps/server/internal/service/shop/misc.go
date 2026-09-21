@@ -14,6 +14,25 @@ type ILogisticsLogic interface {
 	Create(ctx context.Context, in model.LogisticsCompanyInput) (int64, error)
 	Update(ctx context.Context, id int64, in model.LogisticsCompanyInput) error
 	Delete(ctx context.Context, id int64) error
+	// Detail 详情（009 接口微扩: api 有管理详情端点而接口缺定义, 同 D6/D7 模式）。
+	Detail(ctx context.Context, id int64) (*model.LogisticsCompany, error)
+}
+
+// IOperationLogic 运营装修（banner/楼层; 009-logistics-ops research D1 新建）。
+// 落 shop 域: 装修是商城内容（C 端首页消费）, 管理端 admin 渠道消费同域（渠道与域解耦）。
+type IOperationLogic interface {
+	BannerList(ctx context.Context, position int, page model.PageReq) (*model.PageResult[model.OperBannerItem], error)
+	BannerCreate(ctx context.Context, in model.OperBannerInput) (int64, error)
+	BannerUpdate(ctx context.Context, id int64, in model.OperBannerInput) error
+	BannerDelete(ctx context.Context, id int64) error
+	FloorList(ctx context.Context, page model.PageReq) (*model.PageResult[model.OperFloorItem], error)
+	FloorCreate(ctx context.Context, in model.OperFloorInput) (int64, error)
+	FloorUpdate(ctx context.Context, id int64, in model.OperFloorInput) error
+	FloorDelete(ctx context.Context, id int64) error
+	// PublicBanners 在投轮播/弹窗（启用 + 投放时段内, 按位置; research D4）。
+	PublicBanners(ctx context.Context, position int) ([]model.PublicBannerItem, error)
+	// PublicFloors C 端楼层（启用按序; 商品楼层装配摘要, 失效剔除; research D2/D3）。
+	PublicFloors(ctx context.Context) ([]model.PublicFloorItem, error)
 }
 
 // IStoreLogic 门店。

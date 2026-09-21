@@ -682,3 +682,71 @@ type OrderDetailView struct {
 	StatusLogs   []OrderStatusLog  `json:"statusLogs"`
 	CreatedAt    string            `json:"createdAt"`
 }
+
+// ---------- 运营装修（009-logistics-ops, research D1） ----------
+
+// OperBannerItem 轮播/弹窗管理项（admin）。
+type OperBannerItem struct {
+	Id        int64  `json:"id"`
+	Position  int    `json:"position" dc:"1首页轮播 2首页弹窗"`
+	ImageUrl  string `json:"imageUrl"`
+	LinkUrl   string `json:"linkUrl"`
+	Sort      int    `json:"sort"`
+	StartTime string `json:"startTime" dc:"投放起(RFC3339; 空=立即)"`
+	EndTime   string `json:"endTime" dc:"投放止(RFC3339; 空=长期)"`
+	Status    int    `json:"status"`
+}
+
+// OperBannerInput 轮播创建/修改入参（全量覆盖；空时段=立即/长期）。
+type OperBannerInput struct {
+	Position  int
+	ImageUrl  string
+	LinkUrl   string
+	Sort      int
+	StartTime string // RFC3339 或空
+	EndTime   string
+	Status    int
+}
+
+// OperFloorItem 楼层管理项（admin）。
+type OperFloorItem struct {
+	Id        int64          `json:"id"`
+	FloorType int            `json:"floorType" dc:"1金刚区 2商品楼层 3专题"`
+	Title     string         `json:"title"`
+	Config    map[string]any `json:"config"`
+	Sort      int            `json:"sort"`
+	Status    int            `json:"status"`
+}
+
+// OperFloorInput 楼层创建/修改入参（config 为不透明 JSON 对象）。
+type OperFloorInput struct {
+	FloorType int
+	Title     string
+	Config    map[string]any
+	Sort      int
+	Status    int
+}
+
+// PublicBannerItem C 端轮播项（精简字段）。
+type PublicBannerItem struct {
+	Id       int64  `json:"id"`
+	ImageUrl string `json:"imageUrl"`
+	LinkUrl  string `json:"linkUrl"`
+}
+
+// FloorProductSummary 商品楼层装配的商品摘要（research D3）。
+type FloorProductSummary struct {
+	SpuId int64  `json:"spuId"`
+	Name  string `json:"name"`
+	Image string `json:"image" dc:"首图"`
+	Price string `json:"price" dc:"价格(元, 取 price_min 与商品列表口径一致)"`
+}
+
+// PublicFloorItem C 端楼层项（商品楼层含装配摘要）。
+type PublicFloorItem struct {
+	FloorId   int64                 `json:"floorId"`
+	FloorType int                   `json:"floorType"`
+	Title     string                `json:"title"`
+	Config    map[string]any        `json:"config"`
+	Products  []FloorProductSummary `json:"products" dc:"仅商品楼层有值"`
+}

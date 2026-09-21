@@ -15,7 +15,7 @@
 
 ## Phase 1: Setup（现状基线）
 
-- [ ] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 02 收口态 + 废弃表已清）
+- [x] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 02 收口态 + 废弃表已清）
 
 **Checkpoint**: 基线绿。
 
@@ -23,9 +23,9 @@
 
 ## Phase 2: Foundational（阻塞前置，research D1/D5/D7）
 
-- [ ] T002 [P] `internal/model/dto_shop.go` 新增 7 个 DTO（域前缀命名）：`OperBannerItem/OperBannerInput/OperFloorItem/OperFloorInput/PublicBannerItem/PublicFloorItem/FloorProductSummary`（字段见 data-model §五与 api 契约）
-- [ ] T003 [P] `internal/errcode/errcode.go` 新增 `CodeLogisticsCodeTaken = 40012`（交易域段, D5）
-- [ ] T004 `internal/service/shop/misc.go`：`ILogisticsLogic` 微扩 `Detail`（D7）；新建 `IOperationLogic`（banner/floor 管理与 C 端共 10 方法, D1）；PROGRESS 变更记录记账
+- [x] T002 [P] `internal/model/dto_shop.go` 新增 7 个 DTO（域前缀命名）：`OperBannerItem/OperBannerInput/OperFloorItem/OperFloorInput/PublicBannerItem/PublicFloorItem/FloorProductSummary`（字段见 data-model §五与 api 契约）
+- [x] T003 [P] `internal/errcode/errcode.go` 新增 `CodeLogisticsCodeTaken = 40012`（交易域段, D5）
+- [x] T004 `internal/service/shop/misc.go`：`ILogisticsLogic` 微扩 `Detail`（D7）；新建 `IOperationLogic`（banner/floor 管理与 C 端共 10 方法, D1）；PROGRESS 变更记录记账
 
 **Checkpoint**: DTO/接口/错误码就绪。
 
@@ -39,13 +39,13 @@
 
 ### Tests for US1（红先行）
 
-- [ ] T005 [P] [US1] `internal/service/shop/operation_impl_test.go`（物流部分）：创建成功/编码重复 40012/修改名称与状态（**编码不可改**——入参无该字段）/停用后列表仍可检出（status=0 筛选）/软删后列表与详情均 10006/详情不存在 10006/列表状态筛选与分页
+- [x] T005 [P] [US1] `internal/service/shop/operation_impl_test.go`（物流部分）：创建成功/编码重复 40012/修改名称与状态（**编码不可改**——入参无该字段）/停用后列表仍可检出（status=0 筛选）/软删后列表与详情均 10006/详情不存在 10006/列表状态筛选与分页
 
 ### Implementation for US1
 
-- [ ] T006 [US1] `internal/service/shop/logistics_impl.go`：`LogisticsList`（status 筛选 + 分页, sort,id 序）、`LogisticsCreate`（编码唯一 + 必填校验）、`LogisticsUpdate`（名称/规则/排序/状态, 0 行→10006）、`LogisticsDelete`（软删, 0 行→10006）、`LogisticsDetail`
-- [ ] T007 [US1] 连线 `internal/controller/admin/admin_v1_admin_logistics_{list,create,update,delete,detail}.go`（桩清零 ×5；写操作挂 `logistics:company:manage`）
-- [ ] T008 [US1] `go test ./internal/service/shop/...` 绿
+- [x] T006 [US1] `internal/service/shop/logistics_impl.go`：`LogisticsList`（status 筛选 + 分页, sort,id 序）、`LogisticsCreate`（编码唯一 + 必填校验）、`LogisticsUpdate`（名称/规则/排序/状态, 0 行→10006）、`LogisticsDelete`（软删, 0 行→10006）、`LogisticsDetail`
+- [x] T007 [US1] 连线 `internal/controller/admin/admin_v1_admin_logistics_{list,create,update,delete,detail}.go`（桩清零 ×5；写操作挂 `logistics:company:manage`）
+- [x] T008 [US1] `go test ./internal/service/shop/...` 绿
 
 **Checkpoint**: 物流字典可用——发货选择的数据源就绪。
 

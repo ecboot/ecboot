@@ -76,6 +76,8 @@
 | 2026-09-21 | 02 | model.StoreItem 微扩 ProvinceCode/CityCode 字段 | 两渠道详情 Res 均需省市区全栈而 DTO 仅有 districtCode | |
 | 2026-09-21 | 02 | 环境修复：测试库补建缺失的 store 表（另有 merchant/seller/shop 废弃表残留，未删） | 000031 未真正应用（历史迁移改写致账本失真）；非破坏性补建（不做 DROP，废弃表待用户裁定） | |
 | 2026-09-21 | 02 | 门店修改定为全量覆盖语义（显式 Fields 白名单强制零值写入） | gf do 的 omitempty 吞零值致无法关闭自提/置歇业；research D6 | |
+| 2026-09-21 | 03 | 接口变更：`ILogisticsLogic` 微扩 Detail；**新建 `IOperationLogic`**（装修域原无接口/DTO） | 装修接口与 DTO 系勘察确认缺失（批次 03 行已标注）；落 service/shop 同域 | |
+| 2026-09-21 | 03 | spec 契约对齐修正：物流公司 FR-001~003 去掉"排序"（api 契约无 sort 字段，表 sort 仅内部排序位） | 勘察 api/admin/v1/logistics.go 确认 | |
 | 2026-09-21 | 02 | 按用户指示清理测试库三张废弃表（merchant/seller/shop——82f0341 前的多商户概念遗留，各 1 行脚手架种子） | 用户明确授权 DROP；清理后库表 69 = 迁移 68 + schema_migrations，与迁移定义一致 | |
 | 2026-09-21 | 02 | **修复横切缺陷（原计划 chore 批，因影响本批验收前移）**：response.mapError 判据由 `gc.Code()>0` 改为契约码域 `>=10001`——gf 框架码（51 校验/52 DB）归一到 10001/10002，恢复日志与追踪号 | 评审 I4 实证：框架码直出致契约码失效（本批 C1/I1 修复本意返 10001 实际返 51）；波及批次 01/02 全部校验与 DB 错误路径 | |
 | 2026-09-21 | 02 | 评审修复轮（With fixes）：C1 status 白名单 / I1 全量覆盖护栏 / I2 坐标清零显式置空 / I3 分页越界 / I6 idgen 机器码回退 / M2/M4/M6；另修复横切 I4（错误码映射, 见下条） | 独立评审实证复现；I5（IStoreLogic 无实现者）因涉既有跨批次形态, 记为待裁定 | |

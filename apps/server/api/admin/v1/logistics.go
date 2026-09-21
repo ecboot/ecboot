@@ -42,7 +42,7 @@ type (
 		Id           string `json:"id" v:"required" dc:"ID"`
 		Name         string `json:"name" dc:"名称"`
 		TrackingRule string `json:"trackingRule" dc:"单号规则"`
-		Status       int    `json:"status" dc:"1启用 0停用"`
+		Status       int    `json:"status" v:"in:0,1" dc:"1启用 0停用"`
 	}
 	AdminLogisticsUpdateRes struct {
 		Success bool `json:"success"`
