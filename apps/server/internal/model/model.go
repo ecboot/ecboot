@@ -48,3 +48,20 @@ type PageResult[T any] struct {
 	List  []T   `json:"list" dc:"数据列表"`
 	Total int64 `json:"total" dc:"总条数"`
 }
+
+// Normalized 归一化分页参数（服务层实现复用）。
+func (p PageReq) Normalized() PageReq {
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+	if p.PageSize <= 0 || p.PageSize > 100 {
+		p.PageSize = 10
+	}
+	return p
+}
+
+// Offset SQL 偏移。
+func (p PageReq) Offset() int { return (p.Normalized().Page - 1) * p.Normalized().PageSize }
+
+// Limit SQL 行数。
+func (p PageReq) Limit() int { return p.Normalized().PageSize }

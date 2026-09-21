@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"ecboot/internal/bootstrap"
 	_ "ecboot/internal/bootstrap"
 	"ecboot/internal/routes"
 
@@ -16,6 +17,7 @@ var (
 		Usage: "main",
 		Brief: "start http ecboot",
 		Func: func(ctx context.Context, parser *gcmd.Parser) (err error) {
+			bootstrap.EnsureSuperAdmin(ctx)
 			s := g.Server()
 			routes.RouterGroup(s)
 			s.Run()

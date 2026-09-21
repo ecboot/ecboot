@@ -356,6 +356,7 @@ type BrandInput struct {
 	Logo        string
 	Description string
 	Sort        int
+	Status      int
 }
 
 type ProductQuery struct {
@@ -451,6 +452,8 @@ type AdminProductDetailView struct {
 	SpuId             int64             `json:"spuId"`
 	SpuNo             string            `json:"spuNo"`
 	Name              string            `json:"name"`
+	SubTitle          string            `json:"subTitle"`
+	VideoUrl          string            `json:"videoUrl"`
 	CategoryId        int64             `json:"categoryId"`
 	BrandId           int64             `json:"brandId"`
 	FreightTemplateId int64             `json:"freightTemplateId"`
@@ -642,4 +645,33 @@ type AdminReviewItem struct {
 	Content     string `json:"content"`
 	AuditStatus int    `json:"auditStatus"`
 	CreatedAt   string `json:"createdAt"`
+}
+
+// AdminCategoryNode 管理端分类树节点（含禁用/ParentId）。
+type AdminCategoryNode struct {
+	Id       int64               `json:"id"`
+	ParentId int64               `json:"parentId"`
+	Name     string              `json:"name"`
+	Icon     string              `json:"icon"`
+	Level    int                 `json:"level"`
+	Sort     int                 `json:"sort"`
+	Status   int                 `json:"status"`
+	Children []AdminCategoryNode `json:"children"`
+}
+
+// ProductDetailView C 端商品详情（FR-004; 不含成本价; 含限售标记）。
+type ProductDetailView struct {
+	SpuId           int64             `json:"spuId"`
+	SpuNo           string            `json:"spuNo"`
+	Name            string            `json:"name"`
+	SubTitle        string            `json:"subTitle"`
+	Images          []string          `json:"images"`
+	VideoUrl        string            `json:"videoUrl"`
+	Description     string            `json:"description"`
+	SpecDefinitions []map[string]any  `json:"specDefinitions"`
+	Attributes      map[string]string `json:"attributes"`
+	FreightSummary  string            `json:"freightSummary"`
+	SaleRestricted  bool              `json:"saleRestricted"`
+	Skus            []SkuCard         `json:"skus"`
+	ReviewSummary   ReviewSummary     `json:"reviewSummary"`
 }
