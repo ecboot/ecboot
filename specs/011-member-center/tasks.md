@@ -135,3 +135,24 @@
 - 实现期 TDD 抓住 3 处: AddressCreate 漏设 user_id(1364)/invite_record 的 uk(new_user_id) 一人只能被邀一次/
   fixture 清理键按 inviter 会误删同邀请人的其他记录
 - 环境事项: 冒烟时发现服务连宿主 6379 而数据写在容器 Redis(45355) → 对齐配置后通过（已清理临时配置）
+
+## 评审修复轮（2026-09-21, With fixes → 已闭合）
+
+独立评审（含临时 worktree 实测探针）给出 With fixes：
+
+- **C1（必修, 已修）**: `AddressUpdate` 无条件全列写入 → 编辑默认地址即丢默认（is_default 1→0）且未传字段被清空
+  （实测地址直接不可用），**违反 spec US2 验收 3**。修：新增 `addressUpdateDo`（仅非空才更新；`is_default=false` 不动作——
+  "取消默认"经给其他地址设默认实现）；补 `TestAddressUpdateKeepsDefaultAndFields`。
+- **I1（已修）**: `GetForOrder` 返回脱敏电话 → 下单快照会写入掩码号码。修：拆 `addressFromRecordRaw`（内部用，原始号码）
+  与 `addressFromRecord`（会员边界，脱敏）；补 `TestAddressGetForOrderRawPhone`。
+- **I2（已标注）**: `DispatchTask` 未按契约渲染模板/重试（站内信 title=模板编码、content=原始 JSON）→ 已加 `TODO(011 评审 I2)`
+  详述缺口（无调用点，接线前需补齐）。
+- **I3（已修）**: 邀请文案误读 `reward_type`（载体）当 `reward_trigger`（时机）→ 改读 `reward_trigger`；fixture 同步。
+- **I4（已补）**: 6 个内部方法补测（`TestGrowthAndLevel`/`TestFootprintRecordAndClean`/`TestEnqueueAndDispatch`/
+  `TestPointExpireDormant`）；fixture 补收藏/足迹清理（实测残留 8 行孤儿已清）。
+- **I5（已定档）**: `PointRefund` 符号——接口/列注释冲突；**定档为"加回"**（退款语义应退还用户已消耗积分），
+  接口注释与实现注释同步说明（列注释为 V19 旧口径）。
+- **Minor**: 掩码兜底（短手机号/IPv6 全掩码）；`notifyChannels` 改正定长数组防污染；`Fields` 在 Update 上为 no-op
+  与 `ExpireDormant` 循环事务已记入变更记录待后续批次收口。
+- **跨批次记账（高优先）**: `shop/promotion_calc.go` 查询 `point_account.deleted`（该列不存在）→ **积分抵扣恒为 0**，
+  006 接线前必先修。

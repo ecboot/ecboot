@@ -128,7 +128,9 @@ func PointConsume(ctx context.Context, userId int64, points int, orderNo string)
 	return pointChange(ctx, userId, bizTypeConsume, -points, orderNo, false)
 }
 
-// PointRefund 退款回退（内部方法; 可致负）。
+// PointRefund 退款回退（内部方法）: **加回**积分（011 评审 I5 定档）——
+// point_log.points 列注释的"消耗/回退负"为 V19 旧口径; 退款应退还用户已消耗的积分,
+// 故本实现为正向变动（与 Consume 对称）。接口注释已同步。
 func PointRefund(ctx context.Context, userId int64, points int, orderNo string) error {
 	if points <= 0 {
 		return errcode.New(errcode.CodeInvalidParam, "回退积分须为正数")

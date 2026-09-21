@@ -25,9 +25,10 @@ func maskNickname(n string) string {
 	return string(r[0]) + strings.Repeat("*", len(r)-1)
 }
 
-// inviteRewardDesc 奖励说明（reward_type: 1注册即发 2首单后发——V16 reward_trigger 口径）。
-func inviteRewardDesc(rewardType int) string {
-	switch rewardType {
+// inviteRewardDesc 奖励说明（评审 I3: 取 **reward_trigger**——V28 的"奖励触发时机"列
+// (1注册即发 2首单后发); reward_type 是"奖励载体"(V16: 1优惠券), 二者语义不同不可混用）。
+func inviteRewardDesc(rewardTrigger int) string {
+	switch rewardTrigger {
 	case 1:
 		return "注册奖励"
 	case 2:
@@ -48,7 +49,7 @@ func InviteRecords(ctx context.Context, userId int64, page model.PageReq) (*mode
 	if err != nil {
 		return nil, gerror.Wrap(err, "统计邀请记录失败")
 	}
-	recs, err := m.Fields("ir."+icols.NewUserId+", ir."+icols.RewardType+", ir."+icols.Status+
+	recs, err := m.Fields("ir."+icols.NewUserId+", ir."+icols.RewardTrigger+", ir."+icols.Status+
 		", ir."+icols.CreatedAt+", u."+ucols.Nickname).
 		OrderDesc("ir."+icols.Id).
 		Page(page.Page, page.PageSize).
@@ -60,7 +61,7 @@ func InviteRecords(ctx context.Context, userId int64, page model.PageReq) (*mode
 	for _, r := range recs {
 		list = append(list, model.InviteRecordItem{
 			NewUser:    maskNickname(r[ucols.Nickname].String()),
-			RewardDesc: inviteRewardDesc(r[icols.RewardType].Int()),
+			RewardDesc: inviteRewardDesc(r[icols.RewardTrigger].Int()),
 			Status:     r[icols.Status].Int(),
 			CreatedAt:  r[icols.CreatedAt].String(),
 		})

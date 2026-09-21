@@ -32,8 +32,8 @@ func mustJSONMap(m map[string]any) string {
 	return string(b)
 }
 
-// notifyChannels 偏好渠道全集（站内信不在其中——不受偏好控制）。
-var notifyChannels = []int{1, 2}
+// notifyChannels 偏好渠道全集（站内信不在其中——不受偏好控制; 评审 Minor11: 定长数组防调用方污染）。
+var notifyChannels = [2]int{1, 2}
 
 // Messages 站内信列表（FR-009）: isRead=-1 全部 / 0 未读 / 1 已读; 未读计数为**全量**。
 func Messages(ctx context.Context, userId int64, isRead int, page model.PageReq) (*model.MessageListResult, error) {
@@ -205,7 +205,10 @@ func Enqueue(ctx context.Context, userId int64, bizType int, bizNo, templateCode
 	return nil
 }
 
-// DispatchTask 投递任务（内部方法）: 站内信落 user_message; 其他渠道标记已发送（渠道适配后续批次接入）。
+// DispatchTask 投递任务（内部方法）。
+// TODO(011 评审 I2): 当前为**基础形态**——站内信直接落 user_message 且 title=模板编码、content=参数 JSON,
+// 尚未按接口契约"渲染模板(notify_template)→渠道发送→重试计数(retry_count/next_retry_time, 失败≤上限回待发送)"
+// 实现; 站内信落库与状态更新亦未同事务。**接线前需补齐**（本批无调用点, 不阻塞）。
 func DispatchTask(ctx context.Context, taskId int64) error {
 	cols := dao.NotifyTask.Columns()
 	rec, err := dao.NotifyTask.Ctx(ctx).Where(cols.Id, taskId).Where(cols.Status, 10).One()

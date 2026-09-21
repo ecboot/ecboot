@@ -21,6 +21,7 @@ func TestFavoriteLifecycle(t *testing.T) {
 		defer cleanupMember(ctx, t, phone)
 		defer cleanupSpuForMember(ctx, t, sfx)
 		uid := seedMember(ctx, t, phone, "收藏测试", 0)
+		defer cleanupMemberCollections(ctx, t, uid)
 		spuId := seedSpuForMember(ctx, t, sfx, "29.90", `["http://img/um.png"]`, 1)
 
 		// 收藏（幂等）
@@ -79,6 +80,7 @@ func TestFootprintLifecycle(t *testing.T) {
 		defer cleanupSpuForMember(ctx, t, s1)
 		defer cleanupSpuForMember(ctx, t, s2)
 		uid := seedMember(ctx, t, phone, "足迹测试", 0)
+		defer cleanupMemberCollections(ctx, t, uid)
 		spu1 := seedSpuForMember(ctx, t, s1, "10.00", `["http://img/1.png"]`, 1)
 		spu2 := seedSpuForMember(ctx, t, s2, "20.00", `["http://img/2.png"]`, 1)
 

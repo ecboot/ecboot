@@ -21,19 +21,26 @@ import (
 
 // maskPhone 手机号脱敏（前 3 + **** + 后 4）。
 func maskPhone(p string) string {
+	if p == "" {
+		return ""
+	}
 	if len(p) < 7 {
-		return p
+		return "****" // 评审 Minor8: 短值兜底全掩码（原样返回等于不脱敏）
 	}
 	return p[:3] + "****" + p[len(p)-4:]
 }
 
 // maskIP IP 脱敏（IPv4 保留前两段; 其他形态原样返回）。
 func maskIP(ip string) string {
+	if ip == "" {
+		return ""
+	}
 	parts := strings.Split(ip, ".")
 	if len(parts) == 4 {
 		return parts[0] + "." + parts[1] + ".*.*"
 	}
-	return ip
+	// 评审 Minor8: IPv6/非四段值兜底全掩码（原样返回等于不脱敏）
+	return "****"
 }
 
 // matchLevel 按成长值匹配等级（取最大满足门槛者; 无规则或低于最低门槛 → 0/空）。

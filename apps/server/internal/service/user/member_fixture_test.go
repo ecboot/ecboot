@@ -112,16 +112,22 @@ func seedPointLog(ctx context.Context, t *gtest.T, userId int64, bizType, points
 	t.AssertNil(err)
 }
 
-// seedInviteRecord 建邀请记录（inviter 邀请 newUser）。
+// seedInviteRecord 建邀请记录（inviter 邀请 newUser; 第三参为 **reward_trigger** 时机: 1注册即发 2首单后发）。
 func seedInviteRecord(ctx context.Context, t *gtest.T, inviterId, newUserId int64, rewardType int) {
 	// 按唯一键（new_user_id）清理——按 inviter 清会误删同一邀请人的其他记录
 	_, _ = g.DB().Exec(ctx, "DELETE FROM invite_record WHERE new_user_id=?", newUserId)
 	_, err := g.DB().Exec(ctx,
-		"INSERT INTO invite_record(new_user_id,inviter_id,reward_type,reward_ref,status) VALUES(?,?,?,0,1)",
+		"INSERT INTO invite_record(new_user_id,inviter_id,reward_type,reward_ref,status,reward_trigger) VALUES(?,?,1,0,1,?)",
 		newUserId, inviterId, rewardType)
 	t.AssertNil(err)
 }
 
 func cleanupInvite(ctx context.Context, t *gtest.T, inviterId int64) {
 	_, _ = g.DB().Exec(ctx, "DELETE FROM invite_record WHERE inviter_id=?", inviterId)
+}
+
+// cleanupMemberCollections 清理会员的收藏与足迹（评审 I4: 此前遗漏致孤儿行累积）。
+func cleanupMemberCollections(ctx context.Context, t *gtest.T, userId int64) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM user_favorite WHERE user_id=?", userId)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM user_footprint WHERE user_id=?", userId)
 }

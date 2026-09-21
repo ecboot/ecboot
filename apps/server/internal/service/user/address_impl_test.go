@@ -145,3 +145,61 @@ func TestAddressGetForOrder(t *testing.T) {
 		t.Assert(errCode(err), errcode.CodeNotFound)
 	})
 }
+
+// TestAddressUpdateKeepsDefaultAndFields C1 回归: 编辑（尤其默认地址）不得丢默认、不得清空未传字段。
+func TestAddressUpdateKeepsDefaultAndFields(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const phone = "13900003010"
+		defer cleanupMember(ctx, t, phone)
+		uid := seedMember(ctx, t, phone, "编辑测试", 0)
+		defer cleanupAddresses(ctx, t, uid)
+
+		// 默认地址（完整字段）
+		id := seedAddress(ctx, t, uid, "原名", true)
+
+		// 仅改详址（未传 isDefault 与其他字段）
+		t.AssertNil(AddressUpdate(ctx, uid, id, model.AddressInput{DetailAddress: "新详址"}))
+		rec, err := g.DB().GetOne(ctx,
+			"SELECT receiver_name, receiver_phone, province_code, district_code, detail_address, is_default FROM user_address WHERE id=?", id)
+		t.AssertNil(err)
+		t.Assert(rec["detail_address"].String(), "新详址") // 已更新
+		t.Assert(rec["is_default"].Int(), 1)            // C1: 默认保持（此前被清零）
+		t.Assert(rec["receiver_name"].String(), "原名")   // C1: 未传字段不被清空
+		t.Assert(rec["receiver_phone"].String(), "13800000000")
+		t.Assert(rec["province_code"].String(), "330000")
+		t.Assert(rec["district_code"].String(), "330106")
+
+		// 显式传 isDefault=true → 清其他（唯一）并置本条
+		id2 := seedAddress(ctx, t, uid, "第二条", false)
+		t.AssertNil(AddressUpdate(ctx, uid, id2, model.AddressInput{DetailAddress: "第二条改", IsDefault: true}))
+		n, err := g.DB().GetValue(ctx,
+			"SELECT COUNT(*) FROM user_address WHERE user_id=? AND is_default=1 AND deleted=0", uid)
+		t.AssertNil(err)
+		t.Assert(n.Int(), 1)
+		def, err := g.DB().GetValue(ctx, "SELECT id FROM user_address WHERE user_id=? AND is_default=1", uid)
+		t.AssertNil(err)
+		t.Assert(def.Int64(), id2)
+	})
+}
+
+// TestAddressGetForOrderRawPhone I1 回归: 内部取址返回**原始号码**（脱敏仅会员边界）。
+func TestAddressGetForOrderRawPhone(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const phone = "13900003011"
+		defer cleanupMember(ctx, t, phone)
+		uid := seedMember(ctx, t, phone, "取号测试", 0)
+		defer cleanupAddresses(ctx, t, uid)
+
+		id := seedAddress(ctx, t, uid, "取号", false)
+		got, err := AddressGetForOrder(ctx, uid, id)
+		t.AssertNil(err)
+		t.Assert(got.ReceiverPhone, "13800000000") // 原始（下单快照需真实号码）
+
+		// 而会员可见的列表仍是脱敏
+		list, err := AddressList(ctx, uid)
+		t.AssertNil(err)
+		t.Assert(list[0].ReceiverPhone, "138****0000")
+	})
+}

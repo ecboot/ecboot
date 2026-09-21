@@ -17,7 +17,8 @@ type IPointLogic interface {
 	Earn(ctx context.Context, userId int64, bizType int, points int, orderNo string) error
 	// Consume 下单消耗（扣减, 可致负余额——欠款语义）。
 	Consume(ctx context.Context, userId int64, points int, orderNo string) error
-	// Refund 退款回退（bizType=4, 可致负）。
+	// Refund 退款回退（bizType=4, **加回**用户已消耗的积分——011 评审 I5 定档:
+	// 列注释的"消耗/回退负"为旧口径, 退款语义应退还用户, 故实现为本表唯一"负向流程中的正向变动"。
 	Refund(ctx context.Context, userId int64, points int, orderNo string) error
 	// ExpireDormant 滚动过期清零（定时任务: last_earned_at 超 12 个月; bizType=9）。
 	ExpireDormant(ctx context.Context) (int64, error)

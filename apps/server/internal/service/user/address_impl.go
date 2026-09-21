@@ -16,11 +16,12 @@ import (
 	"ecboot/internal/model/do"
 )
 
-func addressFromRecord(r gdb.Record) model.AddressItem {
+// addressFromRecordRaw 行 → DTO（**电话不脱敏**——内部链路用: 下单快照需真实号码）。
+func addressFromRecordRaw(r gdb.Record) model.AddressItem {
 	return model.AddressItem{
 		Id:            r["id"].Int64(),
 		ReceiverName:  r["receiver_name"].String(),
-		ReceiverPhone: maskPhone(r["receiver_phone"].String()),
+		ReceiverPhone: r["receiver_phone"].String(),
 		Province:      r["province"].String(),
 		City:          r["city"].String(),
 		District:      r["district"].String(),
@@ -32,7 +33,51 @@ func addressFromRecord(r gdb.Record) model.AddressItem {
 	}
 }
 
-// addressInputDo 入参 → do（含区划码列）。
+// addressFromRecord 行 → DTO（**会员可见边界**: 电话脱敏）。
+func addressFromRecord(r gdb.Record) model.AddressItem {
+	it := addressFromRecordRaw(r)
+	it.ReceiverPhone = maskPhone(it.ReceiverPhone)
+	return it
+}
+
+// addressUpdateDo 更新入参 → do（010 评审判例延伸: api 各字段可选, **仅非空才更新**;
+// is_default 为 false 时**不动作**——"取消默认"经给其他地址设默认实现, 避免静默丢默认）。
+func addressUpdateDo(in model.AddressInput) do.UserAddress {
+	d := do.UserAddress{}
+	if in.ReceiverName != "" {
+		d.ReceiverName = in.ReceiverName
+	}
+	if in.ReceiverPhone != "" {
+		d.ReceiverPhone = in.ReceiverPhone
+	}
+	if in.Province != "" {
+		d.Province = in.Province
+	}
+	if in.City != "" {
+		d.City = in.City
+	}
+	if in.District != "" {
+		d.District = in.District
+	}
+	if in.DetailAddress != "" {
+		d.DetailAddress = in.DetailAddress
+	}
+	if in.ProvinceCode != "" {
+		d.ProvinceCode = in.ProvinceCode
+	}
+	if in.CityCode != "" {
+		d.CityCode = in.CityCode
+	}
+	if in.DistrictCode != "" {
+		d.DistrictCode = in.DistrictCode
+	}
+	if in.IsDefault {
+		d.IsDefault = 1
+	}
+	return d
+}
+
+// addressInputDo 入参 → do（创建用: 全量写入, 含区划码列）。
 func addressInputDo(in model.AddressInput, isDefault bool) do.UserAddress {
 	d := 0
 	if isDefault {
@@ -137,7 +182,7 @@ func AddressUpdate(ctx context.Context, userId, addressId int64, in model.Addres
 		if _, e := dao.UserAddress.Ctx(ctx).
 			Where(cols.Id, addressId).
 			Where(cols.UserId, userId).
-			Data(addressInputDo(in, in.IsDefault)).
+			Data(addressUpdateDo(in)).
 			Update(); e != nil {
 			return gerror.Wrap(e, "修改地址失败")
 		}
@@ -192,6 +237,7 @@ func AddressGetForOrder(ctx context.Context, userId, addressId int64) (*model.Ad
 	if err != nil {
 		return nil, err
 	}
-	it := addressFromRecord(rec)
+	// 内部链路（下单/运费）返回**原始号码**——脱敏仅发生在会员可见边界
+	it := addressFromRecordRaw(rec)
 	return &it, nil
 }
