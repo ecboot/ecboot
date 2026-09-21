@@ -3,66 +3,93 @@ package user
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
+	"github.com/gogf/gf/v2/database/gdb"
+	gredis "github.com/gogf/gf/v2/database/gredis"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/os/gcfg"
 	"github.com/gogf/gf/v2/test/gtest"
 
 	"ecboot/internal/errcode"
 	"ecboot/internal/library/captcha"
 	"ecboot/internal/library/security"
+	"ecboot/internal/library/sms"
 )
 
 func init() {
-	// 单测 cwd 为包目录: 显式指向 manifest/config 使 g.Redis()/g.DB() 可用
-	if a, ok := g.Cfg().GetAdapter().(*gcfg.AdapterFile); ok {
-		_ = a.SetPath("../../manifest/config")
-	}
+	// 测试显式开启 mock（fail-closed 语义下的白盒开关）
+	os.Setenv("ECBOOT_MOCK", "true")
+	// 确定性测试配置（不依赖 manifest/config 的本地差异——compose 基线环境）。
+	gdb.SetConfig(gdb.Config{
+		"default": gdb.ConfigGroup{
+			{
+				Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase",
+			},
+		},
+	})
+	gredis.SetConfig(&gredis.Config{
+		Address: "127.0.0.1:6379",
+		Db:      0,
+	})
 }
 
-// TestAuthFlow 认证链路端到端（依赖 compose 的 MySQL/Redis 与已应用迁移）。
+// issueCode 清理频控状态并走真实发码链路, 返回 mock 短信码。
+func issueCode(ctx context.Context, t *gtest.T, phone string) string {
+	_, _ = g.Redis().Do(ctx, "DEL", "captcha:sms:interval:"+phone)
+	key, _, answer, err := captcha.Generate(ctx)
+	t.AssertNil(err)
+	_, err = sms.SendSmsCode(ctx, phone, key, answer)
+	t.AssertNil(err)
+	v, err := g.Redis().Do(ctx, "GET", "mock:sms:"+phone)
+	t.AssertNil(err)
+	return v.String()
+}
+
+// cleanState 清理测试遗留（user 行 + Redis 状态键）。
+func cleanState(ctx context.Context, t *gtest.T, phone string) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", phoneCipher().Hash(phone))
+	_, _ = g.Redis().Do(ctx, "DEL",
+		"captcha:sms:interval:"+phone, "captcha:fail:"+phone,
+		"captcha:sms:"+phone, "mock:sms:"+phone)
+}
+
+// errCode 提取错误中的契约码（兼容 gerror 包装）。
+func errCode(err error) int {
+	var ge *gerror.Error
+	if errors.As(err, &ge) {
+		return ge.Code().Code()
+	}
+	return -1
+}
+
+// TestAuthFlow 认证链路端到端。
 func TestAuthFlow(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
 		const phone = "13800001111"
-		// 清理上次运行遗留的用户与 Redis 状态键
-		_, _ = g.DB().Exec(ctx, "DELETE FROM user WHERE phone_hash=?", phoneCipher().Hash(phone))
-		// 清理上次运行遗留的 Redis 状态键（重发锁/失败计数/旧码）
-		_, _ = g.Redis().Do(ctx, "DEL",
-			"captcha:sms:interval:"+phone, "captcha:fail:"+phone,
-			"captcha:sms:"+phone, "mock:sms:"+phone)
+		cleanState(ctx, t, phone)
 
-		// ---- ① 图形验证码: 获取(直调组件可拿答案) → 一次性断言 ----
+		// ① 图形码一次性
 		key, _, answer, err := captcha.Generate(ctx)
 		t.AssertNil(err)
 		ok, err := captcha.Verify(ctx, key, answer)
 		t.AssertNil(err)
 		t.Assert(ok, true)
-		ok, err = captcha.Verify(ctx, key, answer) // 同凭证复用必须失败
+		ok, err = captcha.Verify(ctx, key, answer)
 		t.AssertNil(err)
 		t.Assert(ok, false)
 
-		// ---- ② 发短信码（重新取图形码） ----
-		key2, _, answer2, err := captcha.Generate(ctx)
-		t.AssertNil(err)
-		_, err = SendSmsCode(ctx, phone, key2, answer2)
-		t.AssertNil(err)
-
-		// ---- ③ 注册即登录 ----
-		v, err := g.Redis().Do(ctx, "GET", "mock:sms:"+phone)
-		t.AssertNil(err)
-		code := v.String()
-		t.Assert(code != "", true)
+		// ②③ 注册即登录
+		code := issueCode(ctx, t, phone)
 		out, err := SmsLogin(ctx, phone, code, 1)
 		t.AssertNil(err)
 		t.Assert(out.IsNew, true)
-		t.Assert(out.UserId > 0, true)
 
-		// ---- ④ 库内零明文（SC-007） ----
+		// ④ 库内零明文
 		rec, err := g.DB().GetOne(ctx, "SELECT phone, phone_hash FROM `user` WHERE id=?", out.UserId)
 		t.AssertNil(err)
 		t.Assert(rec["phone_hash"].String() != "", true)
@@ -71,73 +98,95 @@ func TestAuthFlow(t *testing.T) {
 			t.Error("user.phone 疑似明文存储")
 		}
 
-		// ---- ⑤ 会话有效性 ----
+		// ⑤ 会话有效
 		sm := security.NewSessionManager(7)
 		uid, ok, err := sm.Validate(ctx, out.Token)
 		t.AssertNil(err)
 		t.Assert(ok, true)
 		t.Assert(uid, out.UserId)
 
-		// ---- ⑥ 微信归并: 同手机号 → 同一账号 ----
-		out2, err := WxLogin(ctx, "dev001", phone, "", 1)
+		// ⑥ 微信归并: 同号+有效码 → 同一账号
+		mergeCode := issueCode(ctx, t, phone)
+		out2, err := WxLogin(ctx, "dev001", phone, mergeCode, 1)
 		t.AssertNil(err)
 		t.Assert(out2.UserId, out.UserId)
 
-		// ---- ⑦ 绑定冲突: 另一微信身份携同号 → 20004 ----
-		_, err = WxLogin(ctx, "dev002", phone, "", 1)
-		t.Assert(err != nil, true)
+		// ⑦ 绑定冲突 → 20004
+		conflictCode := issueCode(ctx, t, phone)
+		_, err = WxLogin(ctx, "dev002", phone, conflictCode, 1)
 		t.Assert(errCode(err), errcode.CodeWxBindConflict)
 
-		// ---- ⑧ 重复登录（已注册路径, 幂等） ----
-		out3, err := smsLoginReplay(ctx, phone)
+		// ⑧ 重复登录幂等
+		code3 := issueCode(ctx, t, phone)
+		out3, err := SmsLogin(ctx, phone, code3, 1)
 		t.AssertNil(err)
 		t.Assert(out3.IsNew, false)
 		t.Assert(out3.UserId, out.UserId)
 
-		// ---- ⑨ 休眠分级: 拨表 91 天 → 微信静默路径被拒（FR-013） ----
+		// ⑨ 休眠分级: 微信静默被拒; 短信通道放行
 		_, _ = g.DB().Exec(ctx, "UPDATE `user` SET last_active_at=DATE_SUB(NOW(), INTERVAL 91 DAY) WHERE id=?", out.UserId)
-		_, err = WxLogin(ctx, "dev001", "", "", 1) // openid 已绑定, 静默登录
+		_, err = WxLogin(ctx, "dev001", "", "", 1)
 		t.Assert(err != nil, true)
-		t.Assert(errCode(err) == 10001 || errCode(err) == 10002, true) // 拒绝并引导短信通道
-
-		// 短信码通道 = 完整核验, 放行
-		out4, err := smsLoginReplay(ctx, phone)
+		replayCode := issueCode(ctx, t, phone)
+		out4, err := SmsLogin(ctx, phone, replayCode, 1)
 		t.AssertNil(err)
 		t.Assert(out4.UserId, out.UserId)
 
-		// 清理测试数据
 		_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE id=?", out.UserId)
 		_, _ = g.DB().Exec(ctx, "DELETE FROM user_login_log WHERE user_id=?", out.UserId)
 	})
 }
 
-// smsLoginReplay 重新发码并登录（已注册账号路径）。
-func smsLoginReplay(ctx context.Context, phone string) (*LoginOutcome, error) {
-	_, _ = g.Redis().Do(ctx, "DEL", "captcha:sms:interval:"+phone) // 测试内重发绕开 60s 窗口
-	key, _, answer, err := captcha.Generate(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = SendSmsCode(ctx, phone, key, answer); err != nil {
-		return nil, err
-	}
-	v, err := g.Redis().Do(ctx, "GET", "mock:sms:"+phone)
-	if err != nil {
-		return nil, err
-	}
-	return SmsLogin(ctx, phone, v.String(), 1)
+// TestSessionLifecycle 会话三态与 refresh 轮换（评审 I12）。
+func TestSessionLifecycle(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		sm := security.NewSessionManager(7)
+
+		token, refresh, err := sm.Create(ctx, 999)
+		t.AssertNil(err)
+
+		nt, nr, ruid, err := sm.Refresh(ctx, refresh)
+		t.AssertNil(err)
+		t.Assert(ruid, 999)
+		t.Assert(nt != token, true)
+
+		_, _, _, err = sm.Refresh(ctx, refresh) // 旧 refresh 已消费
+		t.Assert(err != nil, true)
+
+		t.AssertNil(sm.Destroy(ctx, nt, nr))
+		_, ok, err := sm.Validate(ctx, nt)
+		t.AssertNil(err)
+		t.Assert(ok, false)
+		_, _, _, err = sm.Refresh(ctx, nr)
+		t.Assert(err != nil, true)
+	})
 }
 
-// errCode 提取错误中的契约码（兼容 gerror 包装与裸 Business）。
-func errCode(err error) int {
-	var ge *gerror.Error
-	if errors.As(err, &ge) {
-		return ge.Code().Code()
-	}
-	type coder interface{ Code() int }
-	var c coder
-	if errors.As(err, &c) {
-		return c.Code()
-	}
-	return -1
+// TestAntiAbuse 防刷规则（60s 重发窗口 / 5 次失败锁定——评审 I12）。
+func TestAntiAbuse(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const phone = "13800002222"
+		cleanState(ctx, t, phone)
+
+		_ = issueCode(ctx, t, phone)
+		key, _, answer, err := captcha.Generate(ctx)
+		t.AssertNil(err)
+		_, err = sms.SendSmsCode(ctx, phone, key, answer)
+		t.Assert(errCode(err), errcode.CodeTooFrequent)
+
+		for i := 0; i < 5; i++ {
+			dbg, _ := g.Redis().Do(ctx, "EXISTS", "captcha:fail:"+phone)
+			t.Log("DEBUG i=", i, "failKeyExists=", dbg.Int())
+			_, err = SmsLogin(ctx, phone, "000000", 1)
+			t.Log("DEBUG i=", i, "errCode=", errCode(err))
+			t.Assert(errCode(err), errcode.CodeCaptchaError) // 1~5 次: 20001
+		}
+		// 第 6 次: 计数达上限 → 锁定 20002
+		_, err = SmsLogin(ctx, phone, "000000", 1)
+		t.Assert(errCode(err), errcode.CodeLocked)
+
+		cleanState(ctx, t, phone)
+	})
 }

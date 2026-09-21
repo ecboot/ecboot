@@ -111,13 +111,13 @@ func (a *schedulerProvider) electionLoop(ctx context.Context) {
 func (a *schedulerProvider) universalClient() (redis.UniversalClient, bool) {
 	gredis := g.Redis()
 	// 获取原始客户端
-    client := gredis.Client()
-    // 类型断言为 UniversalClient
-    universalClient, ok := client.(redis.UniversalClient)
-    if !ok {
-        return nil, false
-    }
-    return universalClient, true
+	client := gredis.Client()
+	// 类型断言为 UniversalClient
+	universalClient, ok := client.(redis.UniversalClient)
+	if !ok {
+		return nil, false
+	}
+	return universalClient, true
 }
 
 // tick 执行一次选主检查：非主抢锁，主续约；状态翻转时注册/摘除任务。

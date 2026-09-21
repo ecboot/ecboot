@@ -3,20 +3,27 @@ package middleware
 import (
 	"errors"
 
-	bizerr "ecboot/internal/library/err"
-
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/util/gvalid"
 )
 
 // Response 统一响应中间件（替代 ghttp.MiddlewareHandlerResponse）：
-// handler 无错 → {code:0, message:"ok", data:res}；
-// 业务异常 → {code:业务码, message:文案}；
-// 校验失败 → {code:10001, message:首错含字段}；
-// 其他错误 → {code:10002, message:系统错误+追踪号}（不泄漏内部细节, spec FR-003）。
+//   - handler 无错且未自行写出 → {code:0, message:"ok", data:res}
+//   - 携带 gcode 的业务错误（errcode.New 工厂）→ {code:契约码, message:文案}
+//   - 校验失败 → {code:10001, message:首错含字段}
+//   - 其他错误 → {code:10002, message:系统错误+追踪号}（不泄漏内部细节, FR-003）
+//
+// 若下游已写出响应体（鉴权直写/渠道回调/Exit 提前返回），本中间件不再覆盖（评审 C4）。
 func Response(r *ghttp.Request) {
 	r.Middleware.Next()
+
+	if r.Response.BufferLength() > 0 {
+		// 下游已显式写出——保留原响应
+		r.SetError(nil)
+		return
+	}
 
 	var (
 		code    int
@@ -26,7 +33,6 @@ func Response(r *ghttp.Request) {
 
 	if err := r.GetError(); err != nil {
 		code, message = mapError(err, r)
-		// 清除错误避免框架再按默认形态输出
 		r.SetError(nil)
 	} else {
 		code, message = 0, "ok"
@@ -41,10 +47,9 @@ func Response(r *ghttp.Request) {
 }
 
 func mapError(err error, r *ghttp.Request) (int, string) {
-	// 业务异常：携带契约错误码
-	var biz *bizerr.Business
-	if errors.As(err, &biz) {
-		return biz.Code(), biz.Message()
+	// 携带 gcode 的业务错误（errcode.New 工厂产物）——契约码直出（评审 C1）
+	if gc := gerror.Code(err); gc.Code() > 0 {
+		return gc.Code(), gc.Message()
 	}
 
 	// 参数校验失败：首错含字段与原因（FR-003）

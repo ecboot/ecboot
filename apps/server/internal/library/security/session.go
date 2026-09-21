@@ -26,8 +26,22 @@ func NewSessionManager(ttlDays int) *SessionManager {
 	return &SessionManager{ttlDays: ttlDays}
 }
 
+// NewSessionManagerFromConfig 会话管理器（TTL 读 system_config: session.ttl_days, 缺失回退 7）。
+// 统一入口——避免调用点硬编码 TTL 造成配置漂移（评审 I8）。
+func NewSessionManagerFromConfig(ctx context.Context) *SessionManager {
+	v, err := g.DB().GetOne(ctx,
+		"SELECT value FROM system_config WHERE code='session.ttl_days' AND status=1 AND deleted=0")
+	days := 7
+	if err == nil && !v.IsEmpty() {
+		if n := v["value"].Int(); n > 0 {
+			days = n
+		}
+	}
+	return NewSessionManager(days)
+}
+
 const (
-	tokenKeyPrefix  = "session:"
+	tokenKeyPrefix   = "session:"
 	refreshKeyPrefix = "session:refresh:"
 )
 
@@ -52,7 +66,7 @@ func (m *SessionManager) Create(ctx context.Context, userId int64) (token, refre
 		return "", "", err
 	}
 	// 刷新凭证长效 = 访问凭证 4 倍（30 天口径）
-	if _, err = g.Redis().Do(ctx, "SET", refreshKeyPrefix+refreshToken, userId, "EX", int((ttl*4).Seconds())); err != nil {
+	if _, err = g.Redis().Do(ctx, "SET", refreshKeyPrefix+refreshToken, userId, "EX", int((ttl * 4).Seconds())); err != nil {
 		return "", "", err
 	}
 	return token, refreshToken, nil

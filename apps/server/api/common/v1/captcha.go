@@ -27,7 +27,7 @@ type (
 
 	// 联调取码（仅 mock 模式注册路由; 生产不存在该端点）
 	MockLatestSmsReq struct {
-		g.Meta `path:"/captcha/sms/mock-latest" tags:"Common" method:"GET" summary:"最近短信验证码(mock)"`
+		g.Meta      `path:"/captcha/sms/mock-latest" tags:"Common" method:"GET" summary:"最近短信验证码(mock)"`
 		PhoneNumber string `json:"phoneNumber" v:"required" dc:"手机号"`
 	}
 	MockLatestSmsRes struct {

@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -15,12 +17,9 @@ import (
 
 	"ecboot/internal/dao"
 	"ecboot/internal/errcode"
-	"ecboot/internal/library/captcha"
 	"ecboot/internal/library/security"
 	"ecboot/internal/library/sms"
 )
-
-// ---------- Redis 键与配置常量（data-model §一） ----------
 
 const (
 	smsCodeKeyPrefix  = "captcha:sms:"
@@ -52,83 +51,48 @@ func cfgInt(ctx context.Context, code string, fallback int) int {
 	return fallback
 }
 
-// phoneCipher 惰性单例：密钥经环境变量 PHONE_KEY 注入（Base64, 32 字节），
-// 未配置时使用开发态默认密钥（仅限本地开发, 生产 MUST 配置环境变量）。
-var phoneCipherInstance *security.PhoneCipher
+// phoneCipher 惰性单例（sync.Once 防并发竞态, 评审 Minor17）：
+// 密钥优先级 config security.phoneKey → env PHONE_KEY → 开发态默认（仅限本地, 启动警告）。
+var (
+	phoneCipherOnce sync.Once
+	phoneCipherImpl *security.PhoneCipher
+	phoneCipherErr  error
+)
 
 func phoneCipher() *security.PhoneCipher {
-	if phoneCipherInstance == nil {
-		key := g.Cfg().MustGet(gctxNew(), "security.phoneKey", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=").String()
-		pc, err := security.NewPhoneCipher(key)
-		if err != nil {
-			panic(fmt.Sprintf("phone key 初始化失败: %v", err))
+	phoneCipherOnce.Do(func() {
+		key := g.Cfg().MustGet(gctxNew(), "security.phoneKey", os.Getenv("PHONE_KEY")).String()
+		if key == "" {
+			key = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" // 开发态默认
+			g.Log().Warning(gctxNew(), "security.phoneKey 未配置, 使用开发态默认密钥——生产环境必须注入!")
 		}
-		phoneCipherInstance = pc
+		phoneCipherImpl, phoneCipherErr = security.NewPhoneCipher(key)
+	})
+	if phoneCipherErr != nil {
+		panic(fmt.Sprintf("phone key 初始化失败: %v", phoneCipherErr))
 	}
-	return phoneCipherInstance
+	return phoneCipherImpl
 }
 
 func gctxNew() context.Context { return context.Background() }
 
-// sessionManager 会话管理器单例（TTL 走配置）。
+// sessionManager 会话管理器（TTL 读配置, 评审 I8 统一入口）。
 func sessionManager(ctx context.Context) *security.SessionManager {
-	return security.NewSessionManager(cfgInt(ctx, "session.ttl_days", defSessionTTLDays))
+	return security.NewSessionManagerFromConfig(ctx)
 }
 
 // mockEnabled 是否开发态 mock（决定发码走 Mock、微信走 MockWxClient）。
+// fail-closed（评审 C5）: 仅当配置 wechat.mockEnabled=true 或 env ECBOOT_MOCK=true 才开启。
 func mockEnabled(ctx context.Context) bool {
-	return g.Cfg().MustGet(ctx, "wechat.mockEnabled", true).Bool()
+	if g.Cfg().MustGet(ctx, "wechat.mockEnabled", false).Bool() {
+		return true
+	}
+	return os.Getenv("ECBOOT_MOCK") == "true"
 }
 
-// ---------- 短信验证码发送（US3 / FR-007~009, FR-014） ----------
-
-// SendSmsCode 发送短信验证码：格式校验→图形码校验→频控→生成落 Redis→Mock 发送。
-func SendSmsCode(ctx context.Context, phone, captchaKey, captchaCode string) (expiresIn int, err error) {
-	if !validPhone(phone) {
-		return 0, errcode.New(errcode.CodeInvalidParam, "手机号格式不正确")
-	}
-	ttl := cfgInt(ctx, "captcha.sms.ttl_seconds", defSmsTTLSeconds)
-
-	// 锁定检查
-	locked, _ := g.Redis().Do(ctx, "EXISTS", failCountPrefix+phone)
-	if locked.Bool() {
-		return 0, errcode.New(errcode.CodeLocked, "尝试次数超限,请稍后再试")
-	}
-
-	// 图形码一次性校验
-	ok, verr := captcha.Verify(ctx, captchaKey, captchaCode)
-	if verr != nil {
-		return 0, verr
-	}
-	if !ok {
-		return 0, errcode.New(errcode.CodeCaptchaError, "图形验证码错误或已过期")
-	}
-
-	// 重发间隔锁
-	resend := cfgInt(ctx, "captcha.sms.resend_seconds", defResendSeconds)
-	v, err := g.Redis().Do(ctx, "SET", smsIntervalPrefix+phone, 1, "NX", "EX", resend)
-	if err != nil {
-		return 0, err
-	}
-	if v.String() != "OK" {
-		return 0, errcode.New(errcode.CodeTooFrequent, "发送过于频繁,请稍后再试")
-	}
-
-	// 生成短信码并落 Redis
-	code, err := sms.GenerateCode()
-	if err != nil {
-		return 0, err
-	}
-	if _, err = g.Redis().Do(ctx, "SET", smsCodeKeyPrefix+phone, code, "EX", ttl); err != nil {
-		return 0, err
-	}
-
-	// 发送（开发态 mock: 写 mock:sms:{phone} 供取码端点）
-	sender := sms.NewMockSender()
-	if err = sender.Send(ctx, phone, code); err != nil {
-		return 0, err
-	}
-	return ttl, nil
+// SendSmsCode 发送短信验证码（实现下沉 library/sms, common 渠道直调; service 保留转发兼容测试）。
+func SendSmsCode(ctx context.Context, phone, captchaKey, captchaCode string) (int, error) {
+	return sms.SendSmsCode(ctx, phone, captchaKey, captchaCode)
 }
 
 // ---------- 短信验证码登录（注册即登录, US3 / FR-010/012/013） ----------
@@ -147,19 +111,11 @@ func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*LoginOu
 		return nil, errcode.New(errcode.CodeInvalidParam, "手机号格式不正确")
 	}
 
-	// 锁定检查
-	locked, _ := g.Redis().Do(ctx, "EXISTS", failCountPrefix+phone)
-	if locked.Bool() {
+	if sms.IsLocked(ctx, phone) {
 		return nil, errcode.New(errcode.CodeLocked, "尝试次数超限,请稍后再试")
 	}
-
-	// 短信码一次性校验（GETDEL）; 失败计数
-	ok, verr := g.Redis().Do(ctx, "GETDEL", smsCodeKeyPrefix+phone)
-	if verr != nil {
-		return nil, verr
-	}
-	if ok.String() == "" || ok.String() != smsCode {
-		countFail(ctx, phone)
+	if !sms.ConsumeSmsCode(ctx, phone, smsCode) {
+		sms.CountFail(ctx, phone)
 		return nil, errcode.New(errcode.CodeCaptchaError, "验证码错误或已过期")
 	}
 
@@ -215,14 +171,6 @@ func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*LoginOu
 		return nil, errcode.New(errcode.CodeUserDisabled, "账号已被禁用,请联系客服")
 	}
 
-	// 休眠分级核身: 短信码登录=完整核验, 天然满足一级要求（微信静默路径见 WxLogin）
-	dormantDays := cfgInt(ctx, "dormant.tier1.days", defDormantDays)
-	if last := record["last_active_at"].Time(); !last.IsZero() &&
-		time.Since(last) > time.Duration(dormantDays)*24*time.Hour {
-		// 短信通道即强核身——放行; 微信静默通道在 WxLogin 中拒绝
-		_ = dormantDays
-	}
-
 	// 会话发放
 	sm := sessionManager(ctx)
 	token, refreshToken, sErr := sm.Create(ctx, userId)
@@ -234,24 +182,6 @@ func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*LoginOu
 	touchLogin(ctx, userId, channel, true, "")
 
 	return &LoginOutcome{Token: token, RefreshToken: refreshToken, UserId: userId, IsNew: isNew}, nil
-}
-
-// countFail 登录/校验失败计数（达上限写锁定键, TTL=锁定时长）。
-func countFail(ctx context.Context, phone string) {
-	maxFails := cfgInt(ctx, "captcha.fail.max", defFailMax)
-	lockSeconds := cfgInt(ctx, "captcha.fail.lock_seconds", defLockSeconds)
-	key := failCountPrefix + phone
-	v, err := g.Redis().Do(ctx, "INCR", key)
-	if err != nil {
-		return
-	}
-	if v.Int() == 1 {
-		_, _ = g.Redis().Do(ctx, "EXPIRE", key, lockSeconds)
-		return
-	}
-	if v.Int() >= maxFails {
-		_, _ = g.Redis().Do(ctx, "EXPIRE", key, lockSeconds)
-	}
 }
 
 // touchLogin 更新最后登录/活跃时间并写登录日志。
@@ -273,7 +203,7 @@ func touchLogin(ctx context.Context, userId int64, channel int, success bool, ip
 		uid = nil
 	}
 	_, _ = dao.UserLoginLog.Ctx(ctx).Data(g.Map{
-		dao.UserLoginLog.Columns().UserId:    uid,
+		dao.UserLoginLog.Columns().UserId:       uid,
 		dao.UserLoginLog.Columns().LoginChannel: channel,
 		dao.UserLoginLog.Columns().LoginStatus:  status,
 		dao.UserLoginLog.Columns().Ip:           ip,

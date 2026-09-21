@@ -41,7 +41,8 @@ var publicPrefixes = []string{
 func isPublicPath(r *ghttp.Request) bool {
 	path := r.URL.Path
 	for _, p := range publicPrefixes {
-		if strings.HasPrefix(path, p) {
+		// 段边界匹配: path==p 或 path 以 p+"/" 开头（防 /user/login* 误匹配）
+		if path == p || strings.HasPrefix(path, p+"/") || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {
 			if path == "/shop/reviews" && r.Method == "POST" {
 				return false // POST 提交评价是会员行为
 			}

@@ -8,11 +8,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/frame/g"
 
 	"ecboot/internal/dao"
 	"ecboot/internal/errcode"
+	"ecboot/internal/library/sms"
 )
 
 // WxIdentity 微信侧身份（真实渠道由 WxClient 实现 code2session 换取）。
@@ -68,12 +69,16 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 		return &LoginOutcome{Token: token, RefreshToken: refresh, UserId: userId}, nil
 	}
 
-	// ② 未绑定 → 手机号优先归并（必须能取得手机号）
+	// ② 未绑定 → 手机号优先归并（必须能取得手机号 + 短信码核验, mock 亦验——评审 C5 fail-closed）
 	if phone == "" {
 		return nil, errcode.New(errcode.CodeInvalidParam, "该微信身份未绑定,需提供手机号完成归并")
 	}
-	if !validPhone(phone) {
+	if !sms.ValidPhone(phone) {
 		return nil, errcode.New(errcode.CodeInvalidParam, "手机号格式不正确")
+	}
+	if !sms.ConsumeSmsCode(ctx, phone, smsCode) {
+		sms.CountFail(ctx, phone)
+		return nil, errcode.New(errcode.CodeCaptchaError, "验证码错误或已过期")
 	}
 	pc := phoneCipher()
 	phoneHash := pc.Hash(phone)
@@ -143,4 +148,3 @@ func ensureNotDormant(record gdb.Record) error {
 	}
 	return nil
 }
-

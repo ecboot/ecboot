@@ -7,8 +7,8 @@ type (
 	SmsLoginReq struct {
 		g.Meta `path:"/login/sms" tags:"User" method:"POST" summary:"短信验证码登录接口"`
 
-		PhoneNumber string `json:"phoneNumber" v:"required" dc:"手机号" d:"18888888888"`
-		SmsCode     string `json:"smsCode" v:"required" dc:"短信验证码" d:"123456"`
+		PhoneNumber string `json:"phoneNumber" v:"required" dc:"手机号"`
+		SmsCode     string `json:"smsCode" v:"required" dc:"短信验证码"`
 		Channel     int    `json:"channel" dc:"注册渠道:1小程序 2H5" d:"1"`
 	}
 	SmsLoginRes struct {
@@ -43,9 +43,10 @@ type (
 		RefreshToken string `json:"refreshToken" v:"required" dc:"新刷新凭证"`
 	}
 
-	// 登出（双凭证同失效）
+	// 登出（访问凭证自动取自鉴权头; refreshToken 可选提交以同时失效刷新凭证——评审 C2）
 	LogoutReq struct {
-		g.Meta `path:"/logout" tags:"User" method:"POST" summary:"登出"`
+		g.Meta       `path:"/logout" tags:"User" method:"POST" summary:"登出"`
+		RefreshToken string `json:"refreshToken" dc:"刷新凭证(提交则一并失效)"`
 	}
 	LogoutRes struct {
 		Success bool `json:"success" dc:"固定true"`

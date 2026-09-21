@@ -48,4 +48,3 @@ type PageResult[T any] struct {
 	List  []T   `json:"list" dc:"数据列表"`
 	Total int64 `json:"total" dc:"总条数"`
 }
-
