@@ -31,12 +31,12 @@
 
 ## Phase 5: US5 后台订单（新写，P1）
 
-- [ ] T012 [P] [US5] `internal/service/shop/order_mgmt_test.go`（红）：AdminList（状态/关键词/分页）/
+- [x] T012 [P] [US5] `internal/service/shop/order_mgmt_test.go`（红）：AdminList（状态/关键词/分页）/
       AdminDetail/Deliver（仅 20 可发 + **停用物流公司拒绝** + 物流信息落库）/AdminCancel（同 C 端语义）/
       SellerRemark（**C 端 Detail 不含该列**）/CancelTimeout/AutoConfirm
-- [ ] T013 [US5] `order_impl.go` 追加 8 方法（Confirm 已在 T004）
-- [ ] T014 [US5] 连线 admin 5 端点（桩清零 ×5；deliver 挂 order:deliver、cancel 挂 order:cancel、remark 挂 order:update）
-- [ ] T015 `go test ./...` 绿
+- [x] T013 [US5] `order_impl.go` 追加 8 方法（Confirm 已在 T004）
+- [x] T014 [US5] 连线 admin 5 端点（桩清零 ×5；deliver 挂 order:deliver、cancel 挂 order:cancel、remark 挂 order:update）
+- [x] T015 `go test ./...` 绿
 
 ## Phase 6: US6 会员优惠券（新写，P2）
 

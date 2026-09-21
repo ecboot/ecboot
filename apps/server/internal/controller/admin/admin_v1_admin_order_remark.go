@@ -3,13 +3,19 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/shop"
 )
 
-// AdminOrderRemark 卖家备注
+// AdminOrderRemark 内部备注（买家不可见）
 func (c *ControllerV1) AdminOrderRemark(ctx context.Context, req *v1.AdminOrderRemarkReq) (res *v1.AdminOrderRemarkRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, "order:update"); err != nil {
+		return nil, err
+	}
+	operator := adminOperator(ctx)
+	if err = shop.NewOrderLogic().SellerRemark(ctx, req.OrderNo, req.SellerRemark, operator); err != nil {
+		return nil, err
+	}
+	return &v1.AdminOrderRemarkRes{Success: true}, nil
 }

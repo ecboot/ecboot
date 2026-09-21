@@ -298,9 +298,11 @@ func orderAmountBook(r gdb.Record) model.AmountBook {
 
 // OrderDetail 订单详情（含状态时间线; 他人资源按不存在处理）。
 func (i *OrderLogicImpl) OrderDetail(ctx context.Context, userId int64, orderNo string) (*model.OrderDetailView, error) {
-	rec, err := dao.TradeOrder.Ctx(ctx).
-		Where(dao.TradeOrder.Columns().OrderNo, orderNo).
-		Where(dao.TradeOrder.Columns().UserId, userId).One()
+	m := dao.TradeOrder.Ctx(ctx).Where(dao.TradeOrder.Columns().OrderNo, orderNo)
+	if userId > 0 { // userId=0 为后台视角（不限制归属, 012 管理面复用）
+		m = m.Where(dao.TradeOrder.Columns().UserId, userId)
+	}
+	rec, err := m.One()
 	if err != nil {
 		return nil, err
 	}
@@ -352,9 +354,12 @@ func (i *OrderLogicImpl) OrderDetail(ctx context.Context, userId int64, orderNo 
 
 // Cancel 用户取消（仅待付款; 条件更新抢占; 释放库存+退优惠+流水）。
 func (i *OrderLogicImpl) Cancel(ctx context.Context, userId int64, orderNo, reason string) error {
-	rec, err := dao.TradeOrder.Ctx(ctx).
-		Where(dao.TradeOrder.Columns().OrderNo, orderNo).
-		Where(dao.TradeOrder.Columns().UserId, userId).One()
+	// userId=0 为后台视角（012 管理面复用同一取消语义）
+	m := dao.TradeOrder.Ctx(ctx).Where(dao.TradeOrder.Columns().OrderNo, orderNo)
+	if userId > 0 {
+		m = m.Where(dao.TradeOrder.Columns().UserId, userId)
+	}
+	rec, err := m.One()
 	if err != nil {
 		return err
 	}
