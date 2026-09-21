@@ -79,13 +79,13 @@
 
 ### Tests for US3（红先行）
 
-- [ ] T013 [P] [US3] `operation_impl_test.go`（C 端部分）：PublicBanners 时段三态（长期命中/未到排除/过期排除）+ 停用排除 + 排序；PublicFloors 启用楼层排序返回 + **商品楼层装配**（有效 SPU 出摘要 name/image/price_min）+ **失效剔除**（下架/不存在 ID 不报错）+ 停用排除 + 位置域外由 api 拦截的 service 兜底
+- [x] T013 [P] [US3] `operation_impl_test.go`（C 端部分）：PublicBanners 时段三态（长期命中/未到排除/过期排除）+ 停用排除 + 排序；PublicFloors 启用楼层排序返回 + **商品楼层装配**（有效 SPU 出摘要 name/image/price_min）+ **失效剔除**（下架/不存在 ID 不报错）+ 停用排除 + 位置域外由 api 拦截的 service 兜底
 
 ### Implementation for US3
 
-- [ ] T014 [US3] `internal/service/shop/operation_impl.go`（C 端部分）：`PublicBanners`（在投 SQL 判定, D4）、`PublicFloors`（启用楼层 + 商品楼层装配 `spuIds` → SPU 摘要, 复用 `firstImage`, D2/D3, 失效剔除）
-- [ ] T015 [US3] 连线 `internal/controller/shop/shop_v1_banner_list.go`、`shop_v1_floor_list.go`（桩清零 ×2；公开, 白名单已有）
-- [ ] T016 [US3] `go test ./...` 绿
+- [x] T014 [US3] `internal/service/shop/operation_impl.go`（C 端部分）：`PublicBanners`（在投 SQL 判定, D4）、`PublicFloors`（启用楼层 + 商品楼层装配 `spuIds` → SPU 摘要, 复用 `firstImage`, D2/D3, 失效剔除）
+- [x] T015 [US3] 连线 `internal/controller/shop/shop_v1_banner_list.go`、`shop_v1_floor_list.go`（桩清零 ×2；公开, 白名单已有）
+- [x] T016 [US3] `go test ./...` 绿
 
 **Checkpoint**: 15 端点全部去桩。
 
@@ -93,7 +93,7 @@
 
 ## Phase 6: User Story 4 - 权限挂接 (Priority: P2)
 
-- [ ] T017 [P] [US4] `internal/middleware/permission_test.go` 补三码断言：无权账号对 `logistics:company:manage`/`operation:banner:manage`/`operation:floor:manage` 均拒 10005、超管放行；核对挂点与 contracts 一致（写操作挂、查询不挂、C 端公开）
+- [x] T017 [P] [US4] `internal/middleware/permission_test.go` 补三码断言：无权账号对 `logistics:company:manage`/`operation:banner:manage`/`operation:floor:manage` 均拒 10005、超管放行；核对挂点与 contracts 一致（写操作挂、查询不挂、C 端公开）
 
 **Checkpoint**: 权限语义闭合。
 

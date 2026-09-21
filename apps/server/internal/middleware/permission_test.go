@@ -92,3 +92,25 @@ func TestRequirePermStoreCodes(t *testing.T) {
 		}
 	})
 }
+
+// TestRequirePermOperationCodes 物流与装修权限码拦截（009-logistics-ops US4, SC-004）:
+// 无权账号对三类写权限码均拒 10005; 超管全放行。
+func TestRequirePermOperationCodes(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		superId := seedMWAdmin(ctx, t, "t_mw_ops_s", 1)
+		plainId := seedMWAdmin(ctx, t, "t_mw_ops_p", 0)
+		defer cleanupMWAdmin(ctx, t, "t_mw_ops_s")
+		defer cleanupMWAdmin(ctx, t, "t_mw_ops_p")
+
+		superCtx := context.WithValue(ctx, consts.CtxUserId, superId)
+		plainCtx := context.WithValue(ctx, consts.CtxUserId, plainId)
+		for _, code := range []string{
+			"logistics:company:manage", "operation:banner:manage", "operation:floor:manage",
+		} {
+			err := RequirePerm(plainCtx, code)
+			t.Assert(errCodeOf(err), errcode.CodeForbidden)
+			t.AssertNil(RequirePerm(superCtx, code))
+		}
+	})
+}

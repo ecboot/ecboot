@@ -7,6 +7,7 @@ package shop
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -338,4 +339,131 @@ func FloorDelete(ctx context.Context, id int64) error {
 		return errcode.New(errcode.CodeNotFound, "楼层不存在")
 	}
 	return nil
+}
+
+// ---- C 端展示（US3, FR-010~013） ----
+
+// PublicBanners 在投轮播（FR-010）: 启用 + 投放时段内（NULL=立即/长期, research D4）, sort,id 序。
+func PublicBanners(ctx context.Context, position int) ([]model.PublicBannerItem, error) {
+	if position != 1 && position != 2 {
+		return nil, errcode.New(errcode.CodeInvalidParam, "轮播位置须为1首页轮播或2首页弹窗")
+	}
+	cols := dao.OperationBanner.Columns()
+	recs, err := dao.OperationBanner.Ctx(ctx).
+		Fields(cols.Id, cols.ImageUrl, cols.LinkUrl).
+		Where(cols.Deleted, 0).
+		Where(cols.Status, 1).
+		Where(cols.Position, position).
+		Where("(start_time IS NULL OR start_time <= NOW())").
+		Where("(end_time IS NULL OR end_time >= NOW())").
+		Order("sort ASC, id ASC").
+		All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询在投轮播失败")
+	}
+	list := make([]model.PublicBannerItem, 0, len(recs))
+	for _, r := range recs {
+		list = append(list, model.PublicBannerItem{
+			Id:       r["id"].Int64(),
+			ImageUrl: r["image_url"].String(),
+			LinkUrl:  r["link_url"].String(),
+		})
+	}
+	return list, nil
+}
+
+// spuIdsFromConfig 解析商品楼层配置的商品 ID 列表（约定 {"spuIds":["<id>",...]}, research D2）;
+// 容错: 缺失/类型不符/非法值一律跳过（展示层尽力而为, 不因脏配置报错）。
+func spuIdsFromConfig(cfg map[string]any) []int64 {
+	raw, ok := cfg["spuIds"]
+	if !ok {
+		return nil
+	}
+	arr, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]int64, 0, len(arr))
+	for _, v := range arr {
+		switch t := v.(type) {
+		case string:
+			if id, err := strconv.ParseInt(t, 10, 64); err == nil && id > 0 {
+				out = append(out, id)
+			}
+		case float64: // JSON 数字形态容错
+			if t > 0 {
+				out = append(out, int64(t))
+			}
+		}
+	}
+	return out
+}
+
+// PublicFloors C 端楼层（FR-011/012）: 启用楼层按序; 商品楼层装配 SPU 摘要并剔除失效商品（research D3）。
+func PublicFloors(ctx context.Context) ([]model.PublicFloorItem, error) {
+	cols := dao.OperationFloor.Columns()
+	recs, err := dao.OperationFloor.Ctx(ctx).
+		Fields(cols.Id, cols.FloorType, cols.Title, cols.Config, cols.Sort).
+		Where(cols.Deleted, 0).
+		Where(cols.Status, 1).
+		Order("sort ASC, id ASC").
+		All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询楼层失败")
+	}
+	list := make([]model.PublicFloorItem, 0, len(recs))
+	allIds := make([]int64, 0)
+	for _, r := range recs {
+		var e entity.OperationFloor
+		if err = r.Struct(&e); err != nil {
+			return nil, gerror.Wrap(err, "解析楼层失败")
+		}
+		cfg := configMap(e.Config)
+		item := model.PublicFloorItem{
+			FloorId:   int64(e.Id),
+			FloorType: e.FloorType,
+			Title:     e.Title,
+			Config:    cfg,
+			Products:  []model.FloorProductSummary{},
+		}
+		if e.FloorType == 2 {
+			allIds = append(allIds, spuIdsFromConfig(cfg)...)
+		}
+		list = append(list, item)
+	}
+
+	// 批量装配: 一次查全部涉及 SPU（上架且未删）, 失效 ID 自然缺失 → 逐个剔除
+	briefs := map[int64]model.FloorProductSummary{}
+	if len(allIds) > 0 {
+		spuCols := dao.ProductSpu.Columns()
+		spuRecs, serr := dao.ProductSpu.Ctx(ctx).
+			Fields(spuCols.Id, spuCols.Name, spuCols.Images, spuCols.PriceMin).
+			Where(spuCols.Deleted, 0).
+			Where(spuCols.Status, 1).
+			WhereIn(spuCols.Id, allIds).
+			All()
+		if serr != nil {
+			return nil, gerror.Wrap(serr, "装配楼层商品失败")
+		}
+		for _, r := range spuRecs {
+			id := r["id"].Int64()
+			briefs[id] = model.FloorProductSummary{
+				SpuId: id,
+				Name:  r["name"].String(),
+				Image: firstImage(r["images"].String()),
+				Price: r["price_min"].String(),
+			}
+		}
+	}
+	for i := range list {
+		if list[i].FloorType != 2 {
+			continue
+		}
+		for _, sid := range spuIdsFromConfig(list[i].Config) {
+			if b, ok := briefs[sid]; ok {
+				list[i].Products = append(list[i].Products, b)
+			}
+		}
+	}
+	return list, nil
 }

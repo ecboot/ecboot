@@ -2,6 +2,7 @@ package shop
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -322,5 +323,155 @@ func TestFloorCrud(t *testing.T) {
 		}
 		err = FloorDelete(ctx, idB)
 		t.Assert(errCode(err), errcode.CodeNotFound)
+	})
+}
+
+// ---- US3 C 端展示 ----
+
+// ---- 商品楼层装配用的 SPU fixture（自包含: trade_test 的 setupTradeFixture 因
+// 000034 新增 spu_no 非空列已失效, 本批不修批次外 fixture） ----
+
+func ensureRefRow(ctx context.Context, t *gtest.T, table, name string, extraCols map[string]any) int64 {
+	rec, err := g.DB().GetOne(ctx, "SELECT id FROM "+table+" WHERE name=?", name)
+	t.AssertNil(err)
+	if !rec.IsEmpty() {
+		return rec["id"].Int64()
+	}
+	cols := "name,status"
+	vals := []any{name, 1}
+	for c, v := range extraCols {
+		cols += "," + c
+		vals = append(vals, v)
+	}
+	ph := "?"
+	for i := 1; i < len(vals); i++ {
+		ph += ",?"
+	}
+	res, err := g.DB().Exec(ctx, "INSERT INTO "+table+"("+cols+") VALUES("+ph+")", vals...)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
+// seedFloorSpu 建测试 SPU（含 spu_no 必填列与价格区间）, 返回 spuId。
+func seedFloorSpu(ctx context.Context, t *gtest.T, suffix, image, priceMin string, status int) int64 {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no=?", "TF2-SPU-"+suffix)
+	brandId := ensureRefRow(ctx, t, "product_brand", "TF2-品牌", nil)
+	catId := ensureRefRow(ctx, t, "product_category", "TF2-分类", map[string]any{"parent_id": 0, "level": 3})
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO product_spu(spu_no,name,category_id,brand_id,images,price_min,price_max,status) VALUES(?,?,?,?,?,?,?,?)",
+		"TF2-SPU-"+suffix, "TF2-商品"+suffix, catId, brandId, image, priceMin, priceMin, status)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
+func cleanupFloorSpu(ctx context.Context, t *gtest.T, suffix string) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no=?", "TF2-SPU-"+suffix)
+}
+
+// TestPublicBanners 在投过滤（FR-010, US3 验收 1/2/3）: 长期命中; 未到/过期/停用排除。
+func TestPublicBanners(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const (
+			imgLong   = "t_pb_long"
+			imgFuture = "t_pb_future"
+			imgPast   = "t_pb_past"
+			imgOff    = "t_pb_off"
+		)
+		defer cleanupBanner(ctx, t, imgLong, imgFuture, imgPast, imgOff)
+
+		future, past := 60, -60
+		seedBanner(ctx, t, imgLong, 1, nil, nil, 1)       // 长期（两端 NULL）
+		seedBanner(ctx, t, imgFuture, 1, &future, nil, 1) // 未到开始
+		seedBanner(ctx, t, imgPast, 1, nil, &past, 1)     // 已过结束
+		seedBanner(ctx, t, imgOff, 1, nil, nil, 0)        // 停用
+
+		list, err := PublicBanners(ctx, 1)
+		t.AssertNil(err)
+		hit := map[string]bool{}
+		for _, it := range list {
+			hit[it.ImageUrl] = true
+		}
+		t.Assert(hit[imgLong], true)
+		t.Assert(hit[imgFuture], false)
+		t.Assert(hit[imgPast], false)
+		t.Assert(hit[imgOff], false)
+
+		// 位置域外 → 10001（service 兜底）
+		_, err = PublicBanners(ctx, 9)
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
+	})
+}
+
+// TestPublicFloors 楼层展示与商品装配（FR-011/012, US3 验收 4/5/6）。
+func TestPublicFloors(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const suffix = "pf"
+		spuId := seedFloorSpu(ctx, t, suffix, `["http://img/tf2.png"]`, "12.34", 1)
+		defer cleanupFloorSpu(ctx, t, suffix)
+
+		const (
+			tGood = "t_pf_good"
+			tProd = "t_pf_prod"
+			tOff  = "t_pf_off"
+		)
+		defer cleanupFloor(ctx, t, tGood, tProd, tOff)
+
+		idGood, err := FloorCreate(ctx, model.OperFloorInput{
+			FloorType: 1, Title: tGood, Status: 1,
+			Config: map[string]any{"entries": []any{map[string]any{"text": "入口"}}},
+		})
+		t.AssertNil(err)
+		sid := strconv.FormatInt(spuId, 10)
+		idProd, err := FloorCreate(ctx, model.OperFloorInput{
+			FloorType: 2, Title: tProd, Status: 1,
+			Config: map[string]any{"spuIds": []any{sid, "999999999"}}, // 含失效 ID
+		})
+		t.AssertNil(err)
+		// 停用楼层: 创建（默认启用）后经 Update 置停用——真实用法
+		idOff, err := FloorCreate(ctx, model.OperFloorInput{
+			FloorType: 3, Title: tOff, Status: 1, Config: map[string]any{},
+		})
+		t.AssertNil(err)
+		t.AssertNil(FloorUpdate(ctx, idOff, model.OperFloorInput{
+			FloorType: 3, Title: tOff, Status: 0, Config: map[string]any{},
+		}))
+
+		list, err := PublicFloors(ctx)
+		t.AssertNil(err)
+		byId := map[int64]model.PublicFloorItem{}
+		for _, it := range list {
+			byId[it.FloorId] = it
+			t.AssertNE(it.Title, tOff) // 停用不出现
+		}
+		good, okG := byId[idGood]
+		prod, okP := byId[idProd]
+		t.Assert(okG, true)
+		t.Assert(okP, true)
+
+		// 金刚区: config 原样返回, 无商品装配
+		t.Assert(good.Config["entries"] != nil, true)
+		t.Assert(len(good.Products), 0)
+
+		// 商品楼层: 有效 SPU 出摘要, 失效 ID 被剔除
+		t.Assert(len(prod.Products), 1)
+		t.Assert(prod.Products[0].SpuId, spuId)
+		t.Assert(prod.Products[0].Name, "TF2-商品"+suffix)
+		t.Assert(prod.Products[0].Image, "http://img/tf2.png")
+		t.Assert(prod.Products[0].Price, "12.34")
+
+		// 下架后剔除（status=0）
+		_, err = g.DB().Exec(ctx, "UPDATE product_spu SET status=0 WHERE id=?", spuId)
+		t.AssertNil(err)
+		list, err = PublicFloors(ctx)
+		t.AssertNil(err)
+		for _, it := range list {
+			if it.FloorId == idProd {
+				t.Assert(len(it.Products), 0)
+			}
+		}
 	})
 }
