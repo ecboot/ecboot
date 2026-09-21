@@ -25,6 +25,8 @@ type IStoreLogic interface {
 	AdminCreate(ctx context.Context, in model.StoreInput) (int64, error)
 	AdminUpdate(ctx context.Context, id int64, in model.StoreInput) error
 	AdminDelete(ctx context.Context, id int64) error
+	// AdminDetail 门店详情（008-store 接口微扩: api 有管理详情端点而接口缺失, 同 D6 模式）。
+	AdminDetail(ctx context.Context, storeId int64) (*model.StoreItem, error)
 }
 
 // IRiskLogic 风控。

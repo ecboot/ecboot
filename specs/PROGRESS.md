@@ -72,3 +72,4 @@
 | 2026-09-21 | 01 | api 契约微扩：AdminLogoutReq 增加 refreshToken 可选字段 | FR-004 双凭证同毁需要；对齐 user 渠道 LogoutReq 既有形态 | `51b0b6b` |
 | 2026-09-21 | 01 | IRBACLogic 微扩 AdminUserDetail 方法 | api 有账号详情端点而接口漏定义；同 D6 模式 | `1ef20f5` |
 | 2026-09-21 | 01 | 评审修复轮（With fixes）：C1 访问日志脱敏（accesslog 既有文件，因本批登录/改密端点引入泄露面）；I1 HasPermission 补角色状态过滤（data-model §三 图纸同步勘误） | 代码评审发现，Critical/Important 合并前必修 | |
+| 2026-09-21 | 02 | IStoreLogic 微扩 AdminDetail 方法 | api 有门店管理详情端点而接口缺定义；同批次 01 D6 模式 | |
