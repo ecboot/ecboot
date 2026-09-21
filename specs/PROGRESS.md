@@ -30,7 +30,7 @@
 | # | 特性目录 | 域 | 端点数 | 依赖 | service 起点 | 状态 | 完成 commit |
 |---|---|---|---|---|---|---|---|
 | 01 | `specs/007-admin-base` | 后台账户与系统配置（登录/登出/刷新/资料/改密、admin_user、RBAC 角色、config、ping/短信调试桩） | 22 | — | 已实现（含会话 audience 安全修复） | ✅ | `45cd314` |
-| 02 | `specs/008-store` | 门店域（自提/核销载体：admin 管理 + common 查询） | 7 | 01 | 接口已有，impl 待补 | ⬜ | |
+| 02 | `specs/008-store` | 门店域（自提/核销载体：admin 管理 + common 查询） | 7 | 01 | 接口已有，impl 待补（AdminDetail 微扩同 D6） | 🔶 | |
 | 03 | `specs/009-logistics-ops` | 物流公司与运营装修（admin logistics/banner/floor + shop banner/floor） | 15 | 01 | 接口已有，impl 待补 | ⬜ | |
 | 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | **impl 大半已有**（005 遗产），补库存后台 | ⬜ | |
 | 05 | `specs/011-member-center` | 会员中心（资料/地址/收藏/足迹/消息/积分/通知偏好/登录日志/邀请记录） | 21 | 01 | 接口已有，impl 待补 | ⬜ | |

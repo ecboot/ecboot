@@ -94,4 +94,3 @@ const (
 func New(code int, msg string) error {
 	return gerror.NewCode(gcode.New(code, msg, nil))
 }
-

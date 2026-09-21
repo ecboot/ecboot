@@ -231,7 +231,7 @@ type OrderCreated struct {
 type OrderSummary struct {
 	OrderNo   string           `json:"orderNo"`
 	Status    int              `json:"status"`
-	Amount    AmountBook  `json:"amount"`
+	Amount    AmountBook       `json:"amount"`
 	Items     []OrderItemBrief `json:"items"`
 	CreatedAt string           `json:"createdAt"`
 }
@@ -248,7 +248,7 @@ type OrderDetail struct {
 	OrderNo         string            `json:"orderNo"`
 	Status          int               `json:"status"`
 	RefundStatus    int               `json:"refundStatus"`
-	Amount          AmountBook   `json:"amount"`
+	Amount          AmountBook        `json:"amount"`
 	Items           []OrderItemDetail `json:"items"`
 	Receiver        map[string]string `json:"receiver" dc:"收货快照"`
 	UserRemark      string            `json:"userRemark"`
