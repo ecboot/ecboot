@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/test/gtest"
@@ -84,4 +85,43 @@ func seedMessage(ctx context.Context, t *gtest.T, userId int64, title string, is
 	t.AssertNil(err)
 	id, _ := res.LastInsertId()
 	return id
+}
+
+// seedPointAccount 建积分账户（balance 可负; lastEarnedAt 为天数偏移, nil=不设）。
+func seedPointAccount(ctx context.Context, t *gtest.T, userId int64, balance int, lastEarnedDaysAgo *int) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM point_account WHERE user_id=?", userId)
+	le := "NULL"
+	if lastEarnedDaysAgo != nil {
+		le = "DATE_SUB(NOW(), INTERVAL " + strconv.Itoa(*lastEarnedDaysAgo) + " DAY)"
+	}
+	_, err := g.DB().Exec(ctx,
+		"INSERT INTO point_account(user_id,balance,last_earned_at) VALUES(?,?,"+le+")", userId, balance)
+	t.AssertNil(err)
+}
+
+func cleanupPoint(ctx context.Context, t *gtest.T, userId int64) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM point_log WHERE user_id=?", userId)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM point_account WHERE user_id=?", userId)
+}
+
+// seedPointLog 建积分流水。
+func seedPointLog(ctx context.Context, t *gtest.T, userId int64, bizType, points, balanceAfter int, orderNo string) {
+	_, err := g.DB().Exec(ctx,
+		"INSERT INTO point_log(user_id,biz_type,points,balance_after,order_no) VALUES(?,?,?,?,?)",
+		userId, bizType, points, balanceAfter, orderNo)
+	t.AssertNil(err)
+}
+
+// seedInviteRecord 建邀请记录（inviter 邀请 newUser）。
+func seedInviteRecord(ctx context.Context, t *gtest.T, inviterId, newUserId int64, rewardType int) {
+	// 按唯一键（new_user_id）清理——按 inviter 清会误删同一邀请人的其他记录
+	_, _ = g.DB().Exec(ctx, "DELETE FROM invite_record WHERE new_user_id=?", newUserId)
+	_, err := g.DB().Exec(ctx,
+		"INSERT INTO invite_record(new_user_id,inviter_id,reward_type,reward_ref,status) VALUES(?,?,?,0,1)",
+		newUserId, inviterId, rewardType)
+	t.AssertNil(err)
+}
+
+func cleanupInvite(ctx context.Context, t *gtest.T, inviterId int64) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM invite_record WHERE inviter_id=?", inviterId)
 }

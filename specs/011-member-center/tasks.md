@@ -90,11 +90,11 @@
 
 **Independent Test**: 查账户与流水（类型筛选）；邀请仅本人
 
-- [ ] T020 [P] [US5] `point_impl_test.go`（红）：账户字段（余额可负如实）；流水类型筛选与分页；
+- [x] T020 [P] [US5] `point_impl_test.go`（红）：账户字段（余额可负如实）；流水类型筛选与分页；
       `Earn`/`Consume`/`Refund`/`ExpireDormant`（内部）；[US6] `invite_impl_test.go`（红）：仅本人记录+分页
-- [ ] T021 [US5] `point_impl.go`（账户/流水 + 内部四方法）+ `invite_impl.go`（邀请列表）
-- [ ] T022 [US5] 连线 3 端点：`user_v1_point_{account,log_list}.go` + `user_v1_invite_record_list.go`（桩清零 ×3）
-- [ ] T023 `go test ./...` 绿
+- [x] T021 [US5] `point_impl.go`（账户/流水 + 内部四方法）+ `invite_impl.go`（邀请列表）
+- [x] T022 [US5] 连线 3 端点：`user_v1_point_{account,log_list}.go` + `user_v1_invite_record_list.go`（桩清零 ×3）
+- [x] T023 `go test ./...` 绿
 
 **Checkpoint**: 21 端点全部去桩。
 
