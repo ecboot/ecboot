@@ -16,6 +16,7 @@ const (
 	CodeUnauthorized = 10003 // 未登录/凭证失效
 	CodeTooFrequent  = 10004 // 操作过于频繁
 	CodeForbidden    = 10005 // 无权限
+	CodeNotFound     = 10006 // 资源不存在
 )
 
 // 用户域（2xxxx）

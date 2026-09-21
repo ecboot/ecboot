@@ -3,13 +3,18 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/system"
 )
 
-// AdminConfigUpdate 修改配置
+// AdminConfigUpdate 修改系统配置
 func (c *ControllerV1) AdminConfigUpdate(ctx context.Context, req *v1.AdminConfigUpdateReq) (res *v1.AdminConfigUpdateRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, "system:config:update"); err != nil {
+		return nil, err
+	}
+	if err = system.ConfigUpdate(ctx, req.Code, req.Value, req.Status); err != nil {
+		return nil, err
+	}
+	return &v1.AdminConfigUpdateRes{Success: true}, nil
 }

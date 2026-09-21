@@ -107,13 +107,13 @@
 
 ### Tests for US4（红先行）
 
-- [ ] T022 [P] [US4] `internal/service/system/config_impl_test.go`：List 返回 000030 种子全项（含说明/默认值语义）/Update 改值与状态/整数型配置传非数字拒绝（valueType 校验 FR-020）/停用后 List 返回 status=0（覆盖层语义 FR-021）
+- [x] T022 [P] [US4] `internal/service/system/config_impl_test.go`：List 返回 000030 种子全项（含说明/默认值语义）/Update 改值与状态/整数型配置传非数字拒绝（valueType 校验 FR-020）/停用后 List 返回 status=0（覆盖层语义 FR-021）
 
 ### Implementation for US4
 
-- [ ] T023 [US4] `internal/service/system/config_impl.go`：`List`（全量, 按 sort/code 序）、`Update`（value 按类型校验 + status 切换）
-- [ ] T024 [US4] 连线 `internal/controller/admin/admin_v1_admin_{config_list,config_update}.go`（桩清零 ×2；Update 挂 `system:config:update`）
-- [ ] T025 [US4] `go test ./...` 绿
+- [x] T023 [US4] `internal/service/system/config_impl.go`：`List`（全量, 按 sort/code 序）、`Update`（value 按类型校验 + status 切换）
+- [x] T024 [US4] 连线 `internal/controller/admin/admin_v1_admin_{config_list,config_update}.go`（桩清零 ×2；Update 挂 `system:config:update`）
+- [x] T025 [US4] `go test ./...` 绿
 
 **Checkpoint**: US1~US4 全部独立可用。
 
@@ -127,8 +127,8 @@
 
 ### Implementation for US5
 
-- [ ] T026 [P] [US5] 连线 `internal/controller/common/common_v1_ping.go`：直接返回存活 Res（无业务依赖；桩清零 ×1）
-- [ ] T027 [P] [US5] `internal/service/system/devtools_impl.go` 导出 `MockLatestSms(ctx, phone)`：非生产环境读 Redis `mock:sms:{phone}` 返回（`library/sms` 落点约定），生产拒绝（research D4）；连线 `internal/controller/common/common_v1_mock_latest_sms.go`（桩清零 ×1）；环境判定与生产拒绝的单元测试
+- [x] T026 [P] [US5] 连线 `internal/controller/common/common_v1_ping.go`：直接返回存活 Res（无业务依赖；桩清零 ×1）
+- [x] T027 [P] [US5] `internal/service/system/devtools_impl.go` 导出 `MockLatestSms(ctx, phone)`：非生产环境读 Redis `mock:sms:{phone}` 返回（`library/sms` 落点约定），生产拒绝（research D4）；连线 `internal/controller/common/common_v1_mock_latest_sms.go`（桩清零 ×1）；环境判定与生产拒绝的单元测试
 
 **Checkpoint**: 22 端点全部去桩。
 
