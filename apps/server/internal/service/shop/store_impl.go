@@ -68,7 +68,7 @@ func storeItemFromRecord(r gdb.Record) model.StoreItem {
 
 // PublicList 游客门店（FR-001~005）: 区县筛选或经纬度附近检索（经纬度优先）, 仅营业。
 func PublicList(ctx context.Context, q model.StoreQuery) (*model.PageResult[model.StoreItem], error) {
-	page := q.PageReq.Normalized()
+	page := q.Normalized()
 	nearby := q.Longitude != 0 && q.Latitude != 0
 
 	if nearby {

@@ -94,8 +94,8 @@
 
 ## Phase 6: Polish & 批次收尾（DoD 全项）
 
-- [ ] T015 `make test` 全绿（含既有回归）+ golangci-lint 本批文件零问题（宪法 IV）
-- [ ] T016 `make check-stub` 对账：admin 109→104、common 3→1；按 quickstart 序列冒烟；更新 specs/PROGRESS.md 批次 02 状态 ✅ 与完成 commit（同 commit）并提交 `feat(008-store): <收尾描述>`
+- [x] T015 `make test` 全绿（含既有回归）+ golangci-lint 本批文件零问题（宪法 IV）
+- [x] T016 `make check-stub` 对账：admin 109→104、common 3→1；按 quickstart 序列冒烟；更新 specs/PROGRESS.md 批次 02 状态 ✅ 与完成 commit（同 commit）并提交 `feat(008-store): <收尾描述>`
 
 ## Dependencies & Execution Order
 
@@ -120,3 +120,13 @@
 - 禁止手改 `internal/dao`、`internal/model/entity|do`（生成物）
 - 全部分层行为遵守 `docs/layer-contracts.md`
 - 本批文件边界（PROGRESS 防偏离条款 3）：plan.md「Source Code」小节所列文件 + specs/008-store/ + specs/PROGRESS.md；越界先记账再动
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（7 包）；本批文件 golangci-lint 0 issues（修复 QF1008；批次外 15 个既有问题留 chore 批）
+- `make check-stub` 对账: admin 109→104、common 3→1（本批 7 端点全清）；四渠道剩余 181 桩
+- HTTP 冒烟 10/10: 超管建店(ST sonyflake 编码)/后台详情/游客区县检索(无认证)/附近检索(distanceM=147 与坐标吻合
+  )/游客详情/无权建店 10005/后台list仅需登录/置歇业/歇业后游客列表清零
+- 环境事项: 测试库补建缺失的 store 表（000031 未真正应用, 历史迁移改写致账本失真；非破坏性补建,
+  merchant/seller/shop 三个废弃表残留未删——DROP 已被安全策略拦截, 待用户裁定）
+- 记录在案: 非法编码入参返回 52 而非 10001（横切层既有行为, 跨批次）
