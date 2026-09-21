@@ -13,6 +13,7 @@ import (
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
 	"ecboot/internal/dao"
@@ -50,11 +51,13 @@ func clearTimeExpr(startEmpty, endEmpty bool) gdb.Raw {
 }
 
 // timeText 库值 → RFC3339（空=零值）。
+// 注: 必须用标准库 time.Time.Format——gtime.Format 接受的是 **gf 布局**（Y-m-d H:i:s / c）,
+// 传 Go 布局会产出字面串（评审 C1 实证: "2006-01-02CST15:04:05Z07:00"）。
 func timeText(t *gtime.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return t.Format(time.RFC3339)
+	return t.Time.Format(time.RFC3339)
 }
 
 // configValue map → JSON 库值; nil 写 NULL。
@@ -181,6 +184,9 @@ func BannerUpdate(ctx context.Context, id int64, in model.OperBannerInput) error
 	if in.ImageUrl == "" {
 		return errcode.New(errcode.CodeInvalidParam, "图片必填")
 	}
+	if in.Status != 0 && in.Status != 1 {
+		return errcode.New(errcode.CodeInvalidParam, "状态须为1启用或0停用")
+	}
 	start, err := parseRFC3339(in.StartTime)
 	if err != nil {
 		return err
@@ -202,29 +208,36 @@ func BannerUpdate(ctx context.Context, id int64, in model.OperBannerInput) error
 		data.EndTime = end
 		fields = append(fields, cols.EndTime)
 	}
-	res, err := dao.OperationBanner.Ctx(ctx).
-		Where(cols.Id, id).Where(cols.Deleted, 0).
-		Data(data).Fields(fields...).
-		Update()
-	if err != nil {
-		return gerror.Wrap(err, "修改轮播失败")
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		if cnt, cerr := dao.OperationBanner.Ctx(ctx).
-			Where(cols.Id, id).Where(cols.Deleted, 0).Count(); cerr == nil && cnt == 0 {
-			return errcode.New(errcode.CodeNotFound, "轮播不存在")
+	// 评审 I2: 主体更新与时段置空同事务（避免半更新——图片/状态已改而时段未清）
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		res, err := dao.OperationBanner.Ctx(ctx).
+			Where(cols.Id, id).Where(cols.Deleted, 0).
+			Data(data).Fields(fields...).
+			Update()
+		if err != nil {
+			return gerror.Wrap(err, "修改轮播失败")
 		}
-	}
-	// 时段清空（空串=清空该端 → 显式置 NULL, 强类型列须经 Raw）
-	if in.StartTime == "" || in.EndTime == "" {
-		if _, err = dao.OperationBanner.Ctx(ctx).
-			Where(cols.Id, id).
-			Data(clearTimeExpr(in.StartTime == "", in.EndTime == "")).
-			Update(); err != nil {
-			return gerror.Wrap(err, "清空投放时段失败")
+		if n, _ := res.RowsAffected(); n == 0 {
+			cnt, cerr := dao.OperationBanner.Ctx(ctx).
+				Where(cols.Id, id).Where(cols.Deleted, 0).Count()
+			if cerr != nil {
+				return gerror.Wrap(cerr, "查询轮播失败")
+			}
+			if cnt == 0 {
+				return errcode.New(errcode.CodeNotFound, "轮播不存在")
+			}
 		}
-	}
-	return nil
+		// 时段清空（空串=清空该端 → 显式置 NULL, 强类型列须经 Raw）
+		if in.StartTime == "" || in.EndTime == "" {
+			if _, err = dao.OperationBanner.Ctx(ctx).
+				Where(cols.Id, id).Where(cols.Deleted, 0).
+				Data(clearTimeExpr(in.StartTime == "", in.EndTime == "")).
+				Update(); err != nil {
+				return gerror.Wrap(err, "清空投放时段失败")
+			}
+		}
+		return nil
+	})
 }
 
 // BannerDelete 软删轮播（FR-009）: 管理端与 C 端同时消失。
@@ -300,6 +313,9 @@ func FloorCreate(ctx context.Context, in model.OperFloorInput) (int64, error) {
 // FloorUpdate 修改楼层（标题/配置/排序/状态）; **楼层类型创建后不可改**（api 入参无 floorType,
 // 类型决定 config 语义, 改型需删后重建）; 目标不存在返 10006。
 func FloorUpdate(ctx context.Context, id int64, in model.OperFloorInput) error {
+	if in.Status != 0 && in.Status != 1 {
+		return errcode.New(errcode.CodeInvalidParam, "状态须为1启用或0停用")
+	}
 	cfg, err := configValue(in.Config)
 	if err != nil {
 		return err
@@ -316,8 +332,12 @@ func FloorUpdate(ctx context.Context, id int64, in model.OperFloorInput) error {
 		return gerror.Wrap(err, "修改楼层失败")
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		if cnt, cerr := dao.OperationFloor.Ctx(ctx).
-			Where(cols.Id, id).Where(cols.Deleted, 0).Count(); cerr == nil && cnt == 0 {
+		cnt, cerr := dao.OperationFloor.Ctx(ctx).
+			Where(cols.Id, id).Where(cols.Deleted, 0).Count()
+		if cerr != nil {
+			return gerror.Wrap(cerr, "查询楼层失败")
+		}
+		if cnt == 0 {
 			return errcode.New(errcode.CodeNotFound, "楼层不存在")
 		}
 	}

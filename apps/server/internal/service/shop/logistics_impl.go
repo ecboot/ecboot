@@ -97,6 +97,10 @@ func LogisticsUpdate(ctx context.Context, id int64, in model.LogisticsCompanyInp
 	if in.Name == "" {
 		return errcode.New(errcode.CodeInvalidParam, "名称必填")
 	}
+	// 状态白名单（009 评审 I1: 域外值会落库致公司从发货选择静默消失）
+	if in.Status != 0 && in.Status != 1 {
+		return errcode.New(errcode.CodeInvalidParam, "状态须为1启用或0停用")
+	}
 	// 状态全量覆盖语义（与门店一致）: 0=停用 1=启用 严格照传——
 	// 后台修改表单总是携带完整档案（含状态单选）, 不做零值归一以免"无法停用"。
 	cols := dao.LogisticsCompany.Columns()
@@ -110,8 +114,12 @@ func LogisticsUpdate(ctx context.Context, id int64, in model.LogisticsCompanyInp
 		return gerror.Wrap(err, "修改物流公司失败")
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		if cnt, cerr := dao.LogisticsCompany.Ctx(ctx).
-			Where(cols.Id, id).Where(cols.Deleted, 0).Count(); cerr == nil && cnt == 0 {
+		cnt, cerr := dao.LogisticsCompany.Ctx(ctx).
+			Where(cols.Id, id).Where(cols.Deleted, 0).Count()
+		if cerr != nil {
+			return gerror.Wrap(cerr, "查询物流公司失败")
+		}
+		if cnt == 0 {
 			return errcode.New(errcode.CodeNotFound, "物流公司不存在")
 		}
 	}

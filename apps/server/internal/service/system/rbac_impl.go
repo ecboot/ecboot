@@ -5,6 +5,7 @@ package system
 
 import (
 	"context"
+	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -287,11 +288,12 @@ func adminRoleMap(ctx context.Context, adminIds []int64) (map[int64][]string, er
 }
 
 // rfc3339 时间出参格式（契约约定 RFC3339; nil 时间返回空串）。
+// 注: 用标准库格式化——gtime.Format 接受 gf 布局, 传 Go 布局会产出字面串（009 评审 C1 同源缺陷）。
 func rfc3339(t *gtime.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.Format("2006-01-02T15:04:05Z07:00")
+	return t.Time.Format(time.RFC3339)
 }
 
 // RoleList 角色分页列表（FR-013）。

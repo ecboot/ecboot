@@ -76,6 +76,10 @@
 | 2026-09-21 | 02 | model.StoreItem 微扩 ProvinceCode/CityCode 字段 | 两渠道详情 Res 均需省市区全栈而 DTO 仅有 districtCode | |
 | 2026-09-21 | 02 | 环境修复：测试库补建缺失的 store 表（另有 merchant/seller/shop 废弃表残留，未删） | 000031 未真正应用（历史迁移改写致账本失真）；非破坏性补建（不做 DROP，废弃表待用户裁定） | |
 | 2026-09-21 | 02 | 门店修改定为全量覆盖语义（显式 Fields 白名单强制零值写入） | gf do 的 omitempty 吞零值致无法关闭自提/置歇业；research D6 | |
+| 2026-09-21 | 03 | 评审修复轮（No→修）：C1 时间格式化误用 gf 布局（`gtime.Format("2006-01-02T...")` 产出字面串）→ 改标准库 `t.Time.Format`；批次 01 `rbac_impl.rfc3339()` 同源缺陷一并修 | 独立评审实证：admin 时段字段出参为垃圾串，弱断言（只断非空）放过 | |
+| 2026-09-21 | 03 | **横切修复**：时区口径统一——DSN 补 `loc=Asia/Shanghai&time_zone='+08:00'`（驱动解释与库会话时钟对齐），修复"读回早 8h、回显再提交每轮漂 8h"；波及全部时间字段读写（config + 5 处测试基座） | 评审实测：Go 进程 +08 而库会话 UTC，gtime 按 Local 解析 UTC 墙钟 | |
+| 2026-09-21 | 03 | 评审加固：I1 service 层 status 白名单（三处）+ I2 时段清空双语句改事务/补 deleted=0/Count 错误传播 + I4 测试清理改按 id 与 TF2- 前缀归并 | 同批评审实证（status=7/3/9 落库；残留 7 行） | |
+| 2026-09-21 | 03 | 记账更正（评审 M1/M6）：`spu_no` 非空列自 000002 起即存在（非 000034；既有 fixture 失效的真实原因是其从未写 spu_no）；补记 api/admin/v1/logistics.go 越界改动 | 评审核查迁移文件与 diff | |
 | 2026-09-21 | 03 | spec 契约对齐修正：轮播位置与楼层类型**创建后不可改**（api 的 Update Req 均无这两个字段）；时段清空以 Raw 显式置 NULL | 勘察 api/admin/v1/operation.go；强类型时间列不能承载 Raw（同批次 02 零值教训） | |
 | 2026-09-21 | 03 | 接口变更：`ILogisticsLogic` 微扩 Detail；**新建 `IOperationLogic`**（装修域原无接口/DTO） | 装修接口与 DTO 系勘察确认缺失（批次 03 行已标注）；落 service/shop 同域 | |
 | 2026-09-21 | 03 | spec 契约对齐修正：物流公司 FR-001~003 去掉"排序"（api 契约无 sort 字段，表 sort 仅内部排序位） | 勘察 api/admin/v1/logistics.go 确认 | |

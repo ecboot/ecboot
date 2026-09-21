@@ -129,6 +129,24 @@
 - `make check-stub` 对账: admin 104→91、shop 42→40（本批 15 端点全清）；四渠道剩余 166 桩
 - 冒烟 12/12: 物流 CRUD/40012/停用保留；轮播投放三态（长期 in/未到 out/过期 out）/位置域外 10001/停用 out；
   楼层装配（有效 SPU 出 name/image/price, 失效剔除, 下架剔除）/无权 10005×2/公开性
-- 实现期发现: **既有 fixture `setupTradeFixture` 已失效**（000034 给 product_spu 加 spu_no 非空列后不再可用——
-  亦解释其被 lint 判 unused）→ 本批写自包含 fixture, 未修批次外既有 fixture（防偏离条款 3）
+- 实现期发现: **既有 fixture `setupTradeFixture` 已失效**——归因更正（评审 M1）: `spu_no` 非空列自
+  **000002** 起即存在（非 000034；000034 只加 price_min/price_max），该 fixture 从未写 spu_no。
+  → 本批写自包含 fixture, 未修批次外既有 fixture（防偏离条款 3）
 - 契约对齐: 轮播位置与楼层类型创建后不可改（api Update Req 无这两字段, spec 已修正）
+
+## 评审修复轮（2026-09-21, No → 修）
+
+- **C1（必修, 已修）**: `timeText`/`rbac_impl.rfc3339` 误用 gf 布局（`gtime.Format` 的 token 是 `Y-m-d H:i:s`，
+  传 Go 布局产出字面串）→ 改标准库 `t.Time.Format(time.RFC3339)`；两处同源缺陷一并修
+- **C2（必修, 待裁定）**: 时区口径不一致（Go 进程 +08 vs MySQL 会话 UTC）致强类型时间列读回偏移 8h、
+  回显再提交每轮再漂 8h。修复需统一时区口径（DSN `loc`/`time_zone` 或库会话时区 + 存储语义决策），
+  属横切基础设施；**本批保留 `TestTimeRoundTrip` 为 Skip 状态作为该缺陷的灯**，口径统一后移除 Skip 即转绿
+- **I1（已修）**: service 层 status 白名单（`in.Status ∈ {0,1}`）三处 + 断言（域外值不落库）
+- **I2（已修）**: 时段清空改 `g.DB().Transaction` 包裹（防半更新）+ 置空语句补 `deleted=0` +
+  Count 错误显式传播（原先 `cerr == nil && cnt == 0` 会在 Count 出错时穿透并误报成功）
+- **I3（已补）**: 断言补强——`TestClearTimeAndConfig`（Raw 置空/置 NULL 实证）、
+  `TestSoftDeleteHidesPublic`（软删后 C 端不可见, FR-009）、`TestUpdateStatusGuard`（I1）、
+  `TestTimeRoundTrip`（C2 灯）
+- **I4（已修）**: `cleanupFloor` 改双路精确匹配（原名 + 改名后 `_2`）并清理实测残留 7 行；
+  fixture 引用行前缀 `TF2-` → `TF-`（命中既有清理模式）并在清理时一并删
+- **M1/M6（已记账）**: spu_no 归因更正；`api/admin/v1/logistics.go` 越界改动补记
