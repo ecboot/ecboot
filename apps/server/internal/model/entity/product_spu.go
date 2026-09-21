@@ -16,7 +16,6 @@ type ProductSpu struct {
 	SubTitle          string      `json:"subTitle"          orm:"sub_title"           ` // 副标题/卖点
 	CategoryId        uint64      `json:"categoryId"        orm:"category_id"         ` // 所属分类ID(三级分类)
 	BrandId           uint64      `json:"brandId"           orm:"brand_id"            ` // 品牌ID,可为空(无品牌商品)
-	SellerId          uint64      `json:"sellerId"          orm:"seller_id"           ` // 所属商家(1=自营;多商家预留)
 	FreightTemplateId uint64      `json:"freightTemplateId" orm:"freight_template_id" ` // 运费模板ID(NULL=包邮)
 	Images            string      `json:"images"            orm:"images"              ` // 主图+轮播图URL数组,按序存储
 	Description       string      `json:"description"       orm:"description"         ` // 图文详情(富文本)

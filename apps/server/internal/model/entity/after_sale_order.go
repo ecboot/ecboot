@@ -16,7 +16,6 @@ type AfterSaleOrder struct {
 	OrderNo           string      `json:"orderNo"           orm:"order_no"            ` // 订单号
 	OrderItemId       uint64      `json:"orderItemId"       orm:"order_item_id"       ` // 订单项ID(售后粒度=订单项)
 	UserId            uint64      `json:"userId"            orm:"user_id"             ` // 申请人用户ID
-	SellerId          uint64      `json:"sellerId"          orm:"seller_id"           ` // 售后处理商家(1=自营;商家后台按此筛选)
 	Type              int         `json:"type"              orm:"type"                ` // 售后类型:1仅退款 2退货退款 3换货(预留未启用)
 	Status            int         `json:"status"            orm:"status"              ` // 状态:10待审核 20待买家寄回 30待退款 40退款中 50已完成 90已拒绝 91已撤销
 	Currency          string      `json:"currency"          orm:"currency"            ` // 币种(ISO 4217,随订单)

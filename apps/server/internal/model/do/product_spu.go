@@ -18,7 +18,6 @@ type ProductSpu struct {
 	SubTitle          any         // 副标题/卖点
 	CategoryId        any         // 所属分类ID(三级分类)
 	BrandId           any         // 品牌ID,可为空(无品牌商品)
-	SellerId          any         // 所属商家(1=自营;多商家预留)
 	FreightTemplateId any         // 运费模板ID(NULL=包邮)
 	Images            any         // 主图+轮播图URL数组,按序存储
 	Description       any         // 图文详情(富文本)

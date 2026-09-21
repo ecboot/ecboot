@@ -24,7 +24,6 @@ type TradeOrderColumns struct {
 	Id                  string // 订单ID
 	OrderNo             string // 订单号(业务号:日期+雪花/随机,全局唯一,分片友好)
 	UserId              string // 买家用户ID
-	SellerId            string // 订单归属商家(1=自营;V1不拆单,多商家上线时购物车按商家分组结算)
 	OrderChannel        string // 下单渠道:1微信小程序 2H5
 	Status              string // 订单状态:10待付款 20待发货 30待收货 40已完成 90已取消
 	RefundStatus        string // 退款状态:0无售后 1部分退款 2全额退款(不影响主状态机)
@@ -71,7 +70,6 @@ var tradeOrderColumns = TradeOrderColumns{
 	Id:                  "id",
 	OrderNo:             "order_no",
 	UserId:              "user_id",
-	SellerId:            "seller_id",
 	OrderChannel:        "order_channel",
 	Status:              "status",
 	RefundStatus:        "refund_status",

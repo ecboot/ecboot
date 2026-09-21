@@ -1,0 +1,85 @@
+// ==========================================================================
+// Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
+// ==========================================================================
+
+package internal
+
+import (
+	"context"
+
+	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/frame/g"
+)
+
+// AdminUserRoleDao is the data access object for the table admin_user_role.
+type AdminUserRoleDao struct {
+	table    string               // table is the underlying table name of the DAO.
+	group    string               // group is the database configuration group name of the current DAO.
+	columns  AdminUserRoleColumns // columns contains all the column names of Table for convenient usage.
+	handlers []gdb.ModelHandler   // handlers for customized model modification.
+}
+
+// AdminUserRoleColumns defines and stores column names for the table admin_user_role.
+type AdminUserRoleColumns struct {
+	Id        string // 关联ID
+	AdminId   string // 后台账号ID
+	RoleId    string // 角色ID
+	CreatedAt string // 创建时间
+}
+
+// adminUserRoleColumns holds the columns for the table admin_user_role.
+var adminUserRoleColumns = AdminUserRoleColumns{
+	Id:        "id",
+	AdminId:   "admin_id",
+	RoleId:    "role_id",
+	CreatedAt: "created_at",
+}
+
+// NewAdminUserRoleDao creates and returns a new DAO object for table data access.
+func NewAdminUserRoleDao(handlers ...gdb.ModelHandler) *AdminUserRoleDao {
+	return &AdminUserRoleDao{
+		group:    "default",
+		table:    "admin_user_role",
+		columns:  adminUserRoleColumns,
+		handlers: handlers,
+	}
+}
+
+// DB retrieves and returns the underlying raw database management object of the current DAO.
+func (dao *AdminUserRoleDao) DB() gdb.DB {
+	return g.DB(dao.group)
+}
+
+// Table returns the table name of the current DAO.
+func (dao *AdminUserRoleDao) Table() string {
+	return dao.table
+}
+
+// Columns returns all column names of the current DAO.
+func (dao *AdminUserRoleDao) Columns() AdminUserRoleColumns {
+	return dao.columns
+}
+
+// Group returns the database configuration group name of the current DAO.
+func (dao *AdminUserRoleDao) Group() string {
+	return dao.group
+}
+
+// Ctx creates and returns a Model for the current DAO. It automatically sets the context for the current operation.
+func (dao *AdminUserRoleDao) Ctx(ctx context.Context) *gdb.Model {
+	model := dao.DB().Model(dao.table)
+	for _, handler := range dao.handlers {
+		model = handler(model)
+	}
+	return model.Safe().Ctx(ctx)
+}
+
+// Transaction wraps the transaction logic using function f.
+// It rolls back the transaction and returns the error if function f returns a non-nil error.
+// It commits the transaction and returns nil if function f returns nil.
+//
+// Note: Do not commit or roll back the transaction in function f,
+// as it is automatically handled by this function.
+func (dao *AdminUserRoleDao) Transaction(ctx context.Context, f func(ctx context.Context, tx gdb.TX) error) (err error) {
+	return dao.Ctx(ctx).Transaction(ctx, f)
+}

@@ -27,7 +27,6 @@ type ProductSpuColumns struct {
 	SubTitle          string // 副标题/卖点
 	CategoryId        string // 所属分类ID(三级分类)
 	BrandId           string // 品牌ID,可为空(无品牌商品)
-	SellerId          string // 所属商家(1=自营;多商家预留)
 	FreightTemplateId string // 运费模板ID(NULL=包邮)
 	Images            string // 主图+轮播图URL数组,按序存储
 	Description       string // 图文详情(富文本)
@@ -52,7 +51,6 @@ var productSpuColumns = ProductSpuColumns{
 	SubTitle:          "sub_title",
 	CategoryId:        "category_id",
 	BrandId:           "brand_id",
-	SellerId:          "seller_id",
 	FreightTemplateId: "freight_template_id",
 	Images:            "images",
 	Description:       "description",

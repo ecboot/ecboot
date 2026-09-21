@@ -13,7 +13,6 @@ type TradeOrder struct {
 	Id                  uint64      `json:"id"                  orm:"id"                    ` // 订单ID
 	OrderNo             string      `json:"orderNo"             orm:"order_no"              ` // 订单号(业务号:日期+雪花/随机,全局唯一,分片友好)
 	UserId              uint64      `json:"userId"              orm:"user_id"               ` // 买家用户ID
-	SellerId            uint64      `json:"sellerId"            orm:"seller_id"             ` // 订单归属商家(1=自营;V1不拆单,多商家上线时购物车按商家分组结算)
 	OrderChannel        int         `json:"orderChannel"        orm:"order_channel"         ` // 下单渠道:1微信小程序 2H5
 	Status              int         `json:"status"              orm:"status"                ` // 订单状态:10待付款 20待发货 30待收货 40已完成 90已取消
 	RefundStatus        int         `json:"refundStatus"        orm:"refund_status"         ` // 退款状态:0无售后 1部分退款 2全额退款(不影响主状态机)

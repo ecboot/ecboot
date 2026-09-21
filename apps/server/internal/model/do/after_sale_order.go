@@ -18,7 +18,6 @@ type AfterSaleOrder struct {
 	OrderNo           any         // 订单号
 	OrderItemId       any         // 订单项ID(售后粒度=订单项)
 	UserId            any         // 申请人用户ID
-	SellerId          any         // 售后处理商家(1=自营;商家后台按此筛选)
 	Type              any         // 售后类型:1仅退款 2退货退款 3换货(预留未启用)
 	Status            any         // 状态:10待审核 20待买家寄回 30待退款 40退款中 50已完成 90已拒绝 91已撤销
 	Currency          any         // 币种(ISO 4217,随订单)
