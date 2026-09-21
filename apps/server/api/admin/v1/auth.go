@@ -28,7 +28,8 @@ type (
 	}
 
 	AdminLogoutReq struct {
-		g.Meta `path:"/logout" tags:"Admin" method:"POST" summary:"后台登出"`
+		g.Meta       `path:"/logout" tags:"Admin" method:"POST" summary:"后台登出"`
+		RefreshToken string `json:"refreshToken" dc:"刷新凭证(双凭证同毁, 对齐user渠道)"`
 	}
 	AdminLogoutRes struct {
 		Success bool `json:"success"`
