@@ -3,12 +3,22 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/shop"
 )
 
+// AdminSkuStatus SKU启停
 func (c *ControllerV1) AdminSkuStatus(ctx context.Context, req *v1.AdminSkuStatusReq) (res *v1.AdminSkuStatusRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, "product:sku:update"); err != nil {
+		return nil, err
+	}
+	skuId, err := parseID(req.SkuId)
+	if err != nil {
+		return nil, err
+	}
+	if err = shop.NewProductLogic().AdminSkuStatus(ctx, skuId, req.Status); err != nil {
+		return nil, err
+	}
+	return &v1.AdminSkuStatusRes{Success: true}, nil
 }

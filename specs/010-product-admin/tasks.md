@@ -51,14 +51,14 @@
 
 ### Implementation for US1（连线, 无新逻辑）
 
-- [ ] T006 [US1] 连线分类 4 端点：`admin_v1_admin_category_{tree,create,update,delete}.go`
+- [x] T006 [US1] 连线分类 4 端点：`admin_v1_admin_category_{tree,create,update,delete}.go`
       （`shop.NewProductLogic()` 调用, research D1；写操作挂 `product:category:{create,update,delete}`）
-- [ ] T007 [US1] 连线品牌 4 端点：`admin_v1_admin_brand_{list,create,update,delete}.go`（挂 `product:brand:*`）
-- [ ] T008 [US1] 连线 SPU 7 端点：`admin_v1_admin_spu_{list,create,detail,update,delete,status,restrict}.go`
+- [x] T007 [US1] 连线品牌 4 端点：`admin_v1_admin_brand_{list,create,update,delete}.go`（挂 `product:brand:*`）
+- [x] T008 [US1] 连线 SPU 7 端点：`admin_v1_admin_spu_{list,create,detail,update,delete,status,restrict}.go`
       （挂 `product:spu:{create,update,delete}`；status/restrict 挂 update）
-- [ ] T009 [US1] 连线 SKU 4 端点：`admin_v1_admin_sku_{create,update,delete,status}.go`
+- [x] T009 [US1] 连线 SKU 4 端点：`admin_v1_admin_sku_{create,update,delete,status}.go`
       （挂 `product:sku:{create,update,delete}`；status 挂 update）
-- [ ] T010 [US1] `go test ./...` 绿（含 005 商品测试回归 —— SC-004 零退化）
+- [x] T010 [US1] `go test ./...` 绿（含 005 商品测试回归 —— SC-004 零退化）
 
 **Checkpoint**: 商品后台闭环。
 

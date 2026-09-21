@@ -333,12 +333,16 @@ type CategoryInput struct {
 	Icon     string
 	Level    int
 	Sort     int
+	Status   int // 修改时生效（创建忽略——连线适配 010-product-admin）
 }
 
 type BrandItem struct {
-	Id   int64  `json:"id"`
-	Name string `json:"name"`
-	Logo string `json:"logo"`
+	Id          int64  `json:"id"`
+	Name        string `json:"name"`
+	Logo        string `json:"logo"`
+	Description string `json:"description" dc:"简介(管理面)"`
+	Sort        int    `json:"sort" dc:"排序(管理面)"`
+	Status      int    `json:"status" dc:"状态(管理面)"`
 }
 
 type BrandInput struct {
@@ -420,6 +424,7 @@ type AdminProductItem struct {
 	SpuNo      string `json:"spuNo"`
 	Name       string `json:"name"`
 	CategoryId int64  `json:"categoryId"`
+	BrandId    int64  `json:"brandId" dc:"品牌(连线适配 010)"`
 	Status     int    `json:"status"`
 	SaleCount  int    `json:"saleCount"`
 	CreatedAt  string `json:"createdAt"`
@@ -463,6 +468,8 @@ type AdminSkuDetail struct {
 	Price     string            `json:"price"`
 	LinePrice string            `json:"linePrice"`
 	CostPrice string            `json:"costPrice" dc:"管理可见"`
+	Weight    string            `json:"weight" dc:"重量克(连线适配 010)"`
+	Barcode   string            `json:"barcode" dc:"条码(连线适配 010)"`
 	Status    int               `json:"status"`
 }
 

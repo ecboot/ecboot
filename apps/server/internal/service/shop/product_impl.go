@@ -161,7 +161,10 @@ func (i *ProductLogicImpl) AdminBrandList(ctx context.Context, status int, page 
 	}
 	list := []model.BrandItem{}
 	for _, r := range all {
-		list = append(list, model.BrandItem{Id: r["id"].Int64(), Name: r["name"].String(), Logo: r["logo"].String()})
+		list = append(list, model.BrandItem{
+			Id: r["id"].Int64(), Name: r["name"].String(), Logo: r["logo"].String(),
+			Description: r["description"].String(), Sort: r["sort"].Int(), Status: r["status"].Int(),
+		})
 	}
 	return &model.PageResult[model.BrandItem]{List: list, Total: int64(total)}, nil
 }
@@ -215,8 +218,9 @@ func (i *ProductLogicImpl) AdminProductList(ctx context.Context, q model.AdminPr
 	for _, r := range all {
 		list = append(list, model.AdminProductItem{
 			SpuId: r["id"].Int64(), SpuNo: r["spu_no"].String(), Name: r["name"].String(),
-			CategoryId: r["category_id"].Int64(), Status: r["status"].Int(),
-			SaleCount: r["sale_count"].Int(), CreatedAt: r["created_at"].String(),
+			CategoryId: r["category_id"].Int64(), BrandId: r["brand_id"].Int64(),
+			Status: r["status"].Int(), SaleCount: r["sale_count"].Int(),
+			CreatedAt: r["created_at"].String(),
 		})
 	}
 	return &model.PageResult[model.AdminProductItem]{List: list, Total: total}, nil
@@ -266,6 +270,7 @@ func (i *ProductLogicImpl) AdminProductDetail(ctx context.Context, spuId int64) 
 			SkuId: r["id"].Int64(), SkuNo: r["sku_no"].String(),
 			Specs: specsMap(r["specs"].String()), Price: r["price"].String(),
 			LinePrice: r["line_price"].String(), CostPrice: r["cost_price"].String(),
+			Weight: r["weight"].String(), Barcode: r["barcode"].String(),
 			Status: r["status"].Int(),
 		})
 	}
@@ -388,4 +393,20 @@ func nextNo(ctx context.Context, prefix string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s%010d", prefix, v.Int64()), nil
+}
+
+// AdminSkuCreateWithNo 创建 SKU 并返回编码（连线适配 010: api 契约 AdminSkuCreateRes 需 skuId 与 skuNo,
+// 而既有 AdminSkuCreate 仅返回 id——不改其签名以免破坏 005 测试, 以本函数补编码）。
+func AdminSkuCreateWithNo(ctx context.Context, spuId int64, in model.SkuInput) (int64, string, error) {
+	id, err := NewProductLogic().AdminSkuCreate(ctx, spuId, in)
+	if err != nil {
+		return 0, "", err
+	}
+	v, err := dao.ProductSku.Ctx(ctx).
+		Where(dao.ProductSku.Columns().Id, id).
+		Value(dao.ProductSku.Columns().SkuNo)
+	if err != nil {
+		return 0, "", err
+	}
+	return id, v.String(), nil
 }

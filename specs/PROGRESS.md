@@ -80,6 +80,7 @@
 | 2026-09-21 | 03 | **横切修复**：时区口径统一——DSN 补 `loc=Asia/Shanghai&time_zone='+08:00'`（驱动解释与库会话时钟对齐），修复"读回早 8h、回显再提交每轮漂 8h"；波及全部时间字段读写（config + 5 处测试基座） | 评审实测：Go 进程 +08 而库会话 UTC，gtime 按 Local 解析 UTC 墙钟 | |
 | 2026-09-21 | 03 | **C2 已修（用户裁定方案 A）**：应用进程固定 UTC（`main.go` 与 4 处测试基座显式 `time.Local = time.UTC`），与库内 UTC 墙钟及会话时钟对齐；`TestTimeRoundTrip` 由 Skip 转绿（往返同一瞬时、回显再提交不漂移） | 评审 C2 实证：Go Local(+08) 与库 UTC 不一致致读回偏移 8h 且每轮再漂 8h；用户裁定"应用进程统一 UTC" | |
 | 2026-09-21 | 04 | 库存实现两处技术决策：①base query 不设 Fields（会被 Count 复用生成 `COUNT(cols...)` 语法错误）；②防负条件不用 `total + (-n) >= 0`（inventory.total 为 INT UNSIGNED, 负数运算触发 out of range 错误码 52）→ 按 delta 符号分支（delta<0 用 `total >= -delta`） | 实现期实证（SQL 报错定位） | |
+| 2026-09-21 | 04 | 连线适配 4 处（按契约最小补充, 全为向后兼容的加字段/加函数, 不改既有签名）：`CategoryInput` +Status；`BrandItem` +Description/Sort/Status；`AdminProductItem` +BrandId；`AdminSkuDetail` +Weight/Barcode；新增 `AdminSkuCreateWithNo`（api 契约需 SkuNo 而既有方法仅返回 id——不改其签名以免破坏 005 测试 5 处调用） | 连线中发现 api 契约字段与既有 DTO/签名不匹配；spec 边界已预告"按契约最小适配并记账" | |
 | 2026-09-21 | 04 | 形态说明：库存新写采用**包级函数**（与 009 的 logistics/operation 同形态）；D1 的"跟随 struct"仅指商品域**连线**既有实现 | 保持 shop 域内两类形态的边界清晰（连线跟随既有、新写跟随 009 先例） | |
 | 2026-09-21 | 03 | 评审加固：I1 service 层 status 白名单（三处）+ I2 时段清空双语句改事务/补 deleted=0/Count 错误传播 + I4 测试清理改按 id 与 TF2- 前缀归并 | 同批评审实证（status=7/3/9 落库；残留 7 行） | |
 | 2026-09-21 | 03 | 记账更正（评审 M1/M6）：`spu_no` 非空列自 000002 起即存在（非 000034；既有 fixture 失效的真实原因是其从未写 spu_no）；补记 api/admin/v1/logistics.go 越界改动 | 评审核查迁移文件与 diff | |
