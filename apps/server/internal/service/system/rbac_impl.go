@@ -274,3 +274,243 @@ func rfc3339(t *gtime.Time) string {
 	}
 	return t.Format("2006-01-02T15:04:05Z07:00")
 }
+
+// RoleList 角色分页列表（FR-013）。
+func RoleList(ctx context.Context, page model.PageReq) (*model.PageResult[model.RoleItem], error) {
+	page = page.Normalized()
+	m := dao.AdminRole.Ctx(ctx).Where(dao.AdminRole.Columns().Deleted, 0)
+	total, err := m.Count()
+	if err != nil {
+		return nil, gerror.Wrap(err, "统计角色失败")
+	}
+	recs, err := m.Page(page.Page, page.PageSize).OrderAsc(dao.AdminRole.Columns().Id).All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询角色失败")
+	}
+	var roles []entity.AdminRole
+	if err = recs.Structs(&roles); err != nil {
+		return nil, gerror.Wrap(err, "解析角色失败")
+	}
+	list := make([]model.RoleItem, 0, len(roles))
+	for _, r := range roles {
+		list = append(list, model.RoleItem{
+			Id:          int64(r.Id),
+			Name:        r.Name,
+			Code:        r.Code,
+			Description: r.Description,
+			Status:      r.Status,
+		})
+	}
+	return &model.PageResult[model.RoleItem]{List: list, Total: int64(total)}, nil
+}
+
+// RoleCreate 创建角色（FR-013）: 编码唯一。
+func RoleCreate(ctx context.Context, in model.RoleInput) (int64, error) {
+	cnt, err := dao.AdminRole.Ctx(ctx).
+		Where(dao.AdminRole.Columns().Code, in.Code).
+		Count()
+	if err != nil {
+		return 0, gerror.Wrap(err, "查询角色失败")
+	}
+	if cnt > 0 {
+		return 0, errcode.New(errcode.CodeRoleCodeTaken, "角色编码已存在")
+	}
+	status := in.Status
+	if status <= 0 {
+		status = 1
+	}
+	res, err := dao.AdminRole.Ctx(ctx).Data(do.AdminRole{
+		Name:        in.Name,
+		Code:        in.Code,
+		Description: in.Description,
+		Status:      status,
+	}).Insert()
+	if err != nil {
+		return 0, gerror.Wrap(err, "创建角色失败")
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, gerror.Wrap(err, "读取新角色ID失败")
+	}
+	return id, nil
+}
+
+// RoleUpdate 修改角色（FR-013; 编码为身份不可改）。
+func RoleUpdate(ctx context.Context, id int64, in model.RoleInput) error {
+	data := do.AdminRole{}
+	if in.Name != "" {
+		data.Name = in.Name
+	}
+	if in.Description != "" {
+		data.Description = in.Description
+	}
+	if in.Status > 0 {
+		data.Status = in.Status
+	}
+	_, err := dao.AdminRole.Ctx(ctx).
+		Where(dao.AdminRole.Columns().Id, id).
+		Where(dao.AdminRole.Columns().Deleted, 0).
+		Data(data).Update()
+	if err != nil {
+		return gerror.Wrap(err, "修改角色失败")
+	}
+	return nil
+}
+
+// RoleDelete 软删角色（FR-013/014）: 被账号引用禁删。
+func RoleDelete(ctx context.Context, id int64) error {
+	cnt, err := dao.AdminUserRole.Ctx(ctx).
+		Where(dao.AdminUserRole.Columns().RoleId, id).
+		Count()
+	if err != nil {
+		return gerror.Wrap(err, "查询角色引用失败")
+	}
+	if cnt > 0 {
+		return errcode.New(errcode.CodeRoleInUse, "角色被账号引用, 禁止删除")
+	}
+	_, err = dao.AdminRole.Ctx(ctx).
+		Where(dao.AdminRole.Columns().Id, id).
+		Where(dao.AdminRole.Columns().Deleted, 0).
+		Data(do.AdminRole{Deleted: 1, Status: 0}).
+		Update()
+	if err != nil {
+		return gerror.Wrap(err, "删除角色失败")
+	}
+	return nil
+}
+
+// RoleDetailView 角色详情（FR-013）: 含已分配权限 ID 集合。
+func RoleDetailView(ctx context.Context, id int64) (*model.RoleDetailView, error) {
+	rec, err := dao.AdminRole.Ctx(ctx).
+		Where(dao.AdminRole.Columns().Id, id).
+		Where(dao.AdminRole.Columns().Deleted, 0).
+		One()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询角色失败")
+	}
+	if rec.IsEmpty() {
+		return nil, errcode.New(errcode.CodeActivityNotFound, "角色不存在")
+	}
+	var role entity.AdminRole
+	if err = rec.Struct(&role); err != nil {
+		return nil, gerror.Wrap(err, "解析角色失败")
+	}
+	permIds, err := dao.AdminRolePermission.Ctx(ctx).
+		Fields(dao.AdminRolePermission.Columns().PermissionId).
+		Where(dao.AdminRolePermission.Columns().RoleId, id).
+		Array()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询角色权限失败")
+	}
+	ids := make([]int64, 0, len(permIds))
+	for _, v := range permIds {
+		ids = append(ids, v.Int64())
+	}
+	return &model.RoleDetailView{
+		Id:            int64(role.Id),
+		Name:          role.Name,
+		Code:          role.Code,
+		Description:   role.Description,
+		Status:        role.Status,
+		PermissionIds: ids,
+	}, nil
+}
+
+// AssignPermissions 角色-权限全量替换（FR-016）: 同事务删旧插新, 幂等。
+func AssignPermissions(ctx context.Context, roleId int64, permissionIds []int64) error {
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		_, err := dao.AdminRolePermission.Ctx(ctx).
+			Where(dao.AdminRolePermission.Columns().RoleId, roleId).
+			Delete()
+		if err != nil {
+			return err
+		}
+		if len(permissionIds) == 0 {
+			return nil
+		}
+		rows := make([]do.AdminRolePermission, 0, len(permissionIds))
+		for _, pid := range permissionIds {
+			rows = append(rows, do.AdminRolePermission{RoleId: roleId, PermissionId: pid})
+		}
+		_, err = dao.AdminRolePermission.Ctx(ctx).Data(rows).Insert()
+		return err
+	})
+	if err != nil {
+		return gerror.Wrap(err, "分配角色权限失败")
+	}
+	return nil
+}
+
+// PermissionTree 权限树（FR-015）: 菜单/按钮/接口统一树, 与 000032 种子同源;
+// 当前种子为 type=3 扁平登记（parent=0）, 树构建按 parent_id 通用嵌套。
+func PermissionTree(ctx context.Context) ([]model.PermissionNode, error) {
+	recs, err := dao.AdminPermission.Ctx(ctx).
+		Where(dao.AdminPermission.Columns().Deleted, 0).
+		Where(dao.AdminPermission.Columns().Status, 1).
+		OrderAsc(dao.AdminPermission.Columns().Sort).
+		All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询权限失败")
+	}
+	var perms []entity.AdminPermission
+	if err = recs.Structs(&perms); err != nil {
+		return nil, gerror.Wrap(err, "解析权限失败")
+	}
+	byParent := map[int64][]model.PermissionNode{}
+	nodes := make([]model.PermissionNode, 0, len(perms))
+	for _, p := range perms {
+		n := model.PermissionNode{
+			Id:       int64(p.Id),
+			ParentId: int64(p.ParentId),
+			Name:     p.Name,
+			Code:     p.Code,
+			Type:     p.Type,
+			Sort:     p.Sort,
+			Status:   p.Status,
+			Children: []model.PermissionNode{},
+		}
+		byParent[n.ParentId] = append(byParent[n.ParentId], n)
+		nodes = append(nodes, n)
+	}
+	// 父子挂接（深度按种子层级, 当前为 1~2 层）
+	var build func(parentId int64) []model.PermissionNode
+	build = func(parentId int64) []model.PermissionNode {
+		out := byParent[parentId]
+		for i := range out {
+			out[i].Children = build(out[i].Id)
+		}
+		return out
+	}
+	return build(0), nil
+}
+
+// HasPermission 权限判定（FR-017/018）: is_super 直通;
+// 数据流 admin_user_role → admin_role_permission → admin_permission(code, 启用未删)。
+func HasPermission(ctx context.Context, adminId int64, code string) (bool, error) {
+	rec, err := dao.AdminUser.Ctx(ctx).
+		Fields(dao.AdminUser.Columns().IsSuper).
+		Where(dao.AdminUser.Columns().Id, adminId).
+		Where(dao.AdminUser.Columns().Deleted, 0).
+		One()
+	if err != nil {
+		return false, gerror.Wrap(err, "查询后台账号失败")
+	}
+	if rec.IsEmpty() {
+		return false, nil
+	}
+	if rec["is_super"].Int() == 1 {
+		return true, nil
+	}
+	cnt, err := dao.AdminUserRole.Ctx(ctx).As("ur").
+		InnerJoin(dao.AdminRolePermission.Table()+" rp", "rp.role_id=ur.role_id").
+		InnerJoin(dao.AdminPermission.Table()+" p", "p.id=rp.permission_id").
+		Where("ur.admin_id", adminId).
+		Where("p.code", code).
+		Where("p.status", 1).
+		Where("p.deleted", 0).
+		Count()
+	if err != nil {
+		return false, gerror.Wrap(err, "权限判定查询失败")
+	}
+	return cnt > 0, nil
+}

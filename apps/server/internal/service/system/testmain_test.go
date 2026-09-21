@@ -43,8 +43,8 @@ func seedAdmin(ctx context.Context, t *gtest.T, username string, isSuper int) in
 	return id
 }
 
-// cleanupAdmin 清理测试后台账号及其审计行。
+// cleanupAdmin 清理测试后台账号及其登录审计行（含无账号的失败尝试行）。
 func cleanupAdmin(ctx context.Context, t *gtest.T, username string) {
 	_, _ = g.DB().Exec(ctx, "DELETE FROM `admin_user` WHERE username=?", username)
-	_, _ = g.DB().Exec(ctx, "DELETE FROM `admin_login_log` WHERE admin_id NOT IN (SELECT id FROM `admin_user`)")
+	_, _ = g.DB().Exec(ctx, "DELETE FROM `admin_login_log` WHERE username=?", username)
 }

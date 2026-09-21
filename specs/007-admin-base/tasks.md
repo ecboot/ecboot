@@ -31,7 +31,7 @@
 - [x] T004 [P] `internal/model/dto_system.go` 新增 `AdminProfile`（Username/RealName/Roles []string）；`internal/service/system/rbac.go` 的 `IAdminAuthLogic` 微扩 `Profile(ctx, adminId int64) (*model.AdminProfile, error)`（research D6）
 - [x] T005 会话 audience 维度（research D1）：`internal/library/security/session.go` 构造与 key 改为 `session:{aud}:{token}`/`session:refresh:{aud}:{token}`（aud: user/admin；`NewSessionManagerFromConfig` 适配）
 - [x] T006 audience 调用点适配：`internal/middleware/auth.go`（按 `/admin/` 前缀判定渠道并校验对应会话；admin 会话额外校验 admin_user 存在且 status=1、deleted=0——账号被禁用/软删后会话立即不可用，spec FR-008）、`internal/service/user/auth.go` 会话创建点、`internal/controller/user/user_v1_logout.go`、`internal/controller/user/user_v1_token_refresh.go`
-- [~] T007（并入 US3, 随 T018 TDD 交付——依赖 HasPermission）原任务: 新增 `internal/middleware/permission.go`：`RequirePerm(ctx, code) error`——取 CtxUserId 调 `system.HasPermission`，未持权返回权限不足错误码（research D2）
+- [x] T007（随 T018 交付）新增 `internal/middleware/permission.go`：`RequirePerm(ctx, code) error`——取 CtxUserId 调 `system.HasPermission`，未持权返回权限不足错误码（research D2）
 - [x] T008 回归适配：`internal/service/user/auth_flow_test.go` 适配 audience 签名；`go test ./...` 全绿（既有认证/交易回归通过）
 
 **Checkpoint**: 会话双渠道隔离 + 权限挂接基建就绪；回归绿。
@@ -86,14 +86,14 @@
 
 ### Tests for US3（红先行）
 
-- [ ] T017 [P] [US3] `internal/service/system/rbac_impl_test.go`（角色部分）：角色创建/编码冲突拒绝/修改/有账号引用禁删（FR-014）/无引用可软删/RoleDetailView 含 permissionIds/PermissionTree 与 000032 种子同源同层级（children 嵌套）/AssignPermissions 全量替换幂等/HasPermission：is_super 直通、持权 true、无权 false、权限 status=0 不命中（FR-017/018）
+- [x] T017 [P] [US3] `internal/service/system/rbac_impl_test.go`（角色部分）：角色创建/编码冲突拒绝/修改/有账号引用禁删（FR-014）/无引用可软删/RoleDetailView 含 permissionIds/PermissionTree 与 000032 种子同源同层级（children 嵌套）/AssignPermissions 全量替换幂等/HasPermission：is_super 直通、持权 true、无权 false、权限 status=0 不命中（FR-017/018）
 
 ### Implementation for US3
 
-- [ ] T018 [US3] `internal/service/system/rbac_impl.go`（角色部分）：`RoleList/RoleCreate/RoleUpdate/RoleDelete/RoleDetailView/PermissionTree/AssignPermissions/HasPermission`（判定数据流见 data-model §三）
-- [ ] T019 [US3] 连线 `internal/controller/admin/admin_v1_admin_{role_list,role_create,role_update,role_delete,role_detail,role_assign_perm,permission_tree}.go`（桩清零 ×7；写操作挂对应权限点 `system:role:manage`/`system:role:assign`）
-- [ ] T020 [US3] 权限拦截行为验证（spec SC-003）：非超管无权账号调 `POST /admin/roles` 被拒、超管放行的集成断言（service 层 RequirePerm 语义级测试）
-- [ ] T021 [US3] `go test ./...` 绿（含 US1/US2 回归）
+- [x] T018 [US3] `internal/service/system/rbac_impl.go`（角色部分）：`RoleList/RoleCreate/RoleUpdate/RoleDelete/RoleDetailView/PermissionTree/AssignPermissions/HasPermission`（判定数据流见 data-model §三）
+- [x] T019 [US3] 连线 `internal/controller/admin/admin_v1_admin_{role_list,role_create,role_update,role_delete,role_detail,role_assign_perm,permission_tree}.go`（桩清零 ×7；写操作挂对应权限点 `system:role:manage`/`system:role:assign`）
+- [x] T020 [US3] 权限拦截行为验证（spec SC-003）：非超管无权账号调 `POST /admin/roles` 被拒、超管放行的集成断言（service 层 RequirePerm 语义级测试）
+- [x] T021 [US3] `go test ./...` 绿（含 US1/US2 回归）
 
 **Checkpoint**: RBAC 从数据管理变为真实访问控制。
 

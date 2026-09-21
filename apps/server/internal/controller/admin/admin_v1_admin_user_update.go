@@ -5,12 +5,16 @@ import (
 	"strconv"
 
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
 	"ecboot/internal/model"
 	"ecboot/internal/service/system"
 )
 
 // AdminUserUpdate 修改后台账号
 func (c *ControllerV1) AdminUserUpdate(ctx context.Context, req *v1.AdminUserUpdateReq) (res *v1.AdminUserUpdateRes, err error) {
+	if err = middleware.RequirePerm(ctx, "system:admin:manage"); err != nil {
+		return nil, err
+	}
 	id, err := strconv.ParseInt(req.Id, 10, 64)
 	if err != nil {
 		return nil, err

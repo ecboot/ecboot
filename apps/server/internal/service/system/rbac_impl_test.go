@@ -183,3 +183,170 @@ func TestAdminUserDetail(t *testing.T) {
 		t.Assert(errCode(err), errcode.CodeAdminBadCredential)
 	})
 }
+
+const (
+	tRoleName = "t_rc_role"
+)
+
+// seedRole 建测试角色, 返回 ID。
+func seedRole(ctx context.Context, t *gtest.T, code string, status int) int64 {
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO admin_role(name,code,description,status) VALUES(?,?, '', ?)", code, code, status)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
+// seedPerm 建测试权限点, 返回 ID。
+func seedPerm(ctx context.Context, t *gtest.T, code string, status int) int64 {
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO admin_permission(name,code,type,sort,status) VALUES(?,?,3,9999,?)", code, code, status)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
+// TestRoleCrud 角色 CRUD（FR-013）: 创建/编码唯一/修改/详情含 permissionIds。
+func TestRoleCrud(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		cleanRoles(ctx, t, tRoleName)
+		defer cleanRoles(ctx, t, tRoleName)
+
+		id, err := RoleCreate(ctx, model.RoleInput{Name: "角色A", Code: tRoleName, Description: "测试"})
+		t.AssertNil(err)
+		t.AssertGT(id, 0)
+
+		// 编码唯一 → 80004
+		_, err = RoleCreate(ctx, model.RoleInput{Name: "角色B", Code: tRoleName})
+		t.Assert(errCode(err), errcode.CodeRoleCodeTaken)
+
+		// 修改
+		t.AssertNil(RoleUpdate(ctx, id, model.RoleInput{Name: "角色A2", Description: "改", Status: 1}))
+
+		// 详情
+		dv, err := RoleDetailView(ctx, id)
+		t.AssertNil(err)
+		t.Assert(dv.Name, "角色A2")
+		t.Assert(dv.Code, tRoleName)
+		t.Assert(len(dv.PermissionIds), 0)
+	})
+}
+
+// TestRoleDeleteGuard 被账号引用禁删（FR-014）。
+func TestRoleDeleteGuard(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		cleanRoles(ctx, t, "t_rc_del")
+		id := seedRole(ctx, t, "t_rc_del", 1)
+		adminId := seedAdmin(ctx, t, "t_rc_del_a", 0)
+		defer cleanRoles(ctx, t, "t_rc_del")
+		defer cleanupAdmin(ctx, t, "t_rc_del_a")
+		t.AssertNil(AssignRoles(ctx, adminId, []int64{id}))
+
+		// 被引用 → 80005
+		err := RoleDelete(ctx, id)
+		t.Assert(errCode(err), errcode.CodeRoleInUse)
+
+		// 解除引用后可软删
+		t.AssertNil(AssignRoles(ctx, adminId, nil))
+		t.AssertNil(RoleDelete(ctx, id))
+		rec, err := g.DB().GetOne(ctx, "SELECT deleted FROM admin_role WHERE id=?", id)
+		t.AssertNil(err)
+		t.Assert(rec["deleted"].Int(), 1)
+	})
+}
+
+// TestPermissionTree 权限树与种子同源（FR-015）: 全量节点、type=3 扁平、children 嵌套结构。
+func TestPermissionTree(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		tree, err := PermissionTree(ctx)
+		t.AssertNil(err)
+		total, err := g.DB().GetValue(ctx,
+			"SELECT COUNT(*) FROM admin_permission WHERE deleted=0 AND status=1")
+		t.AssertNil(err)
+		t.Assert(len(tree), total.Int())
+
+		// 含本批契约核心权限码
+		found := false
+		for _, n := range tree {
+			if n.Code == "system:role:manage" {
+				found = true
+			}
+		}
+		t.Assert(found, true)
+	})
+}
+
+// TestAssignPermissions 角色-权限全量替换幂等（FR-016）。
+func TestAssignPermissions(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		cleanRoles(ctx, t, "t_rc_ap")
+		rid := seedRole(ctx, t, "t_rc_ap", 1)
+		defer cleanRoles(ctx, t, "t_rc_ap")
+		p1 := seedPerm(ctx, t, "t_rc:p1", 1)
+		p2 := seedPerm(ctx, t, "t_rc:p2", 1)
+		defer func() {
+			_, _ = g.DB().Exec(ctx, "DELETE FROM admin_permission WHERE id IN (?,?)", p1, p2)
+		}()
+
+		t.AssertNil(AssignPermissions(ctx, rid, []int64{p1, p2}))
+		dv, err := RoleDetailView(ctx, rid)
+		t.AssertNil(err)
+		t.Assert(len(dv.PermissionIds), 2)
+
+		// 全量替换为 [p1]
+		t.AssertNil(AssignPermissions(ctx, rid, []int64{p1}))
+		dv, err = RoleDetailView(ctx, rid)
+		t.AssertNil(err)
+		t.Assert(len(dv.PermissionIds), 1)
+		t.Assert(dv.PermissionIds[0], p1)
+	})
+}
+
+// TestHasPermission 权限判定（FR-017/018）: 超管直通/持权/无权/停用权限不命中。
+func TestHasPermission(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		superId := seedAdmin(ctx, t, "t_rc_super", 1)
+		plainId := seedAdmin(ctx, t, "t_rc_plain", 0)
+		defer cleanupAdmin(ctx, t, "t_rc_super")
+		defer cleanupAdmin(ctx, t, "t_rc_plain")
+		cleanRoles(ctx, t, "t_rc_hp")
+		rid := seedRole(ctx, t, "t_rc_hp", 1)
+		defer cleanRoles(ctx, t, "t_rc_hp")
+		p := seedPerm(ctx, t, "t_rc:hp", 1)
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM admin_permission WHERE id=?", p) }()
+
+		// 超管直通（任意码）
+		ok, err := HasPermission(ctx, superId, "any:thing:here")
+		t.AssertNil(err)
+		t.Assert(ok, true)
+
+		// 未知管理员 → false
+		ok, err = HasPermission(ctx, 999999999, "system:role:manage")
+		t.AssertNil(err)
+		t.Assert(ok, false)
+
+		// 授权后命中
+		t.AssertNil(AssignRoles(ctx, plainId, []int64{rid}))
+		t.AssertNil(AssignPermissions(ctx, rid, []int64{p}))
+		ok, err = HasPermission(ctx, plainId, "t_rc:hp")
+		t.AssertNil(err)
+		t.Assert(ok, true)
+
+		// 未授权码 → false
+		ok, err = HasPermission(ctx, plainId, "system:role:manage")
+		t.AssertNil(err)
+		t.Assert(ok, false)
+
+		// 权限停用 → false
+		_, err = g.DB().Exec(ctx, "UPDATE admin_permission SET status=0 WHERE id=?", p)
+		t.AssertNil(err)
+		ok, err = HasPermission(ctx, plainId, "t_rc:hp")
+		t.AssertNil(err)
+		t.Assert(ok, false)
+	})
+}

@@ -5,11 +5,15 @@ import (
 	"strconv"
 
 	"ecboot/api/admin/v1"
+	"ecboot/internal/middleware"
 	"ecboot/internal/service/system"
 )
 
 // AdminUserAssignRoles 账号-角色分配
 func (c *ControllerV1) AdminUserAssignRoles(ctx context.Context, req *v1.AdminUserAssignRolesReq) (res *v1.AdminUserAssignRolesRes, err error) {
+	if err = middleware.RequirePerm(ctx, "system:admin:assign"); err != nil {
+		return nil, err
+	}
 	id, err := strconv.ParseInt(req.Id, 10, 64)
 	if err != nil {
 		return nil, err
