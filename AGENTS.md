@@ -33,7 +33,8 @@ Guidance for AI coding agents working in this repository.
 ## Agent Rules
 
 - Generate commit messages in Chinese, following Conventional Commits style, e.g. `feat: 新增用户登录`, `chore: 升级依赖`.
-- 金额（Money）一律使用 `DECIMAL(10,2)` 存储与 `CHAR(3)` ISO 4217 币种（默认 `CNY`）；Go 应用层统一使用十进制整数分或 decimal 库运算，禁止 `float32/float64` 存算金额，禁止 `==` 比较金额。
+- 金额（Money）存储用 `DECIMAL(10,2)` + `CHAR(3)` ISO 4217 币种（默认 `CNY`）；Go 应用层统一使用 `github.com/shopspring/decimal` 运算，禁止 `float32/float64` 存算金额，禁止 `==` 比较金额。
+- 分布式 ID 生成统一使用 `github.com/sony/sonyflake/v2`（替代自增 ID 的业务编号场景：订单号/SKU 编码等）。
 - 系统定位（B2C + 多门店）：纯 B2C 社交电商，门店（store）是线下载体（自提/核销/附近门店）；禁止引入多租户/多商户/商家概念（无 tenant/seller/merchant 维度）——B2B2C 需求另立独立项目。
 
 ## 合规红线（中国，设计前必须知道）

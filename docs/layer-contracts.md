@@ -67,6 +67,12 @@ main.go / internal/app（装配与启动，bootstrap 注册驱动）
 - 命名纪律：**包内导出类型必须带子域前缀**（`DistXxx`/`PointXxx`），禁止裸通用名。
 - 拆分触发器（到点机械执行）：单包文件 > 15 或 > 5k 行；某子域需独立测试装配/独立依赖；user 分销落地文件 > 5 → 拆 `service/distribution`。
 
+## 基础库约定
+
+- 金额运算：`github.com/shopspring/decimal`（禁止 float）
+- 分布式 ID：`github.com/sony/sonyflake/v2`（业务编号: 订单号/SKU 编码等）
+- ORM 数据访问：GoFrame gdb（`gf gen dao` 生成物 + do/entity 强类型）
+
 ## 系统定位
 
 纯 B2C + 多门店社交电商：平台统一经营商品与交易，门店（store）为线下载体（自提/核销/附近门店）。无多租户、无多商户/商家概念；B2B2C 需求另立独立项目。
