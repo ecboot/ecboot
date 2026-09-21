@@ -5,9 +5,12 @@ package shop
 
 import (
 	"context"
+
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/os/gtime"
 	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -18,6 +21,7 @@ import (
 	"ecboot/internal/errcode"
 	"ecboot/internal/library/money"
 	"ecboot/internal/model"
+	"ecboot/internal/model/do"
 )
 
 // OrderLogicImpl IOrderLogic 实现。
@@ -465,4 +469,44 @@ func provinceRestricted(ctx context.Context, spuId int64, provinceCode string) b
 		return false
 	}
 	return strings.Contains(v.String(), provinceCode)
+}
+
+// Confirm 确认收货（012 FR-004）: 待收货(30) → 已完成(40) + 状态流水; 非 30 → 40006; 他人订单 → 40005。
+// 佣金计提事件位: 完成态由分销结算（批次 11 / 定时消费）按订单完成推进, 本方法只落状态与流水。
+func (i *OrderLogicImpl) Confirm(ctx context.Context, userId int64, orderNo string) error {
+	cols := dao.TradeOrder.Columns()
+	rec, err := dao.TradeOrder.Ctx(ctx).
+		Where(cols.OrderNo, orderNo).
+		Where(cols.UserId, userId).One()
+	if err != nil {
+		return err
+	}
+	if rec.IsEmpty() {
+		return errcode.New(errcode.CodeOrderNotFound, "订单不存在")
+	}
+	if rec[cols.Status].Int() != 30 {
+		return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可确认收货")
+	}
+	// 条件更新防并发重复确认
+	res, err := dao.TradeOrder.Ctx(ctx).
+		Where(cols.OrderNo, orderNo).
+		Where(cols.Status, 30).
+		Data(do.TradeOrder{Status: 40, FinishTime: gtime.Now()}).
+		Update()
+	if err != nil {
+		return gerror.Wrap(err, "确认收货失败")
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可确认收货")
+	}
+	_, _ = dao.TradeOrderLog.Ctx(ctx).Data(do.TradeOrderLog{
+		OrderNo:      orderNo,
+		OrderId:      rec[cols.Id].Int64(),
+		FromStatus:   30,
+		ToStatus:     40,
+		Remark:       "确认收货",
+		OperatorType: 2, // 2=用户（表注释: 1系统 2用户 3管理员）
+		OperatorId:   fmt.Sprintf("user:%d", userId),
+	}).Insert()
+	return nil
 }

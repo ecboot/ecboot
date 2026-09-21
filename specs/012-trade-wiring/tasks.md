@@ -6,19 +6,19 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 05 收口态）；确认桩数 shop 35 / admin 69 / user 13
+- [x] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 05 收口态）；确认桩数 shop 35 / admin 69 / user 13
 
 ## Phase 2: 前置修复（阻塞 US2，FR-001）
 
-- [ ] T002 [P] `internal/service/shop/promotion_calc.go`：`calcPointDeductFen` 移除 `AND deleted=0`（该表无此列，批次 05 评审债务）；补行为级断言（有余额勾选→>0 / 未勾选→0 / 无账户行→0 不报错）于既有 trade_test.go 或新文件
-- [ ] T003 `go test ./internal/service/shop/...` 绿（既有交易链路零退化）
+- [x] T002 [P] `internal/service/shop/promotion_calc.go`：`calcPointDeductFen` 移除 `AND deleted=0`（该表无此列，批次 05 评审债务）；补行为级断言（有余额勾选→>0 / 未勾选→0 / 无账户行→0 不报错）于既有 trade_test.go 或新文件
+- [x] T003 `go test ./internal/service/shop/...` 绿（既有交易链路零退化）
 
 ## Phase 3: US2 购物车 + US3 订单 C 端（连线 + Confirm 新写）
 
-- [ ] T004 [US3] `OrderLogicImpl.Confirm`（30→40 条件更新 + 日志 + 佣金事件位；非 30 → 40006）+ TDD
-- [ ] T005 [US2] 连线购物车 5 端点（桩清零 ×5；Checkout 的积分抵扣由 T002 修复承接）
-- [ ] T006 [US3] 连线订单 C 端 4 端点（create/list/detail/cancel）+ Confirm 端点（桩清零 ×5）
-- [ ] T007 `go test ./...` 绿
+- [x] T004 [US3] `OrderLogicImpl.Confirm`（30→40 条件更新 + 日志 + 佣金事件位；非 30 → 40006）+ TDD
+- [x] T005 [US2] 连线购物车 5 端点（桩清零 ×5；Checkout 的积分抵扣由 T002 修复承接）
+- [x] T006 [US3] 连线订单 C 端 4 端点（create/list/detail/cancel）+ Confirm 端点（桩清零 ×5）
+- [x] T007 `go test ./...` 绿
 
 ## Phase 4: US4 支付（新写，P1）
 

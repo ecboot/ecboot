@@ -3,12 +3,19 @@ package shop
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/shop/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/shop"
 )
 
+// CartRemoveItem 移除购物车项
 func (c *ControllerV1) CartRemoveItem(ctx context.Context, req *v1.CartRemoveItemReq) (res *v1.CartRemoveItemRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	itemId, err := parseID(req.ItemId)
+	if err != nil {
+		return nil, err
+	}
+	if err = shop.NewCartLogic().RemoveItem(ctx, middleware.CtxUserIdFrom(ctx), itemId); err != nil {
+		return nil, err
+	}
+	return &v1.CartRemoveItemRes{Success: true}, nil
 }
