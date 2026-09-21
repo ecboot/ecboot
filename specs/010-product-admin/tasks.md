@@ -140,3 +140,9 @@
 - **Minor 已处理**: Update 上 no-op 的 `Fields` 移除；spec FR-011/FR-012 措辞勘误；PROGRESS commit 记录更正。
 - **跨批次债务（记账）**: I3 公开路径不解析 Bearer（viewerUserId 恒 0, 涉 middleware）；`AdminSpuListReq.Status` 零值二义；
   `AdminSkuCreateWithNo` 非原子；库存列表未过滤软删 SKU；`IInventoryLogic` 死契约；`BrandItem` 职责混。
+
+### 修复轮 HTTP 复验（2026-09-21）
+
+- **C1**: 新建分类（api 不传 status）→ 库内 `status=1`、**C 端 `/shop/categories` 树可见 True** ✓
+- **C2**: 改名（parent_id/level 预置 1/2）→ 库内 `parent=1 level=2 status=1 sort=9`（未清零, 字段正确更新）✓
+- **I1**: 扣减超可售（total=10/locked=8/Δ=-3）→ `{"code":30007,...}`（修复前撞 CHECK 报系统错误）✓
