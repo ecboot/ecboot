@@ -34,4 +34,6 @@ type IAdminAuthLogic interface {
 	Login(ctx context.Context, username, password, captchaKey, captchaCode, ip, userAgent string) (*model.AdminLoginResult, error)
 	// ChangePassword 改密（旧密码校验）。
 	ChangePassword(ctx context.Context, adminId int64, oldPassword, newPassword string) error
+	// Profile 个人信息（账号 + 角色编码联查；007-admin-base research D6）。
+	Profile(ctx context.Context, adminId int64) (*model.AdminProfile, error)
 }

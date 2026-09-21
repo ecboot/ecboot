@@ -80,6 +80,13 @@ const (
 const (
 	CodeAdminBadCredential = 80001 // 后台凭证错误
 	CodeOldPasswordWrong   = 80002 // 原密码错误
+	CodeAdminNameTaken     = 80003 // 登录名已存在
+	CodeRoleCodeTaken      = 80004 // 角色编码已存在
+	CodeRoleInUse          = 80005 // 角色被账号引用禁删
+	CodeAdminSelfGuard     = 80006 // 禁止操作自身/超管账号
+	CodeConfigValueInvalid = 80007 // 配置值与类型不匹配
+	CodeProdDenied         = 80008 // 生产环境禁用（调试端点）
+	CodeAdminDisabled      = 80009 // 后台账号已禁用
 )
 
 // New 构造带契约错误码的业务错误（统一响应中间件映射为三段式）。

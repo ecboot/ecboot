@@ -156,3 +156,10 @@ type AdminLoginResult struct {
 	RealName     string `json:"realName"`
 	IsSuper      bool   `json:"isSuper"`
 }
+
+// AdminProfile 后台个人信息（007-admin-base research D6）。
+type AdminProfile struct {
+	Username string
+	RealName string
+	Roles    []string // 角色编码列表
+}

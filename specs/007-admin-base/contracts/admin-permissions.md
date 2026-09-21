@@ -40,13 +40,15 @@
 
 ## 本批新增错误码（沿 errcode 既有风格）
 
-| 语义 | 触发 |
-|---|---|
-| 权限不足 | RequirePerm 未持权且非超管 |
-| 用户名已存在 | AdminUserCreate 冲突 |
-| 角色编码已存在 | AdminRoleCreate 冲突 |
-| 存在引用禁删 | AdminRoleDelete 被 admin_user_role 引用 |
-| 禁止操作自身/超管 | AdminUserDelete(id=自身 或 is_super) |
-| 原密码错误 | AdminChangePassword |
-| 配置值类型不合法 | AdminConfigUpdate valueType 校验失败 |
-| 生产环境禁用 | MockLatestSms 于 prod |
+| 码 | 语义 | 触发 |
+|---|---|---|
+| 10005（复用） | 权限不足 | RequirePerm 未持权且非超管，不新增登记 |
+| 80001（既有） | 后台凭证错误 | AdminLogin 用户名不存在/密码错误 |
+| 80009 | 后台账号已禁用 | AdminLogin 命中 status=2 或 deleted=1 账号 |
+| 80002（既有） | 原密码错误 | AdminChangePassword |
+| 80003 | 用户名已存在 | AdminUserCreate 冲突 |
+| 80004 | 角色编码已存在 | AdminRoleCreate 冲突 |
+| 80005 | 存在引用禁删 | AdminRoleDelete 被 admin_user_role 引用 |
+| 80006 | 禁止操作自身/超管 | AdminUserDelete(id=自身 或 is_super) |
+| 80007 | 配置值类型不合法 | AdminConfigUpdate valueType 校验失败 |
+| 80008 | 生产环境禁用 | MockLatestSms 于 prod（调试端点） |
