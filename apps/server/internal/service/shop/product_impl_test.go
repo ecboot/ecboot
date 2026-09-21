@@ -64,11 +64,11 @@ func catalogSuite(t *gtest.T) (ctx context.Context, brandId, catId, spuId int64)
 }
 
 func catalogTeardown(ctx context.Context, t *gtest.T, spuId int64) {
+	g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM (SELECT id FROM product_sku WHERE spu_id=?) x)", spuId)
 	g.DB().Exec(ctx, "DELETE FROM product_sku WHERE spu_id=?", spuId)
 	g.DB().Exec(ctx, "DELETE FROM product_spu WHERE id=?", spuId)
 	g.DB().Exec(ctx, "DELETE FROM product_brand WHERE name=?", testBrandName)
 	g.DB().Exec(ctx, "DELETE FROM product_category WHERE name=?", testCatName)
-	g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM (SELECT id FROM product_sku WHERE sku_no LIKE 'T-SKU%') x)")
 }
 
 // svcIProduct 便捷引用（实现注册后由实现提供; 测试直接构造实现结构）。
@@ -224,7 +224,9 @@ func TestSpuSkuLifecycle(t *testing.T) {
 		t.AssertNil(impl.AdminProductStatus(ctx, spuId, 0))
 		t.AssertNil(impl.AdminProductDelete(ctx, spuId))
 
-		// 清理
+		// 清理（**库存行必须先删**: product_sku 一删, 按 SKU 定位库存的子查询就永远空集 → 静默泄漏,
+		// 泄漏行 total=0 恒满足预警条件, 累积到 100 行会挤爆 InventoryWarnings 的分页窗口）
+		_, _ = g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM product_sku WHERE spu_id=?)", spuId)
 		_, _ = g.DB().Exec(ctx, "DELETE ps FROM product_sku ps JOIN product_spu s ON ps.spu_id=s.id WHERE s.name LIKE 'T-测试%'")
 		_, _ = g.DB().Exec(ctx, "DELETE FROM product_sku WHERE spu_id IN (?, ?)", sku1, sku2)
 		_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE id IN (?, ?)", spuId, 0)
@@ -243,6 +245,8 @@ func TestSkuPriceRefreshOnEdit(t *testing.T) {
 		spuId, _, err := impl.AdminProductCreate(ctx, model.SpuInput{Name: "T-价格SPU", CategoryId: catId, Images: []string{"x"}})
 		t.AssertNil(err)
 		defer func() {
+			// 库存行先删（同上: 后删 SKU 才能定位到库存; 顺序颠倒即静默泄漏）
+			_, _ = g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM product_sku WHERE spu_id=?)", spuId)
 			_, _ = g.DB().Exec(ctx, "DELETE FROM product_sku WHERE spu_id=?", spuId)
 			_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE id=?", spuId)
 		}()

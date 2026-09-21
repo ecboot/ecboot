@@ -36,6 +36,12 @@ func cleanupMember(ctx context.Context, t *gtest.T, phone string) {
 // seedLevelRule 建等级规则（用后 cleanupLevelRule）。
 func seedLevelRule(ctx context.Context, t *gtest.T, name string, threshold int) int64 {
 	_, _ = g.DB().Exec(ctx, "DELETE FROM user_level_rule WHERE name=?", name)
+	// 自增 id 必须留在 user.level(TINYINT, ±127) 的值域内。
+	// 012 修复轮发现: user.level 的列注释写明"等级ID(user_level_rule.id)"而 user_level_rule.id 是 BIGINT,
+	// 类型自相矛盾（属批次 05 域的契约缺陷, PROGRESS §五 已记账待裁定）; 测试库反复重建规则会把
+	// AUTO_INCREMENT 推过 127, 使 LevelRecalc 写 user.level 报 1264——那是契约问题, 不是本测试的验证目标,
+	// 故此处把自增起点压回, 保证用例确定性。**生产侧修复须由迁移裁定, 不在本测试遮掩范围内。**
+	_, _ = g.DB().Exec(ctx, "ALTER TABLE user_level_rule AUTO_INCREMENT=1")
 	res, err := g.DB().Exec(ctx,
 		"INSERT INTO user_level_rule(name,growth_threshold,status) VALUES(?,?,1)", name, threshold)
 	t.AssertNil(err)

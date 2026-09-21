@@ -4,14 +4,17 @@ import (
 	"context"
 
 	"ecboot/api/shop/v1"
-	"ecboot/internal/middleware"
 	"ecboot/internal/model"
 	"ecboot/internal/service/shop"
 )
 
 // OrderList 我的订单列表
 func (c *ControllerV1) OrderList(ctx context.Context, req *v1.OrderListReq) (res *v1.OrderListRes, err error) {
-	out, err := shop.NewOrderLogic().List(ctx, middleware.CtxUserIdFrom(ctx), req.Status,
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out, err := shop.NewOrderLogic().List(ctx, userId, req.Status,
 		model.PageReq{Page: req.Page, PageSize: req.PageSize})
 	if err != nil {
 		return nil, err

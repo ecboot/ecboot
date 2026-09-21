@@ -8,7 +8,7 @@ import (
 // （nil = gf ORM 跳过该列; 空串写 DECIMAL/数值列会 1366——实测根因）。
 func omitEmptyStrings(v any) {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
+	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
 		return
 	}
 	re := rv.Elem()

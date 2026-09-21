@@ -92,10 +92,13 @@ func Receive(ctx context.Context, userId, couponId int64) (int64, error) {
 	var id int64
 	ccols, ucols := dao.Coupon.Columns(), dao.UserCoupon.Columns()
 	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		// 评审 I4: 先对模板行加**悲观锁**（LockUpdate）串行化同模板的并发领取;
+		// 否则两个并发事务都读到 mine=0 都通过限领（尤其 total_count=0 不限量时整段防超发被跳过, 完全无锁）。
 		rec, e := dao.Coupon.Ctx(ctx).
 			Where(ccols.Id, couponId).
 			Where(ccols.Status, 1).
 			Where(ccols.Deleted, 0).
+			LockUpdate().
 			One()
 		if e != nil {
 			return gerror.Wrap(e, "查询券模板失败")
@@ -103,13 +106,19 @@ func Receive(ctx context.Context, userId, couponId int64) (int64, error) {
 		if rec.IsEmpty() {
 			return errcode.New(errcode.CodeCouponSoldOut, "优惠券不存在或已停发")
 		}
-		// 限领校验
-		mine, e := dao.UserCoupon.Ctx(ctx).
+		// 限领校验: 锁定读（RR 快照下普通 SELECT 读旧值, 须 FOR UPDATE 才见最新已提交行）
+		var mine int
+		mv, e := dao.UserCoupon.Ctx(ctx).
+			Fields("COUNT(*) AS c").
 			Where(ucols.UserId, userId).
 			Where(ucols.CouponId, couponId).
-			Count()
+			LockUpdate().
+			One()
 		if e != nil {
 			return gerror.Wrap(e, "查询已领券失败")
+		}
+		if mv != nil {
+			mine = mv["c"].Int()
 		}
 		if mine >= rec[ccols.PerLimit].Int() {
 			return errcode.New(errcode.CodeCouponSoldOut, "已达个人限领数量")

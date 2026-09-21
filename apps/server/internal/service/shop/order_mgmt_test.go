@@ -2,6 +2,7 @@ package shop
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -66,6 +67,63 @@ func TestOrderConfirm(t *testing.T) {
 		// 他人订单 → 40005（不可见语义）
 		err = NewOrderLogic().Confirm(ctx, other, "T-CFM-OK")
 		t.Assert(errCode(err), errcode.CodeOrderNotFound)
+	})
+}
+
+// TestOrderCancelWritesLog 取消订单（I6）: 状态迁移流水必须落库, 且**三方取消**的审计口径互不串味。
+// 原实现三处都错: ① 写 `operator` 列（trade_order_log 无此列, 只有 operator_type/operator_id）→ 1054
+// 被 `_, _` 吞掉, 每次取消都静默无流水; ② cancel_type 恒写 1（后台/超时取消都记成"用户取消"）;
+// ③ operator_type 误用 cancel_type 的枚举（用户取消写成 1=系统）, 且 userId=0 把系统与管理员混同。
+func TestOrderCancelWritesLog(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const h1 = "ORD-CXL-1"
+		defer cleanupPointUser(ctx, t, h1)
+		uid := seedPointUser(ctx, t, h1)
+
+		type audit struct{ cancelType, opType int; opId, remark string }
+		assertCancel := func(orderNo string, want audit) {
+			lg, err := g.DB().GetOne(ctx,
+				"SELECT l.from_status, l.to_status, l.operator_type, l.operator_id, l.remark, o.cancel_type "+
+					"FROM trade_order_log l JOIN trade_order o ON o.id=l.order_id WHERE l.order_no=?", orderNo)
+			t.AssertNil(err)
+			t.Assert(lg["from_status"].Int(), 10)
+			t.Assert(lg["to_status"].Int(), 90)
+			t.Assert(lg["cancel_type"].Int(), want.cancelType)
+			t.Assert(lg["operator_type"].Int(), want.opType)
+			t.Assert(lg["operator_id"].String(), want.opId)
+			t.Assert(lg["remark"].String(), want.remark)
+		}
+
+		// ① C 端用户取消 → cancel_type=1用户, operator_type=2用户
+		id := seedOrder(ctx, t, uid, "T-CXL-U", 10)
+		defer cleanupOrder(ctx, t, "T-CXL-U")
+		t.AssertNil(NewOrderLogic().Cancel(ctx, uid, "T-CXL-U", "不想要了"))
+		st, err := g.DB().GetValue(ctx, "SELECT status FROM trade_order WHERE id=?", id)
+		t.AssertNil(err)
+		t.Assert(st.Int(), 90)
+		assertCancel("T-CXL-U", audit{1, 2, "user:" + fmt.Sprint(uid), "不想要了"})
+
+		// ② 后台取消 → cancel_type=3管理员, operator_type=3管理员, operator_id 带管理员身份
+		seedOrder(ctx, t, uid, "T-CXL-A", 10)
+		defer cleanupOrder(ctx, t, "T-CXL-A")
+		t.AssertNil(NewOrderLogic().AdminCancel(ctx, "T-CXL-A", "后台取消", "admin:9"))
+		assertCancel("T-CXL-A", audit{3, 3, "admin:9", "后台取消"})
+
+		// ③ 超时自动取消 → cancel_type=2系统超时, operator_type=1系统
+		seedOrder(ctx, t, uid, "T-CXL-S", 10)
+		defer cleanupOrder(ctx, t, "T-CXL-S")
+		_, _ = g.DB().Exec(ctx,
+			"UPDATE trade_order SET created_at=DATE_SUB(NOW(), INTERVAL 60 MINUTE) WHERE order_no='T-CXL-S'")
+		n, err := NewOrderLogic().CancelTimeout(ctx)
+		t.AssertNil(err)
+		t.AssertGE(n, 1)
+		assertCancel("T-CXL-S", audit{2, 1, "system:timeout", "超时未支付自动取消"})
+
+		// 非待付款 → 40006
+		seedOrder(ctx, t, uid, "T-CXL-BAD", 20)
+		defer cleanupOrder(ctx, t, "T-CXL-BAD")
+		t.Assert(errCode(NewOrderLogic().Cancel(ctx, uid, "T-CXL-BAD", "x")), errcode.CodeStatusNotAllowed)
 	})
 }
 

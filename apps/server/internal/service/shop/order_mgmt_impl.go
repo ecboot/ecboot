@@ -171,10 +171,15 @@ func (i *OrderLogicImpl) Deliver(ctx context.Context, orderNo, logisticsCode, de
 	return nil
 }
 
-// AdminCancel 后台取消（FR-011）: 与 C 端同语义（状态 90 + 资源释放; userId=0 表后台视角）。
+// AdminCancel 后台取消（FR-011）: 与 C 端同语义（状态 90 + 资源释放）, 但审计口径为管理员。
+// 012 修复轮 I6 补漏: 原先丢弃 operator 且走 Cancel(0) → cancel_type 记"用户"、operator_type 也用错枚举,
+// 审计上无法区分"用户自己取消"与"后台取消"。现在 operator（controller 侧 admin:{id}）原样落到 operator_id。
 func (i *OrderLogicImpl) AdminCancel(ctx context.Context, orderNo, reason, operator string) error {
-	_ = operator
-	return i.Cancel(ctx, 0, orderNo, reason)
+	opId := operator
+	if opId == "" {
+		opId = "admin"
+	}
+	return i.cancelBy(ctx, 0, orderNo, reason, cancelTypeAdmin, opTypeAdmin, opId)
 }
 
 // SellerRemark 内部备注（FR-012）: 买家不可见（C 端查询口径不含该列）。
@@ -216,7 +221,10 @@ func (i *OrderLogicImpl) CancelTimeout(ctx context.Context) (int, error) {
 	}
 	n := 0
 	for _, r := range recs {
-		if err := i.Cancel(ctx, 0, r[cols.OrderNo].String(), "超时未支付自动取消"); err != nil {
+		// 012 修复轮 I6 补漏: 超时取消的取消方是"系统", 不是用户也不是管理员——
+		// 原走 Cancel(0) 致 cancel_type/operator_type 双双记错。
+		if err := i.cancelBy(ctx, 0, r[cols.OrderNo].String(), "超时未支付自动取消",
+			cancelTypeSystem, opTypeSystem, "system:timeout"); err != nil {
 			continue
 		}
 		n++

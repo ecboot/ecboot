@@ -5,7 +5,11 @@ package shop
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/os/gtime"
+
 	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/library/money"
 )
 
 // calcFullReductionFen 满减命中最优档（时段内 + 范围命中(全场V1) + 商品金额≥档位）。
@@ -14,11 +18,15 @@ func calcFullReductionFen(ctx context.Context, provinceCode string, goodsFen int
 	if goodsFen <= 0 {
 		return 0
 	}
-	// 命中时段内启用的全场满减活动, 取满足门槛的最大档
+	// 命中时段内启用的全场满减活动, 取满足门槛的最大档。
+	// 012 修复轮补漏（同 I7 根因）: 档位 threshold/discount 皆 DECIMAL 存**元**, 而 goodsFen 为**分**。
+	// 原 SQL 直接拿"元门槛"比"分金额"（100 倍过宽: 1.5 元车能命中满 100 减 20）,
+	// 且把"元抵扣额"当"分"返回（100 倍少抵）——评审只指出券门槛一处, 满减两处同病。
+	// 门槛在 SQL 侧按 ×100 折算（DECIMAL 精确无浮点误差）; 抵扣额在 Go 侧走 money 库换算。
 	rec, err := g.DB().GetOne(ctx, `
 SELECT a.id,
        (SELECT MAX(l.discount_amount) FROM promotion_activity_ladder l
-         WHERE l.activity_id = a.id AND l.threshold_amount <= ?) AS best_discount
+         WHERE l.activity_id = a.id AND l.threshold_amount * 100 <= ?) AS best_discount
 FROM promotion_activity a
 WHERE a.status = 1 AND a.deleted = 0
   AND NOW() BETWEEN a.start_time AND a.end_time
@@ -27,10 +35,14 @@ ORDER BY a.id LIMIT 1`, goodsFen)
 		return 0
 	}
 	best := rec["best_discount"]
-	if best.IsNil() || best.Int64() <= 0 {
+	if best.IsNil() {
 		return 0
 	}
-	return best.Int64()
+	discountFen, e := money.FromYuanString(best.String())
+	if e != nil || discountFen <= 0 {
+		return 0
+	}
+	return discountFen
 }
 
 // calcCouponDiscountFen 券抵扣（校验: 归属/未用/未过期/门槛）。
@@ -48,15 +60,29 @@ WHERE uc.id = ? AND uc.user_id = ?`, userCouponId, userId)
 	if rec["status"].Int() != 1 { // 非未使用
 		return 0
 	}
-	threshold := rec["threshold_amount"].Int64()
-	if goodsFen*100 < threshold*100 { // 元→分比较（阈值以元存储）
+	// 评审 I7 修正: ① 门槛维度——原判据 `goodsFen*100 < threshold*100` 等价于「分 < 元」（100 倍错位）,
+	// 使满 100 减 20 的券在 1 元购物车上命中; 正确为 `goodsFen < thresholdFen`（分 < 分）。
+	// ② 过期校验——expire_time 此前已 select 却从未比较, 过期券在试算与下单仍抵扣。
+	// ③ 修复轮补漏: **抵扣额同样是元**, 原实现 `discount_amount.Int64()` 直接把元当分返回（100 倍少抵）。
+	// 元→分一律走 money.FromYuanString（`Int64()*100` 会把 99.99 截断成 9900, 差 99 分）。
+	thresholdFen, e := money.FromYuanString(rec["threshold_amount"].String())
+	if e != nil {
 		return 0
 	}
-	discount := rec["discount_amount"].Int64()
-	if discount > goodsFen {
-		discount = goodsFen // 抵扣不超商品金额
+	if goodsFen < thresholdFen {
+		return 0
 	}
-	return discount
+	if et := rec["expire_time"].GTime(); et != nil && !et.After(gtime.Now()) {
+		return 0
+	}
+	discountFen, e := money.FromYuanString(rec["discount_amount"].String())
+	if e != nil || discountFen <= 0 {
+		return 0
+	}
+	if discountFen > goodsFen {
+		discountFen = goodsFen // 抵扣不超商品金额
+	}
+	return discountFen
 }
 
 // calcPointDeductFen 积分抵扣（1 积分=1 分; 上限=可用积分与可抵金额较小者）。

@@ -14,6 +14,7 @@ package shop
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -32,10 +33,14 @@ type PayLogicImpl struct{}
 
 func NewPayLogic() *PayLogicImpl { return &PayLogicImpl{} }
 
+// pay_order.status 契约（000007 列注释）: 10待支付 20支付成功 30支付失败 90已关闭
+// 评审 I3: 原 `payStatusClosed = 30` 误把"关闭"写成"失败"（且 data-model 图纸同错）→ 已修正。
+// 注: 30（失败）本批无写入路径——渠道回调 success=false 按"拒绝并等渠道重试"处理, 不推进状态机
+// （若置 30, 后续真实成功回调的条件更新 `status=10` 将不命中, 反而制造资金脏态）。
 const (
 	payStatusPending = 10
 	payStatusSuccess = 20
-	payStatusClosed  = 30
+	payStatusClosed  = 90
 
 	orderStatusPending  = 10
 	orderStatusPaid     = 20
@@ -82,6 +87,16 @@ func (i *PayLogicImpl) Create(ctx context.Context, userId int64, orderNo string,
 		return nil, errcode.New(errcode.CodePayCreateFailed, "应付金额必须大于 0")
 	}
 
+	// 评审 C3: 同订单同时至多一张待支付单（000007 注释为服务层义务）——先失效旧的待支付单
+	pcols0 := dao.PayOrder.Columns()
+	if _, err = dao.PayOrder.Ctx(ctx).
+		Where(pcols0.OrderNo, orderNo).
+		Where(pcols0.Status, payStatusPending).
+		Data(g.Map{pcols0.Status: payStatusClosed, pcols0.ClosedTime: gtime.Now()}).
+		Update(); err != nil {
+		return nil, gerror.Wrap(err, "失效历史支付单失败")
+	}
+
 	raw, err := payNoOf()
 	if err != nil {
 		return nil, gerror.Wrap(err, "生成支付号失败")
@@ -97,6 +112,7 @@ func (i *PayLogicImpl) Create(ctx context.Context, userId int64, orderNo string,
 		pcols.Amount:     rec[ocols.PayAmount].String(),
 		pcols.Currency:   "CNY",
 		pcols.Status:     payStatusPending,
+		pcols.ExpireTime: gtime.Now().Add(30 * time.Minute), // 与订单超时口径同源（评审 I3）
 	}).Insert()
 	if err != nil {
 		return nil, gerror.Wrap(err, "创建支付单失败")
@@ -143,28 +159,55 @@ func channelCode(channel string) int {
 // writeCallbackLog 回调原文留档（只追加; 成败均落——对账依据）。
 // 列语义（000007 注释）: notify_type 1支付结果/2退款结果; verify_status 0失败/1通过;
 // process_status 0未处理或重复忽略/1已处理。
+// 评审 I2: ① 写入失败不再静默（留档是对账唯一依据, 丢失必须可见）;
+// ② raw_body 为 JSON NOT NULL——非 JSON 原文由 jsonColumn 兜底编码后再入库。
 func writeCallbackLog(ctx context.Context, channel, payNo string, notifyType int, rawBody string, processed bool) {
 	ps := 0
 	if processed {
 		ps = 1
 	}
-	_, _ = dao.PayCallbackLog.Ctx(ctx).Data(g.Map{
+	if _, err := dao.PayCallbackLog.Ctx(ctx).Data(g.Map{
 		"pay_no":         payNo,
 		"pay_channel":    channelCode(channel),
 		"notify_type":    notifyType,
 		"verify_status":  1, // mock 渠道验签占位通过
 		"process_status": ps,
-		"raw_body":       rawBody,
-	}).Insert()
+		"raw_body":       jsonColumn(rawBody),
+	}).Insert(); err != nil {
+		g.Log().Errorf(ctx, "回调留档写入失败 pay_no=%q notify_type=%d err=%v", payNo, notifyType, err)
+	}
+}
+
+// jsonColumn 保证写入 JSON 列的字符串是合法 JSON。
+// 背景（评审 I2）: pay_callback_log.raw_body 为 `JSON NOT NULL`, 直接写非 JSON 原文会报
+// 3140 Invalid JSON text 并被原实现的 `_, _ =` 吞掉——**恰恰是"报文非法"这一最该留档的场景留不下任何记录**。
+// 退化策略: 非 JSON 原文编码为 JSON 字符串字面量（内容完整保留, 仅多了转义, 仍满足"原文留档可重放"）。
+func jsonColumn(raw string) string {
+	if json.Valid([]byte(raw)) {
+		return raw
+	}
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return `""`
+	}
+	return string(b)
 }
 
 // HandlePayNotify 支付回调（FR-006/007）: 幂等四层防线 + 同事务推进。
 func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawBody []byte) error {
 	payload, err := paychannel.NewMock().ParseNotify(rawBody)
 	if err != nil {
+		// 评审 I2: 报文非法是最该留档的场景（原实现直接 return 无留档）
+		writeCallbackLog(ctx, channel, "", 1, string(rawBody), false)
 		return errcode.New(errcode.CodeInvalidParam, "回调报文非法")
 	}
 	raw := string(rawBody)
+
+	// 评审 C2: success 标志必须校验——否则"支付失败"通知会走完成功路径（刷单/资损）
+	if !payload.Success {
+		writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, false)
+		return errcode.New(errcode.CodeInvalidParam, "渠道标记支付失败")
+	}
 
 	// ⑧ 金额校验（先查支付单）
 	pcols := dao.PayOrder.Columns()
@@ -185,7 +228,11 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 		return errcode.New(errcode.CodeInvalidParam, "回调金额与应付不符")
 	}
 
-	// ①③④ 条件更新 + 留档 + 同事务推进
+	// ①③④ 条件更新 + 同事务推进
+	// 评审 I2: **留档一律移出事务**——写在事务内则回滚即丢（原实现两处在事务内、一处在事务外, 语义不一）。
+	processed := false  // 是否真正推进（process_status=1）
+	dirtyOrderNo := ""  // 资金已入账但订单不可推进的脏态订单号（评审 C3b）
+	var dirtyOrderId int64
 	err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		res, e := dao.PayOrder.Ctx(ctx).
 			Where(pcols.PayNo, payload.PayNo).
@@ -199,11 +246,10 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 			return gerror.Wrap(e, "更新支付单失败")
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
-			// 已处理（或已关闭）→ 幂等应答（不二次推进）
-			writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, false)
+			// 已处理（或已关闭）→ 幂等应答（不二次推进; 留档由事务外统一落, 评审 I2）
 			return nil
 		}
-		// 订单推进（条件 status=10; 已取消 → 不推进, 留档）
+		// 订单推进（条件 status=10; 已取消 → 不推进, 记脏态）
 		ocols := dao.TradeOrder.Columns()
 		ores, e := dao.TradeOrder.Ctx(ctx).
 			Where(ocols.OrderNo, rec[pcols.OrderNo].String()).
@@ -214,8 +260,10 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 			return gerror.Wrap(e, "推进订单失败")
 		}
 		if n, _ := ores.RowsAffected(); n == 0 {
-			writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, false)
-			return nil // 支付成功但订单已取消等脏态: 不推进（资金由对账/退款处理）
+			// 支付成功但订单已取消等脏态: 不推进（资金由对账/退款处理）; 标记留待事务外留档
+			dirtyOrderNo = rec[pcols.OrderNo].String()
+			dirtyOrderId = rec[pcols.OrderId].Int64()
+			return nil
 		}
 		// 库存核销（按订单行: total-n, locked-n）
 		items, e := dao.TradeOrderItem.Ctx(ctx).
@@ -226,14 +274,20 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 		for _, it := range items {
 			skuId := it[dao.TradeOrderItem.Columns().SkuId].Int64()
 			qty := it[dao.TradeOrderItem.Columns().Quantity].Int()
-			if _, e = tx.Model(dao.Inventory.Table()).
+			ires, ie := tx.Model(dao.Inventory.Table()).
 				Where(dao.Inventory.Columns().SkuId, skuId).
 				Where(dao.Inventory.Columns().Locked+" >= ?", qty).
 				Data(g.Map{
 					dao.Inventory.Columns().Total:  gdb.Raw("total - " + itoa(qty)),
 					dao.Inventory.Columns().Locked: gdb.Raw("locked - " + itoa(qty)),
-				}).Update(); e != nil {
-				return gerror.Wrap(e, "库存核销失败")
+				}).Update()
+			if ie != nil {
+				return gerror.Wrap(ie, "库存核销失败")
+			}
+			// 评审 I1: 必须判行数——affected=0 意味着库存行缺失或锁定不足（如秒杀单不锁 inventory），
+			// 静默跳过会造成"订单已推进但库存未扣"的账实不符。
+			if n, _ := ires.RowsAffected(); n == 0 {
+				return gerror.Newf("库存核销未命中(sku=%d qty=%d): 锁定不足或库存行缺失", skuId, qty)
 			}
 		}
 		// 状态流水
@@ -246,10 +300,27 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 			"operator_type": 1, // 1=系统（渠道回调）
 			"operator_id":   "system:pay",
 		}).Insert()
-		writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, true)
+		processed = true
 		return nil
 	})
-	return err
+
+	// 留档（事务外, 评审 I2）: 事务回滚也留——"回调来过但没处理成"正是对账最需要的一行。
+	writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, processed)
+	if err != nil {
+		return err
+	}
+
+	// 评审 C3b: 脏态资金对账标记——钱已入账（支付单保持 20, 不得篡改事实）而订单不可推进。
+	// 该场景此前除一条会被事务吞掉的留档外没有任何标记, 无人知道要退款。现在:
+	//   ① 上面那行留档 process_status=0（机器可查, 对账口径:
+	//      pay_order.status=20 且 trade_order.status=90 且存在 notify_type=1/process_status=0 的留档）;
+	//   ② 这里再打一条 Error 级日志（告警可捞, 前缀固定）。
+	// 注: 不写 trade_order_log 标记行——该表经 OrderDetail 直接暴露给 C 端时间线, 会泄露内部资金文案。
+	if dirtyOrderNo != "" {
+		g.Log().Errorf(ctx, "[资金异常] 支付成功但订单不可推进, 待退款对账: pay_no=%s order_no=%s order_id=%d",
+			payload.PayNo, dirtyOrderNo, dirtyOrderId)
+	}
+	return nil
 }
 
 // HandleRefundNotify 退款回调（FR-008）: 幂等推进售后单状态（mock 渠道）。
@@ -259,22 +330,31 @@ func (i *PayLogicImpl) HandleRefundNotify(ctx context.Context, channel string, r
 		OutRefundNo string `json:"outRefundNo"`
 		Success     bool   `json:"success"`
 	}
-	if err := json.Unmarshal(rawBody, &p); err != nil || !p.Success {
+	if err := json.Unmarshal(rawBody, &p); err != nil {
+		writeCallbackLog(ctx, channel, "", 2, string(rawBody), false)
 		return errcode.New(errcode.CodeInvalidParam, "退款回调报文非法")
 	}
-	// 售后单联动（条件更新: 退款中 → 已退款; 幂等——affected=0 视为已处理）
+	if !p.Success {
+		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
+		return errcode.New(errcode.CodeInvalidParam, "渠道标记退款失败")
+	}
+	// 评审 C1 修正: ① 匹配键用 after_sale_no（000008 契约: out_refund_no = after_sale_no;
+	// 原用 refund_no 是渠道回填列, 无人写入 → WHERE 永不命中）；② 状态 40退款中 → 50已完成
+	// （原 30→40 实为"待退款→退款中", 语义错位）；③ affected=0 不得记"已处理"。
 	acols := dao.AfterSaleOrder.Columns()
 	res, err := dao.AfterSaleOrder.Ctx(ctx).
-		Where(acols.RefundNo, p.OutRefundNo).
-		Where(acols.Status, 30). // 30=退款中（V8 状态机）
-		Data(g.Map{acols.Status: 40, acols.RefundTime: gtime.Now()}).
+		Where(acols.AfterSaleNo, p.OutRefundNo).
+		Where(acols.Status, 40). // 40=退款中
+		Data(g.Map{acols.Status: 50, acols.RefundTime: gtime.Now()}).
 		Update()
 	if err != nil {
 		return gerror.Wrap(err, "推进售后单失败")
 	}
-	n, _ := res.RowsAffected()
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
+		return errcode.New(errcode.CodeNotFound, "退款单未匹配或状态不符")
+	}
 	writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), true)
-	_ = n
 	return nil
 }
 

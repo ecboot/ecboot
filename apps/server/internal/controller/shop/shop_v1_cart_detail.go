@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"ecboot/api/shop/v1"
-	"ecboot/internal/middleware"
 	"ecboot/internal/service/shop"
 )
 
 // CartDetail 购物车详情
 func (c *ControllerV1) CartDetail(ctx context.Context, req *v1.CartDetailReq) (res *v1.CartDetailRes, err error) {
-	view, err := shop.NewCartLogic().Detail(ctx, middleware.CtxUserIdFrom(ctx))
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
+	view, err := shop.NewCartLogic().Detail(ctx, userId)
 	if err != nil {
 		return nil, err
 	}

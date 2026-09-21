@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"ecboot/api/shop/v1"
-	"ecboot/internal/middleware"
 	"ecboot/internal/model"
 	"ecboot/internal/service/shop"
 )
 
 // CartCheckout 结算试算（金额账本勾稽; 积分抵扣由 012 前置修复承接）
 func (c *ControllerV1) CartCheckout(ctx context.Context, req *v1.CartCheckoutReq) (res *v1.CartCheckoutRes, err error) {
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var addrId, couponId int64
 	if req.AddressId != "" {
 		if addrId, err = parseID(req.AddressId); err != nil {
@@ -22,7 +25,7 @@ func (c *ControllerV1) CartCheckout(ctx context.Context, req *v1.CartCheckoutReq
 			return nil, err
 		}
 	}
-	out, err := shop.NewCartLogic().Checkout(ctx, middleware.CtxUserIdFrom(ctx), model.CheckoutQuery{
+	out, err := shop.NewCartLogic().Checkout(ctx, userId, model.CheckoutQuery{
 		AddressId: addrId, CouponId: couponId, UsePoint: req.UsePoint, UseAccount: req.UseAccount,
 	})
 	if err != nil {

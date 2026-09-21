@@ -3,7 +3,11 @@
 // 事务感知: 全部方法第一个参数为 tx（*gdb.TX），由订单事务统一提交/回滚。
 package shop
 
-import "context"
+import (
+	"context"
+
+	"ecboot/internal/model"
+)
 
 // txContext 事务句柄（由 order 编排传入; 具体 *gdb.TX 在实现内断言）。
 type TX any
@@ -44,10 +48,19 @@ type INotifyEnqueue interface {
 	OrderCompleted(ctx context.Context, userId int64, orderNo string)
 }
 
+// ICouponQuery 券**查询**口（012 评审 I5）: 结算试算要回"当前可用券列表", 属 shop 域端点的出参义务。
+// 与 ICouponTrade（下单事务内的核销/退回口）刻意分开: 查询口无事务语义, 本批即可接;
+// 核销口随"下单券/积分/余额三段联动"一并延后（PROGRESS §五 记账）。
+type ICouponQuery interface {
+	// UsableForOrder 返回该用户对给定商品金额（元, 字符串）可用的券, 抵扣降序。
+	UsableForOrder(ctx context.Context, userId int64, goodsAmountYuan string) ([]model.UsableCouponBrief, error)
+}
+
 // 注册变量（user 域 bootstrap 装配时注入; 未注入则相关能力降级跳过并告警）。
 var (
 	CouponTrade  ICouponTrade
 	PointTrade   IPointTrade
 	AccountTrade IAccountTrade
 	NotifyEnq    INotifyEnqueue
+	CouponQuery  ICouponQuery
 )

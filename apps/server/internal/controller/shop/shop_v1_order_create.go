@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"ecboot/api/shop/v1"
-	"ecboot/internal/middleware"
 	"ecboot/internal/model"
 	"ecboot/internal/service/shop"
 )
 
 // OrderCreate 创建订单（幂等 requestToken; 玩法上下文互斥）
 func (c *ControllerV1) OrderCreate(ctx context.Context, req *v1.OrderCreateReq) (res *v1.OrderCreateRes, err error) {
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
 	addrId, err := parseID(req.AddressId)
 	if err != nil {
 		return nil, err
@@ -39,7 +42,7 @@ func (c *ControllerV1) OrderCreate(ctx context.Context, req *v1.OrderCreateReq) 
 		}
 		cartIds = append(cartIds, id)
 	}
-	out, err := shop.NewOrderLogic().Create(ctx, middleware.CtxUserIdFrom(ctx), model.OrderCreateInput{
+	out, err := shop.NewOrderLogic().Create(ctx, userId, model.OrderCreateInput{
 		RequestToken: req.RequestToken, AddressId: addrId, UserCouponId: couponId,
 		UsePoint: req.UsePoint, UseAccount: req.UseAccount, UserRemark: req.UserRemark,
 		CartItemIds: cartIds, GroupBuyTeamId: teamId, SkuId: skuId, Quantity: req.Quantity,

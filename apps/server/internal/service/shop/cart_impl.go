@@ -202,6 +202,19 @@ func (i *CartLogicImpl) Checkout(ctx context.Context, userId int64, q model.Chec
 		payFen = 0
 	}
 
+	// 可用券列表（012 评审 I5）: 原实现该字段恒为空数组——券查询能力在 shop 域没有出口
+	// （user 域的 UsableForOrder 无人调用）, 前端"选券"面板因此永远拿不到数据。
+	// 走 ports.go 的 ICouponQuery（依赖倒置, 装配层注入 user 域实现）, 未注入/查询失败均降级为空。
+	if totalFen > 0 {
+		if CouponQuery == nil {
+			g.Log().Warningf(ctx, "券查询口未注入(I5): /cart/checkout 的 usableCoupons 降级为空")
+		} else if cps, e := CouponQuery.UsableForOrder(ctx, userId, money.ToYuanString(totalFen)); e != nil {
+			g.Log().Warningf(ctx, "可用券查询失败(降级为空): user_id=%d err=%v", userId, e)
+		} else {
+			result.UsableCoupons = cps
+		}
+	}
+
 	result.Amount = model.AmountBook{
 		TotalAmount:         money.ToYuanString(totalFen),
 		CouponAmount:        money.ToYuanString(couponFen),

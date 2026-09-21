@@ -81,9 +81,18 @@ func TestInventoryList(t *testing.T) {
 }
 
 // TestInventoryWarnings 预警: available <= warn_count 命中（含等于）（FR-007）。
+// purgeOrphanInventory 清理孤儿库存行（product_sku 已不存在的历史残留）。
+// 背景: 早期 fixture 先删 SKU 再按 SKU 定位库存（子查询恒空集）→ 库存行静默泄漏;
+// 泄漏行 total=0 恒满足 `total-locked <= warn_count`, 累积满 100 行就会把本测试的分页窗口挤爆
+// （表现为"等于阈值不命中"的假失败）。此处做一次自愈, 使断言不受库内历史残留影响。
+func purgeOrphanInventory(ctx context.Context) {
+	_, _ = g.DB().Exec(ctx, "DELETE i FROM inventory i LEFT JOIN product_sku s ON s.id=i.sku_id WHERE s.id IS NULL")
+}
+
 func TestInventoryWarnings(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
+		purgeOrphanInventory(ctx)
 		const (
 			sfxOk  = "inv_w_ok"  // avail 8 > warn 5 → 不命中
 			sfxEq  = "inv_w_eq"  // avail 5 == warn 5 → 命中（含等于）

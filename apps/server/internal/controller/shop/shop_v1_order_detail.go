@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"ecboot/api/shop/v1"
-	"ecboot/internal/middleware"
 	"ecboot/internal/service/shop"
 )
 
 // OrderDetail 订单详情（他人订单按不存在）
 func (c *ControllerV1) OrderDetail(ctx context.Context, req *v1.OrderDetailReq) (res *v1.OrderDetailRes, err error) {
-	d, err := shop.NewOrderLogic().OrderDetail(ctx, middleware.CtxUserIdFrom(ctx), req.OrderNo)
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d, err := shop.NewOrderLogic().OrderDetail(ctx, userId, req.OrderNo)
 	if err != nil {
 		return nil, err
 	}

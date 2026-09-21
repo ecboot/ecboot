@@ -35,7 +35,7 @@ type (
 		g.Meta   `path:"/cart/items/{itemId}" method:"PUT" summary:"修改购物车项"`
 		ItemId   string `json:"itemId" v:"required" dc:"购物车项ID"`
 		Quantity int    `json:"quantity" dc:"数量"`
-		Checked  bool   `json:"checked" dc:"勾选"`
+		Checked  *bool  `json:"checked" dc:"勾选(不传=不改; 评审 I9 三态化)"`
 	}
 	CartUpdateItemRes struct {
 		Success bool `json:"success"`

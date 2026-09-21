@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -42,6 +43,7 @@ func nextOrderNo() (string, error) {
 // orderLine 下单行（聚合 SKU/SPU/库存信息）。
 type orderLine struct {
 	SkuId          int64
+	SkuNo          string // trade_order_item.sku_no 非空列（快照）
 	SpuId          int64
 	SpuName        string
 	SkuName        string
@@ -104,24 +106,37 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	}
 
 	// 步骤3: 库存锁定
+	// 012 修复轮 I11: 条件更新**必须判 RowsAffected**——未命中即库存不足。
+	// 原实现只看 error（条件不命中时 error 为 nil, 行数为 0）, 于是库存 1 也能下 2 件的单（静默超卖）。
+	// 注: 本函数 defer 以 `err != nil` 判回滚, 故所有错误路径都必须给 err 赋值, 否则事务泄漏。
 	for _, ln := range lines {
 		if in.FlashSaleItemId > 0 {
 			// 秒杀: 活动分账条件更新
-			if _, err = tx.Model("flash_sale_item").Ctx(ctx).
+			var fsRes sql.Result
+			if fsRes, err = tx.Model("flash_sale_item").Ctx(ctx).
 				Where("id", in.FlashSaleItemId).
 				Where("stock_count - sold_count >= ?", ln.Quantity).
 				Data(g.Map{"sold_count": gdb.Raw("sold_count + " + fmt.Sprint(ln.Quantity))}).
 				Update(); err != nil {
 				return nil, err
 			}
+			if n, _ := fsRes.RowsAffected(); n == 0 {
+				err = errcode.New(errcode.CodeSoldOut, "秒杀库存不足")
+				return nil, err
+			}
 			continue
 		}
 		// 普通/拼团/砍价: inventory 锁定（条件更新防超卖）
-		if _, err = tx.Model("inventory").Ctx(ctx).
+		var invRes sql.Result
+		if invRes, err = tx.Model("inventory").Ctx(ctx).
 			Where("sku_id", ln.SkuId).
 			Where("total - locked >= ?", ln.Quantity).
 			Data(g.Map{"locked": gdb.Raw("locked + " + fmt.Sprint(ln.Quantity))}).
 			Update(); err != nil {
+			return nil, err
+		}
+		if n, _ := invRes.RowsAffected(); n == 0 {
+			err = errcode.New(errcode.CodeStockInsufficient, "库存不足")
 			return nil, err
 		}
 	}
@@ -187,10 +202,9 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	}
 
 	// ---- 步骤6: 订单项快照（行分摊, 尾差记末行） ----
-	lineFens := make([]int64, len(lines))
-	for i2, ln := range lines {
-		lineFens[i2] = ln.LineFen
-	}
+	// 012 修复轮 C4a: sku_no/spu_name/sku_name/original_price 均为**非空无默认值列**（000006），
+	// 原实现漏写 → 每次下单报 1364 回滚（该端点此前零测试 + 冒烟未覆盖下单, 故长期未暴露）。
+	lineFens := lineFensOf(lines)
 	promoAlloc := money.AllocateProRata(promotionFen, lineFens)
 	for idx, ln := range lines {
 		linePromo := promoAlloc[idx]
@@ -200,8 +214,13 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 			"order_id":         orderId,
 			"spu_id":           ln.SpuId,
 			"sku_id":           ln.SkuId,
+			"sku_no":           ln.SkuNo,
+			"spu_name":         ln.SpuName,
+			"sku_name":         ln.SkuName,
+			"sku_image":        ln.SkuImage,
 			"quantity":         ln.Quantity,
 			"sku_specs":        mustJSON(ln.Specs),
+			"original_price":   money.ToYuanString(ln.PriceFen),
 			"price":            money.ToYuanString(ln.PriceFen),
 			"promotion_amount": money.ToYuanString(linePromo),
 			"pay_amount":       money.ToYuanString(linePay),
@@ -211,12 +230,15 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	}
 
 	// ---- 步骤7: 状态流水 ----
-	if _, err = tx.Model("trade_order_log").Ctx(ctx).Data(g.Map{
-		"order_no":  orderNo,
-		"order_id":  orderId,
-		"to_status": 10,
-		"remark":    "订单创建",
-		"operator":  "user",
+	// 012 修复轮 C4b: trade_order_log **无 operator 列**（只有 operator_type/operator_id）——
+	// 与评审 I6（Cancel 同缺陷）同根因; 下单方为用户 → 2=用户（表注释: 1系统 2用户 3管理员）。
+	if _, err = tx.Model("trade_order_log").Ctx(ctx).Data(do.TradeOrderLog{
+		OrderNo:      orderNo,
+		OrderId:      orderId,
+		ToStatus:     10,
+		Remark:       "订单创建",
+		OperatorType: 2,
+		OperatorId:   fmt.Sprintf("user:%d", userId),
 	}).Insert(); err != nil {
 		return nil, err
 	}
@@ -352,12 +374,36 @@ func (i *OrderLogicImpl) OrderDetail(ctx context.Context, userId int64, orderNo 
 	}, nil
 }
 
-// Cancel 用户取消（仅待付款; 条件更新抢占; 释放库存+退优惠+流水）。
+// 取消方口径（012 修复轮 I6 补漏）——**两个列的枚举不同, 禁止混用**:
+//
+//	trade_order.cancel_type        1用户 2系统超时 3管理员（000006 列注释）
+//	trade_order_log.operator_type  1系统 2用户 3管理员（000006 列注释）
+//
+// 修复前: cancel_type 恒写 1（后台/超时取消都被记成"用户取消"）, operator_type 用的却是
+// cancel_type 的枚举（用户取消写成 1=系统）, 且 userId=0 把"系统超时"与"管理员"混为一谈。
+const (
+	cancelTypeUser   = 1
+	cancelTypeSystem = 2
+	cancelTypeAdmin  = 3
+
+	opTypeSystem = 1
+	opTypeUser   = 2
+	opTypeAdmin  = 3
+)
+
+// Cancel 用户取消（C 端; 仅待付款）——ownerUserId 限定归属, 他人订单按不存在处理。
+// 后台取消/超时取消走 cancelBy（取消方不同 → 审计两列不同）。
 func (i *OrderLogicImpl) Cancel(ctx context.Context, userId int64, orderNo, reason string) error {
-	// userId=0 为后台视角（012 管理面复用同一取消语义）
+	return i.cancelBy(ctx, userId, orderNo, reason, cancelTypeUser, opTypeUser, fmt.Sprintf("user:%d", userId))
+}
+
+// cancelBy 取消实现（ownerUserId>0 时校验归属; 后台/系统视角传 0 不限归属）。
+func (i *OrderLogicImpl) cancelBy(
+	ctx context.Context, ownerUserId int64, orderNo, reason string, cancelType, opType int, opId string,
+) error {
 	m := dao.TradeOrder.Ctx(ctx).Where(dao.TradeOrder.Columns().OrderNo, orderNo)
-	if userId > 0 {
-		m = m.Where(dao.TradeOrder.Columns().UserId, userId)
+	if ownerUserId > 0 {
+		m = m.Where(dao.TradeOrder.Columns().UserId, ownerUserId)
 	}
 	rec, err := m.One()
 	if err != nil {
@@ -374,7 +420,7 @@ func (i *OrderLogicImpl) Cancel(ctx context.Context, userId int64, orderNo, reas
 		Where(dao.TradeOrder.Columns().Status, 10).
 		Data(g.Map{
 			dao.TradeOrder.Columns().Status:       90,
-			dao.TradeOrder.Columns().CancelType:   1,
+			dao.TradeOrder.Columns().CancelType:   cancelType,
 			dao.TradeOrder.Columns().CancelReason: reason,
 			dao.TradeOrder.Columns().CancelTime:   time.Now(),
 		}).Update()
@@ -394,11 +440,20 @@ func (i *OrderLogicImpl) Cancel(ctx context.Context, userId int64, orderNo, reas
 		_, _ = g.DB().Exec(ctx,
 			"UPDATE inventory SET locked=locked-? WHERE sku_id=? AND locked>=?", qty, skuId, qty)
 	}
-	_, _ = dao.TradeOrderLog.Ctx(ctx).Data(g.Map{
-		"order_no": orderNo, "order_id": rec["id"].Int64(),
-		"from_status": 10, "to_status": 90,
-		"remark": reason, "operator": "user",
-	}).Insert()
+	// 评审 I6 修正: trade_order_log **无 operator 列**（只有 operator_type/operator_id）——
+	// 原写法报 1054 且被吞, 致每次取消都没有状态流水。
+	if _, e := dao.TradeOrderLog.Ctx(ctx).Data(do.TradeOrderLog{
+		OrderNo:      orderNo,
+		OrderId:      rec["id"].Int64(),
+		FromStatus:   10,
+		ToStatus:     90,
+		Remark:       reason,
+		OperatorType: opType,
+		OperatorId:   opId,
+	}).Insert(); e != nil {
+		// 不再吞错（审计流水缺失必须可见）
+		g.Log().Errorf(ctx, "订单取消流水写入失败 order_no=%s err=%v", orderNo, e)
+	}
 	return nil
 }
 
@@ -428,7 +483,7 @@ func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int
 			return err
 		}
 		lines = append(lines, orderLine{
-			SkuId: skuId, SpuId: sku["spu_id"].Int64(),
+			SkuId: skuId, SkuNo: sku["sku_no"].String(), SpuId: sku["spu_id"].Int64(),
 			SpuName: spu["name"].String(), SkuName: sku["name"].String(),
 			SkuImage: sku["image"].String(),
 			Specs:    specsMap(sku["specs"].String()),

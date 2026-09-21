@@ -76,3 +76,43 @@
   回调留档表 pay_channel 为整型（加 channelCode 映射）; trade_order_item 无 image/line_amount 列
 - **范围外记账（高优先）**: 006 下单缺券/积分/余额三段联动（"算了没扣"）；pay 的余额结算待批次 11 账户域
 - 用户关键词仅支持 ID 精确（手机号需 PhoneCipher 跨域 → 待共享库方式补齐）
+
+## 评审修复轮（2026-09-21 续作）
+
+独立评审的 With fixes 裁决（11 项）**此前只记账未改码、且 0 测试**；本次续作把修复落地并补齐回归测试。
+
+### 修复清单（评审项）
+
+C1 退款回调列名/状态机双错配 · C2 回调 success 标志 · C3a 单待支付单不变式 · C3b 脏态资金标记（+更正为"加固"）·
+I1 库存核销判行数 · I2 留档出事务 + JSON 列兜底 + 不吞错 · I3 pay_order 状态字面量/expire_time ·
+I4 券领取悲观锁 · I6 取消流水列名 · I7 券门槛与过期 · I8 userId=0 哨兵 · I9 购物车 checked 三态 · I10 回调应答直写
+
+### 本轮**新发现**并修复（评审未覆盖）
+
+- [x] **C4（Critical）下单端点实际不可用**: `Create` 步骤6 漏写 4 个非空列（1364）+ 步骤7 用不存在的 `operator` 列（1054）。批次 06 对 `Create` 零覆盖 + 冒烟绕开下单 → "桩清零"掩盖端点不可用
+- [x] **I11 静默超卖**: 步骤3 库存锁定/秒杀分账未判 `RowsAffected`
+- [x] **I7 补漏（资金）**: 满减与券的**抵扣额**同样未做元→分换算（100 倍少抵）；满减门槛亦为分/元错位；`Int64()*100` 截断小数 → 统一 `money.FromYuanString`
+- [x] **I6 补漏（审计）**: `cancel_type` 恒写 1、`operator_type` 误用 cancel_type 枚举、`userId=0` 混同系统/管理员；`AdminCancel` 丢弃的 `operator` 已落 `operator_id`
+- [x] **I5（用户裁定: 只补查询口）**: 新增 `shop.ICouponQuery` + `internal/bootstrap` 装配 → `/shop/cart/checkout` 的 `usableCoupons` 不再恒空；下单三段联动仍延后批次 11
+
+### 回归测试（新增/改造）
+
+- [x] `order_create_test.go`（新）: 下单快照（订单/项/流水/库存）+ 库存不足 40001
+- [x] `pay_review_test.go`（新）: C1/C2/C3a/C3b/I1/I2/I3 七项，含重复回调留档
+- [x] `promotion_coupon_test.go`（新）: 满减/券的门槛与抵扣额维度、过期券
+- [x] `cart_checkout_test.go`（新）: 券查询口注入/降级 + checked 三态（service 层）
+- [x] `controller/shop/member_guard_test.go`（新, **本仓首例 controller 层测试**）: I8 防御 + I9 三态 + 下单端点全链路
+- [x] `bootstrap/ports_test.go`（新）: 端口注入断言 + 端到端
+- [x] `order_mgmt_test.go` / `trade_test.go` / `pay_impl_test.go`: 三方取消审计、fixture 修正（缺 `spu_no`/清理顺序/精确名匹配）
+
+### 验证证据
+
+- `go test ./...` **连续 4 次全绿**（含批次 01~05 既有链路, SC-004 零退化）
+- `make check-stub` 对账: shop 21 / admin 64 / user 10 / common 1 = 96（与收口一致, 无回归）
+- golangci-lint 本批文件 0 issues（全量 22 → 16, 余 16 条全在跨批文件, 见 PROGRESS §五）
+- 「先红后绿」实证: 以 `git stash` 回退 `pay_impl.go`/`order_impl.go` 逐个复核新测试确实为红（非事后补测）
+
+### 待裁定（跨批, 已记账）
+
+- `user.level` 列类型 TINYINT 与自身注释（存 `user_level_rule.id` BIGINT）矛盾 → 规则 id > 127 时等级更新报 1264；生产修复需迁移裁定（批次 05 域）
+- `make lint` 全量非零（16 条跨批）；批次 04 测试的库存孤儿行泄漏已修
