@@ -48,11 +48,11 @@
 
 **Independent Test**: 建两条 → 设默认 → 唯一性成立 → 他人地址操作被拒
 
-- [ ] T008 [P] [US2] `address_impl_test.go`（红）：列表/新增/修改/删除；**设默认同事务清其他（无双默认）**；
+- [x] T008 [P] [US2] `address_impl_test.go`（红）：列表/新增/修改/删除；**设默认同事务清其他（无双默认）**；
       **他人地址改删设默认 → 10006**；`GetForOrder` 归属校验（内部方法）
-- [ ] T009 [US2] `address_impl.go`：5 端点方法 + `GetForOrder`
-- [ ] T010 [US2] 连线 5 端点（桩清零 ×5）
-- [ ] T011 [US2] `go test ./...` 绿
+- [x] T009 [US2] `address_impl.go`：5 端点方法 + `GetForOrder`
+- [x] T010 [US2] 连线 5 端点（桩清零 ×5）
+- [x] T011 [US2] `go test ./...` 绿
 
 ---
 

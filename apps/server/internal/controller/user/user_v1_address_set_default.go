@@ -3,12 +3,19 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
+// AddressSetDefault 设默认地址（归属校验; 同事务清其他, 默认唯一）
 func (c *ControllerV1) AddressSetDefault(ctx context.Context, req *v1.AddressSetDefaultReq) (res *v1.AddressSetDefaultRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	id, err := parseID(req.Id)
+	if err != nil {
+		return nil, err
+	}
+	if err = user.AddressSetDefault(ctx, middleware.CtxUserIdFrom(ctx), id); err != nil {
+		return nil, err
+	}
+	return &v1.AddressSetDefaultRes{Success: true}, nil
 }
