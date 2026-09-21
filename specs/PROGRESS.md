@@ -34,7 +34,7 @@
 | 03 | `specs/009-logistics-ops` | 物流公司与运营装修（admin logistics/banner/floor + shop banner/floor） | 15 | 01 | 已实现（装修域新建接口/DTO；含投放与装配） | ✅ | `1034ace` |
 | 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | 已实现（连线收口 + 库存补齐 + 评审修复轮） | ✅ | `d626fd9` |
 | 05 | `specs/011-member-center` | 会员中心（资料/地址/收藏/足迹/消息/积分/通知偏好/登录日志/邀请记录） | 21 | 01 | 已实现（8 接口从零实现 + 1 迁移 + 评审修复轮） | ✅ | `a1602a6` |
-| 06 | `specs/012-trade-wiring` | 交易闭环连线（shop 购物车/订单/支付 + admin 订单发货/取消/备注 + user 优惠券） | 22 | 02 03 04 | **shop 侧 impl 已实现**，重连线 + admin 侧补 impl | ⬜ | |
+| 06 | `specs/012-trade-wiring` | 交易闭环连线（shop 购物车/订单/支付 + admin 订单发货/取消/备注 + user 优惠券） | 22 | 02 03 04 | 混合：连线（cart/order C 端）+ 新写（pay 5/coupon 6/admin order 5/confirm 1）+ **前置修积分 bug** | 🔶 | |
 | 07 | `specs/013-after-sale` | 售后域（shop 申请/撤销售后 + admin 审核/收货/重退款） | 11 | 06 | 接口已有，impl 待补 | ⬜ | |
 | 08 | `specs/014-review` | 评价域（shop 发表/追加/我的评价/商品评价列表） | 4 | 06 | 接口已有，impl 待补 | ⬜ | |
 | 09 | `specs/015-marketing-c` | 营销 C 端（首页聚合 + 秒杀/拼团/砍价/助力/满减列表与玩法动作） | 12 | 06 | 接口已有，impl 待补 | ⬜ | |
