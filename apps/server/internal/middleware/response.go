@@ -3,10 +3,13 @@ package middleware
 import (
 	"errors"
 
+	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/util/gvalid"
+
+	"ecboot/internal/errcode"
 )
 
 // Response 统一响应中间件（替代 ghttp.MiddlewareHandlerResponse）：
@@ -47,23 +50,41 @@ func Response(r *ghttp.Request) {
 }
 
 func mapError(err error, r *ghttp.Request) (int, string) {
-	// 携带 gcode 的业务错误（errcode.New 工厂产物）——契约码直出（评审 C1）
-	if gc := gerror.Code(err); gc.Code() > 0 {
+	code, message := mapErrorCode(err)
+	if code == errcode.CodeSystemError {
+		// 系统错误：服务端留日志 + 追踪号回传（不暴露内部细节, FR-003）
+		traceId := r.Response.Header().Get("X-Trace-Id")
+		g.Log().Error(r.Context(), err)
+		message = "系统繁忙,请稍后重试(追踪号: " + traceId + ")"
+	}
+	return code, message
+}
+
+// mapErrorCode 错误 → 契约码与文案（纯函数便于单测; 系统错误的追踪号与日志由调用方补）。
+//   - 契约业务码（>= 10001, errcode.New 工厂产物）→ 直出（评审 C1）
+//   - 参数校验失败（gvalid 错误或 gf 校验码）→ 10001, 首错含字段（FR-003）
+//   - 其余（**含 gf 框架码 51/52 等**）→ 10002 系统错误
+//
+// 007/008 评审 I4: 初版判据 `gc.Code() > 0` 使 gf 框架码（51 Validation Failed /
+// 52 Db Operation Error）直接透出，契约的 10001/10002 语义失效——现以契约码域
+// （>= CodeInvalidParam）为界，框架码统一归入 10002 并恢复日志与追踪号。
+func mapErrorCode(err error) (int, string) {
+	if gc := gerror.Code(err); gc.Code() >= errcode.CodeInvalidParam {
 		return gc.Code(), gc.Message()
 	}
 
-	// 参数校验失败：首错含字段与原因（FR-003）
+	// 参数校验失败：首错含字段与原因
 	var verr gvalid.Error
 	if errors.As(err, &verr) {
 		msg := "参数校验失败"
 		if fe := verr.FirstError(); fe != nil {
 			msg = "参数校验失败: " + fe.Error()
 		}
-		return 10001, msg
+		return errcode.CodeInvalidParam, msg
+	}
+	if gerror.Code(err).Code() == gcode.CodeValidationFailed.Code() {
+		return errcode.CodeInvalidParam, "参数校验失败"
 	}
 
-	// 系统错误：追踪号回传便于排查，不暴露内部细节
-	traceId := r.Response.Header().Get("X-Trace-Id")
-	g.Log().Error(r.Context(), err)
-	return 10002, "系统繁忙,请稍后重试(追踪号: " + traceId + ")"
+	return errcode.CodeSystemError, ""
 }
