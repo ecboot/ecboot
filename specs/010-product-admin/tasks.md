@@ -15,7 +15,7 @@
 
 ## Phase 1: Setup（现状基线）
 
-- [ ] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 03 收口态 + 时区统一）；确认 27 端点桩数 91/40
+- [x] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 03 收口态 + 时区统一）；确认 27 端点桩数 91/40
 
 **Checkpoint**: 基线绿。
 
@@ -29,15 +29,15 @@
 
 ### Tests for US2（红先行）
 
-- [ ] T002 [P] [US2] `internal/service/shop/inventory_impl_test.go`：List 可售推导（total-locked）与筛选分页；Warnings 阈值命中（available<=warn_count, 含等于）与不命中；Adjust 正负调整生效 + `inventory_log` 留痕（change_type=5/quantity=绝对值/total_after/locked_after/operator=admin:{id}/remark）；调整致负 → 30007；不存在 SKU → 30007
+- [x] T002 [P] [US2] `internal/service/shop/inventory_impl_test.go`：List 可售推导（total-locked）与筛选分页；Warnings 阈值命中（available<=warn_count, 含等于）与不命中；Adjust 正负调整生效 + `inventory_log` 留痕（change_type=5/quantity=绝对值/total_after/locked_after/operator=admin:{id}/remark）；调整致负 → 30007；不存在 SKU → 30007
 
 ### Implementation for US2
 
-- [ ] T003 [US2] `internal/service/shop/inventory_impl.go`（新增）：`InventoryList`/`InventoryWarnings`/`InventoryAdjust`
+- [x] T003 [US2] `internal/service/shop/inventory_impl.go`（新增）：`InventoryList`/`InventoryWarnings`/`InventoryAdjust`
       （JOIN product_sku 取名/编码；调整同事务写流水；条件更新防负, research D3）
-- [ ] T004 [US2] 连线 `internal/controller/admin/admin_v1_admin_inventory_{list,warn,adjust}.go`（桩清零 ×3；
+- [x] T004 [US2] 连线 `internal/controller/admin/admin_v1_admin_inventory_{list,warn,adjust}.go`（桩清零 ×3；
       调整挂 `inventory:adjust`；查询仅登录）
-- [ ] T005 [US2] `go test ./internal/service/shop/...` 绿
+- [x] T005 [US2] `go test ./internal/service/shop/...` 绿
 
 **Checkpoint**: 库存后台可用（交易前提）。
 
