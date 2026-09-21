@@ -66,13 +66,13 @@
 
 ### Tests for US2（红先行）
 
-- [ ] T013 [P] [US2] `internal/service/system/rbac_impl_test.go`（账号部分）：创建成功/用户名冲突拒绝/修改姓名状态/禁用后 Login 被拒/软删后列表详情不可见且登录被拒/AssignRoles 全量替换幂等/删除自身与超管被拒（FR-012）/列表 status+keyword 筛选分页正确
+- [x] T013 [P] [US2] `internal/service/system/rbac_impl_test.go`（账号部分）：创建成功/用户名冲突拒绝/修改姓名状态/禁用后 Login 被拒/软删后列表详情不可见且登录被拒/AssignRoles 全量替换幂等/删除自身与超管被拒（FR-012）/列表 status+keyword 筛选分页正确
 
 ### Implementation for US2
 
-- [ ] T014 [US2] `internal/service/system/rbac_impl.go`（账号部分）：`AdminUserList`（status/keyword/分页, 关联角色编码+last_login_time）、`AdminUserCreate`（用户名唯一+bcrypt）、`AdminUserUpdate`（real_name/status）、`AdminUserDelete`（软删；禁删自身/超管）、`AssignRoles`（事务删旧插新）
-- [ ] T015 [US2] 连线 `internal/controller/admin/admin_v1_admin_{user_list,user_create,user_update,user_delete,user_detail,user_assign_roles}.go`（桩清零 ×6；写操作挂 `middleware.RequirePerm(ctx, "system:admin:manage")`、AssignRoles 挂 `system:admin:assign`，见 contracts）
-- [ ] T016 [US2] `go test ./...` 绿（含 US1 回归）
+- [x] T014 [US2] `internal/service/system/rbac_impl.go`（账号部分）：`AdminUserList`（status/keyword/分页, 关联角色编码+last_login_time）、`AdminUserCreate`（用户名唯一+bcrypt）、`AdminUserUpdate`（real_name/status）、`AdminUserDelete`（软删；禁删自身/超管）、`AssignRoles`（事务删旧插新）
+- [x] T015 [US2] 连线 `internal/controller/admin/admin_v1_admin_{user_list,user_create,user_update,user_delete,user_detail,user_assign_roles}.go`（桩清零 ×6；权限挂点随 US3 的 RequirePerm 就绪后补挂——编译依赖顺序, 见 T019）
+- [x] T016 [US2] `go test ./...` 绿（含 US1 回归）
 
 **Checkpoint**: US1+US2 独立可用。
 

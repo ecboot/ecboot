@@ -8,15 +8,16 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"ecboot/internal/consts"
 	"ecboot/internal/library/security"
 	"ecboot/internal/service/system"
 )
 
-// CtxUserId ctx 中当前会员 ID 的键（控制器经 middleware.CtxUserIdFrom(ctx) 读取）。
-const CtxUserId = "currentUserId"
-
-// CtxToken ctx 中当前访问凭证的键（登出销毁用）。
-const CtxToken = "currentToken"
+// CtxUserId/CtxToken ctx 键已下沉 consts（service 层可无环读取），此处别名保持既有引用。
+const (
+	CtxUserId = consts.CtxUserId
+	CtxToken  = consts.CtxToken
+)
 
 // CtxUserIdFrom 从上下文读取当前会员 ID（0=未登录）。
 func CtxUserIdFrom(ctx context.Context) int64 {

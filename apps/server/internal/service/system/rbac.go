@@ -20,6 +20,8 @@ type IRBACLogic interface {
 	// AssignPermissions 角色-权限全量替换（同事务删旧插新）。
 	AssignPermissions(ctx context.Context, roleId int64, permissionIds []int64) error
 	AdminUserList(ctx context.Context, status int, keyword string, page model.PageReq) (*model.PageResult[model.AdminUserItem], error)
+	// AdminUserDetail 账号详情（007-admin-base 接口微扩: api 有 Detail 端点而接口缺失, 同 D6 模式）。
+	AdminUserDetail(ctx context.Context, id int64) (*model.AdminUserItem, error)
 	// AdminUserCreate 创建后台账号（密码 bcrypt; 审计留痕）。
 	AdminUserCreate(ctx context.Context, in model.AdminUserInput) (int64, error)
 	AdminUserUpdate(ctx context.Context, id int64, in model.AdminUserUpdateInput) error

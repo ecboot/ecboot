@@ -2,13 +2,20 @@ package admin
 
 import (
 	"context"
-
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
+	"strconv"
 
 	"ecboot/api/admin/v1"
+	"ecboot/internal/service/system"
 )
 
+// AdminUserDelete 删除后台账号(软删)
 func (c *ControllerV1) AdminUserDelete(ctx context.Context, req *v1.AdminUserDeleteReq) (res *v1.AdminUserDeleteRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	id, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if err = system.AdminUserDelete(ctx, id); err != nil {
+		return nil, err
+	}
+	return &v1.AdminUserDeleteRes{Success: true}, nil
 }
