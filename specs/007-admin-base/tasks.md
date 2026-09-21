@@ -136,9 +136,9 @@
 
 ## Phase 8: Polish & 批次收尾（DoD 全项）
 
-- [ ] T028 `make test` 全绿（含认证/交易既有回归）+ `make lint` 通过（宪法 IV）
-- [ ] T029 `make check-stub` 对账：admin 129→107、common 5→3（本批 22 清零）；结果记入 PROGRESS.md 批次 01 状态 ✅ 与完成 commit（同 commit 更新）
-- [ ] T030 按 `specs/007-admin-base/quickstart.md` 手工序列走查一遍；更新 specs/PROGRESS.md 批次 01 行（状态/commit）并提交 `feat(007-admin-base): <收尾描述>`
+- [x] T028 `make test` 全绿（含认证/交易既有回归）+ `make lint` 通过（宪法 IV）
+- [x] T029 `make check-stub` 对账：admin 129→107、common 5→3（本批 22 清零）；结果记入 PROGRESS.md 批次 01 状态 ✅ 与完成 commit（同 commit 更新）
+- [x] T030 按 `specs/007-admin-base/quickstart.md` 手工序列走查一遍；更新 specs/PROGRESS.md 批次 01 行（状态/commit）并提交 `feat(007-admin-base): <收尾描述>`
 
 ## Dependencies & Execution Order
 
@@ -168,3 +168,13 @@
 - 全部分层行为遵守 `docs/layer-contracts.md`（controller 禁触 dao；service 用 do/entity 强类型）
 - 测试基座：005/006 模式（确定性配置注入 + 数据自建清理）
 - 本批文件边界（PROGRESS 防偏离条款 3）：plan.md「Source Code」小节所列文件 + specs/007-admin-base/ + specs/PROGRESS.md；越界先记账再动
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（6 包: security/middleware/system/user/shop/money）；本批文件 golangci-lint 0 issues
+  （批次外 21 个既有问题留待独立 chore 批，防偏离条款 3）
+- `make check-stub` 对账: admin 129→109、common 8→3，本批 22 端点全清；四渠道剩余 188 桩
+- HTTP 冒烟 10/10: ping/登录/错密码 80001/建号/无权 10005/超管放行/配置列表/登出即 10003
+  （禁用自身冒烟返回 10005 为正确分层语义: 权限门先于业务规则, 80006 由 service 层测试覆盖）
+- 已知环境事项: 本机 golangci-lint 旧二进制与 go.mod 1.26.0 错配, 已重装 @latest；测试库 mydatabase
+  迁移账本遗留 dirty 标记已以 `migrate force 34` 修复后正常应用 000035

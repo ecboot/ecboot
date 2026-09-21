@@ -457,7 +457,6 @@ func PermissionTree(ctx context.Context) ([]model.PermissionNode, error) {
 		return nil, gerror.Wrap(err, "解析权限失败")
 	}
 	byParent := map[int64][]model.PermissionNode{}
-	nodes := make([]model.PermissionNode, 0, len(perms))
 	for _, p := range perms {
 		n := model.PermissionNode{
 			Id:       int64(p.Id),
@@ -470,7 +469,6 @@ func PermissionTree(ctx context.Context) ([]model.PermissionNode, error) {
 			Children: []model.PermissionNode{},
 		}
 		byParent[n.ParentId] = append(byParent[n.ParentId], n)
-		nodes = append(nodes, n)
 	}
 	// 父子挂接（深度按种子层级, 当前为 1~2 层）
 	var build func(parentId int64) []model.PermissionNode

@@ -19,7 +19,7 @@ import (
 
 func init() {
 	// 确定性测试配置（compose 基线, 与 service 层同源）
-	gdb.SetConfig(gdb.Config{
+	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase"},
 		},

@@ -16,7 +16,7 @@ func init() {
 	// 测试显式开启 mock（fail-closed 语义下的白盒开关）
 	_ = os.Setenv("ECBOOT_MOCK", "true")
 	// 确定性测试配置（compose 基线——与 user/shop 域测试同源, 不依赖本地 manifest 差异）
-	gdb.SetConfig(gdb.Config{
+	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{
 				Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase",
