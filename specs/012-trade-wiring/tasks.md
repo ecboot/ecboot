@@ -49,8 +49,8 @@
 
 ## Phase 7: Polish & 批次收尾
 
-- [ ] T020 `make test` 全绿 + golangci-lint 本批文件零问题（含既有交易链路零退化——SC-004）
-- [ ] T021 `make check-stub` 对账：shop 35→21、admin 69→64、user 13→10；按 quickstart 冒烟；
+- [x] T020 `make test` 全绿 + golangci-lint 本批文件零问题（含既有交易链路零退化——SC-004）
+- [x] T021 `make check-stub` 对账：shop 35→21、admin 69→64、user 13→10；按 quickstart 冒烟；
       更新 PROGRESS 批次 06 状态 ✅ 与完成 commit（同 commit）并提交
 
 ## Dependencies & Execution Order
@@ -64,3 +64,15 @@
 - 禁止手改 `internal/dao`、`internal/model/entity|do`（本批零迁移，无生成物变更）
 - **支付回调幂等四层防线为硬约束**（资金安全）；金额不符必留档
 - 本批文件边界：plan.md「Source Code」+ specs/012-trade-wiring/ + specs/PROGRESS.md
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（7 包, 批次 01~05 全部零退化——SC-004 达标）；本批文件 golangci-lint 0 issues
+- `make check-stub` 对账: **shop 35→21、admin 69→64、user 13→10（本批 22 端点全清, SC-001 达标）**；四渠道剩余 96 桩
+- **前置修复清偿**: 积分抵扣 bug（批次 05 评审债务）——TDD 先红（EXPECT 0 == 300）后绿；覆盖 min(余额,上限)/未勾选/无账户行/余额<=0
+- 冒烟 6/6: 后台订单列表（本批新写端点）/券可领列表（含 CanReceive 与有效期描述）/**领取**/**我的券**（未使用+过期时间）/
+  **重复领取 50001**（限领生效）
+- 实现期修正（记账）: decimal 未在依赖（项目 money 库为自实现 int64 分）; PayCreated 字段名（ChannelParams）;
+  回调留档表 pay_channel 为整型（加 channelCode 映射）; trade_order_item 无 image/line_amount 列
+- **范围外记账（高优先）**: 006 下单缺券/积分/余额三段联动（"算了没扣"）；pay 的余额结算待批次 11 账户域
+- 用户关键词仅支持 ID 精确（手机号需 PhoneCipher 跨域 → 待共享库方式补齐）
