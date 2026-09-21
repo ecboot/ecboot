@@ -231,21 +231,9 @@ type OrderCreated struct {
 type OrderSummary struct {
 	OrderNo   string           `json:"orderNo"`
 	Status    int              `json:"status"`
-	Amount    OrderAmountBook  `json:"amount"`
+	Amount    AmountBook  `json:"amount"`
 	Items     []OrderItemBrief `json:"items"`
 	CreatedAt string           `json:"createdAt"`
-}
-
-type OrderAmountBook struct {
-	TotalAmount         string `json:"totalAmount"`
-	PromotionAmount     string `json:"promotionAmount"`
-	CouponAmount        string `json:"couponAmount"`
-	FullReductionAmount string `json:"fullReductionAmount"`
-	PointAmount         string `json:"pointAmount"`
-	PointUsed           int    `json:"pointUsed"`
-	AccountAmount       string `json:"accountAmount"`
-	FreightAmount       string `json:"freightAmount"`
-	PayAmount           string `json:"payAmount"`
 }
 
 type OrderItemBrief struct {
@@ -260,7 +248,7 @@ type OrderDetail struct {
 	OrderNo         string            `json:"orderNo"`
 	Status          int               `json:"status"`
 	RefundStatus    int               `json:"refundStatus"`
-	Amount          OrderAmountBook   `json:"amount"`
+	Amount          AmountBook   `json:"amount"`
 	Items           []OrderItemDetail `json:"items"`
 	Receiver        map[string]string `json:"receiver" dc:"收货快照"`
 	UserRemark      string            `json:"userRemark"`
@@ -674,4 +662,21 @@ type ProductDetailView struct {
 	SaleRestricted  bool              `json:"saleRestricted"`
 	Skus            []SkuCard         `json:"skus"`
 	ReviewSummary   ReviewSummary     `json:"reviewSummary"`
+}
+
+// OrderDetailView 订单详情（含金额账本/商品行/状态时间线）。
+type OrderDetailView struct {
+	OrderNo      string            `json:"orderNo"`
+	Status       int               `json:"status"`
+	RefundStatus int               `json:"refundStatus"`
+	Amount       AmountBook        `json:"amount"`
+	Items        []OrderItemBrief  `json:"items"`
+	Receiver     map[string]string `json:"receiver" dc:"收货快照"`
+	UserRemark   string            `json:"userRemark"`
+	SellerRemark string            `json:"sellerRemark"`
+	Pay          map[string]string `json:"pay" dc:"支付摘要"`
+	Deliver      map[string]string `json:"deliver" dc:"物流信息"`
+	Cancel       map[string]string `json:"cancel" dc:"取消信息"`
+	StatusLogs   []OrderStatusLog  `json:"statusLogs"`
+	CreatedAt    string            `json:"createdAt"`
 }
