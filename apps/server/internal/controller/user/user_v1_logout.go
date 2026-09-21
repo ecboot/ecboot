@@ -11,7 +11,7 @@ import (
 func (c *ControllerV1) Logout(ctx context.Context, req *v1.LogoutReq) (res *v1.LogoutRes, err error) {
 	token := ctx.Value(middleware.CtxToken)
 	if s, ok := token.(string); ok && s != "" {
-		sm := security.NewSessionManager(7)
+		sm := security.NewSessionManager("user", 7)
 		if err = sm.Destroy(ctx, s, req.RefreshToken); err != nil {
 			return nil, err
 		}

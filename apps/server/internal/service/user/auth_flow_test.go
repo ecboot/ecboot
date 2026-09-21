@@ -99,7 +99,7 @@ func TestAuthFlow(t *testing.T) {
 		}
 
 		// ⑤ 会话有效
-		sm := security.NewSessionManager(7)
+		sm := security.NewSessionManager("user", 7)
 		uid, ok, err := sm.Validate(ctx, out.Token)
 		t.AssertNil(err)
 		t.Assert(ok, true)
@@ -141,7 +141,7 @@ func TestAuthFlow(t *testing.T) {
 func TestSessionLifecycle(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
-		sm := security.NewSessionManager(7)
+		sm := security.NewSessionManager("user", 7)
 
 		token, refresh, err := sm.Create(ctx, 999)
 		t.AssertNil(err)

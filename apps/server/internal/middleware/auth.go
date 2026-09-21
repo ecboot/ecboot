@@ -9,6 +9,7 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 
 	"ecboot/internal/library/security"
+	"ecboot/internal/service/system"
 )
 
 // CtxUserId ctx 中当前会员 ID 的键（控制器经 middleware.CtxUserIdFrom(ctx) 读取）。
@@ -52,23 +53,37 @@ func isPublicPath(r *ghttp.Request) bool {
 	return false
 }
 
-// Auth 鉴权中间件：公开路径直通；其余要求有效 Bearer（会员会话, 滑动续期）。
-// 管理组校验（凭证+权限点）属后台特性, 当前管理路径同走会员会话占位。
+// Auth 鉴权中间件：公开路径直通；其余要求有效 Bearer（滑动续期）。
+// 会话按渠道隔离（research D1）：/admin/ 前缀走 admin 会话并校验账号态（FR-008:
+// 禁用/软删账号的既有会话立即不可用）；其余走 user 会话。
+// 管理组权限点校验由 controller 显式 RequirePerm 挂接（research D2）。
 func Auth(r *ghttp.Request) {
 	if isPublicPath(r) {
 		r.Middleware.Next()
 		return
+	}
+	aud := "user"
+	if strings.HasPrefix(r.URL.Path, "/admin/") {
+		aud = "admin"
 	}
 	token := strings.TrimPrefix(r.GetHeader("Authorization", ""), "Bearer ")
 	if token == "" {
 		unauthorized(r)
 		return
 	}
-	sm := security.NewSessionManager(7) // TTL 实际由会话创建时的值控制, 校验续期用同默认
+	sm := security.NewSessionManager(aud, 7) // TTL 实际由会话创建时的值控制, 校验续期用同默认
 	userId, ok, err := sm.Validate(r.Context(), token)
 	if err != nil || !ok {
 		unauthorized(r)
 		return
+	}
+	// 管理渠道加验账号态（禁用/软删即拒）
+	if aud == "admin" {
+		active, aErr := system.ActiveAdmin(r.Context(), userId)
+		if aErr != nil || !active {
+			unauthorized(r)
+			return
+		}
 	}
 	// userId 注入 ctx（控制器经 CtxUserIdFrom 读取）
 	ctx := context.WithValue(r.Context(), CtxUserId, userId)

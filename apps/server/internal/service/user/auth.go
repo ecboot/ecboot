@@ -77,9 +77,9 @@ func phoneCipher() *security.PhoneCipher {
 
 func gctxNew() context.Context { return context.Background() }
 
-// sessionManager 会话管理器（TTL 读配置, 评审 I8 统一入口）。
+// sessionManager 会话管理器（TTL 读配置, 评审 I8 统一入口；会员渠道, research D1）。
 func sessionManager(ctx context.Context) *security.SessionManager {
-	return security.NewSessionManagerFromConfig(ctx)
+	return security.NewSessionManagerFromConfig(ctx, "user")
 }
 
 // mockEnabled 是否开发态 mock（决定发码走 Mock、微信走 MockWxClient）。
