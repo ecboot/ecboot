@@ -40,12 +40,12 @@
 
 ## Phase 6: US6 会员优惠券（新写，P2）
 
-- [ ] T016 [P] [US6] `internal/service/user/coupon_impl_test.go`（红）：AvailableTemplates（过滤领完/超限/停发）/
+- [x] T016 [P] [US6] `internal/service/user/coupon_impl_test.go`（红）：AvailableTemplates（过滤领完/超限/停发）/
       Receive（**同事务防超发+限领**；超限 → 50001）/Mine（四态 + **惰性过期判定**）/
       UsableForOrder（门槛 + 抵扣降序）/Consume（绑单号）/ReturnBack（退回，有效期不变）
-- [ ] T017 [US6] `internal/service/user/coupon_impl.go`（新增，包级函数 6 个）
-- [ ] T018 [US6] 连线 user 3 端点（桩清零 ×3）
-- [ ] T019 `go test ./...` 绿
+- [x] T017 [US6] `internal/service/user/coupon_impl.go`（新增，包级函数 6 个）
+- [x] T018 [US6] 连线 user 3 端点（桩清零 ×3）
+- [x] T019 `go test ./...` 绿
 
 ## Phase 7: Polish & 批次收尾
 

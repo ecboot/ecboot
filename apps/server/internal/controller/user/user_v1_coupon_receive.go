@@ -3,13 +3,20 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
-// CouponReceive 领券（防超发/限领, 幂等语义由服务端保证）
+// CouponReceive 领取优惠券（同事务防超发+限领）
 func (c *ControllerV1) CouponReceive(ctx context.Context, req *v1.CouponReceiveReq) (res *v1.CouponReceiveRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	cid, err := parseID(req.CouponId)
+	if err != nil {
+		return nil, err
+	}
+	id, err := user.Receive(ctx, middleware.CtxUserIdFrom(ctx), cid)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CouponReceiveRes{UserCouponId: fmtID(id)}, nil
 }
