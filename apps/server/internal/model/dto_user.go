@@ -178,3 +178,11 @@ type WxIdentity struct {
 	Unionid string
 	Phone   string // getPhoneNumber 一键取号结果（mock 模式由命令显式传入）
 }
+
+// InviteRecordItem 邀请激励记录（011-member-center; 对齐 api 契约）。
+type InviteRecordItem struct {
+	NewUser    string `json:"newUser" dc:"新用户(脱敏昵称)"`
+	RewardDesc string `json:"rewardDesc" dc:"奖励说明"`
+	Status     int    `json:"status" dc:"1已发放"`
+	CreatedAt  string `json:"createdAt"`
+}

@@ -22,6 +22,8 @@ type IDistributionLogic interface {
 	Relations(ctx context.Context, userId int64, page model.PageReq) (*model.DistRelationResult, error)
 	// BindRelation 绑定直接上级（注册/首次归因时; 保护期内可换绑, 期满锁定 V23）。
 	BindRelation(ctx context.Context, userId, inviterId int64, channel int) error
+	// InviteRecords 邀请激励记录（011-member-center 微扩: api 有该端点而接口缺定义, 同 D6/D7 模式）。
+	InviteRecords(ctx context.Context, userId int64, page model.PageReq) (*model.PageResult[model.InviteRecordItem], error)
 
 	// ---- 归因与佣金 ----
 	// ShareReport 分享行为上报（归因窗口起点; 游客可报, user_id 可空）。

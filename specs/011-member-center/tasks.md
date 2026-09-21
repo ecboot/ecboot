@@ -16,13 +16,13 @@
 
 ## Phase 1: Setup（现状基线）
 
-- [ ] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 04 收口态）；确认 user 桩数 34
+- [x] T001 基线确认：`go build ./...` 与 `go test ./...` 全绿（批次 04 收口态）；确认 user 桩数 34
 
 ## Phase 2: Foundational（阻塞前置，research D2/D5）
 
-- [ ] T002 [P] 新增迁移 `migrations/000036_user_notify_preference.{up,down}.sql`（会员×渠道唯一, D2）；
+- [x] T002 [P] 新增迁移 `migrations/000036_user_notify_preference.{up,down}.sql`（会员×渠道唯一, D2）；
       `make migrate-fresh` 空库全量重放零失败（SC-004）；`make gen` 生成 dao/entity/do
-- [ ] T003 [P] `internal/model/dto_user.go` 新增 `InviteRecordItem`；`internal/service/user/distribution.go`
+- [x] T003 [P] `internal/model/dto_user.go` 新增 `InviteRecordItem`；`internal/service/user/distribution.go`
       的 `IDistributionLogic` 微扩 `InviteRecords`（D5）；PROGRESS 记账
 
 ## Phase 3: User Story 1 - 资料与登录记录 (Priority: P1) 🎯 MVP
