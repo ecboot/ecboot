@@ -1,4 +1,4 @@
-.PHONY: build test lint gen migrate-up migrate-fresh run
+.PHONY: build test lint gen migrate-up migrate-fresh run check-stub
 
 # 宪法 IV 验证命令的快捷形态
 build:
@@ -25,3 +25,13 @@ migrate-fresh:
 
 run:
 	go run main.go
+
+# 进度验收（specs/PROGRESS.md DoD 依据）：统计各渠道 controller 桩数，用数字说话
+check-stub:
+	@echo "渠道    总端点  未实现桩"; \
+	for ch in admin common shop user; do \
+		total=`ls internal/controller/$$ch/ 2>/dev/null | grep -c '^.*_v1_.*\.go$$'`; \
+		stub=`grep -l "CodeNotImplemented" internal/controller/$$ch/*.go 2>/dev/null | wc -l`; \
+		echo "$$ch    $$total    $$stub"; \
+	done; \
+	echo "未连线桩合计: `grep -l "CodeNotImplemented" internal/controller/*/*.go 2>/dev/null | wc -l` / 210"
