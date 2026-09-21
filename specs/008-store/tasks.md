@@ -16,7 +16,7 @@
 
 ## Phase 1: Setup（现状基线）
 
-- [ ] T001 基线确认：`go build ./...` 与 `go test ./...` 当前全绿（批次 01 收口态），记录为回归基准
+- [x] T001 基线确认：`go build ./...` 与 `go test ./...` 当前全绿（批次 01 收口态），记录为回归基准
 
 **Checkpoint**: 基线绿。
 
@@ -26,8 +26,8 @@
 
 **⚠️ CRITICAL**: idgen 与接口微扩未完成前，用户故事不得开始
 
-- [ ] T002 [P] 新增 `internal/library/idgen/idgen.go`：sonyflake 单例 + `NextID() (uint64, error)`（先写唯一性测试 `idgen_test.go`：连续两次 NextID 不相等——红→绿）
-- [ ] T003 [P] `internal/service/shop/misc.go` 的 `IStoreLogic` 微扩 `AdminDetail(ctx, storeId int64) (*model.StoreItem, error)`（research D3, 同批次 01 D6 模式）；变更记录记账
+- [x] T002 [P] 新增 `internal/library/idgen/idgen.go`：sonyflake 单例 + `NextID() (uint64, error)`（先写唯一性测试 `idgen_test.go`：连续两次 NextID 不相等——红→绿）
+- [x] T003 [P] `internal/service/shop/misc.go` 的 `IStoreLogic` 微扩 `AdminDetail(ctx, storeId int64) (*model.StoreItem, error)`（research D3, 同批次 01 D6 模式）；变更记录记账
 
 **Checkpoint**: 编码生成与接口面就绪。
 
@@ -41,13 +41,13 @@
 
 ### Tests for US1（红先行）
 
-- [ ] T004 [P] [US1] `internal/service/shop/store_impl_test.go`：PublicList 区县筛选仅营业/附近检索距离升序+distanceM/半径过滤（默认 10km、上限 100 回退）/无坐标店排除/区县+经纬度同传附近优先/PublicDetail 歇业店可见且不存在返回 10006；种子门店自建清理
+- [x] T004 [P] [US1] `internal/service/shop/store_impl_test.go`：PublicList 区县筛选仅营业/附近检索距离升序+distanceM/半径过滤（默认 10km、上限 100 回退）/无坐标店排除/区县+经纬度同传附近优先/PublicDetail 歇业店可见且不存在返回 10006；种子门店自建清理
 
 ### Implementation for US1
 
-- [ ] T005 [US1] `internal/service/shop/store_impl.go`：`PublicList`（包围盒预筛 + Haversine 计算列 + HAVING + 距离排序，research D1；区县模式 sort,id 排序）、`PublicDetail`（status/deleted 过滤）
-- [ ] T006 [US1] 连线 `internal/controller/common/common_v1_store_list.go`、`common_v1_store_detail.go`（桩清零 ×2；ID string↔int64 转换走 parseID 同款语义）
-- [ ] T007 [US1] `go test ./internal/service/shop/... ./internal/controller/...` 绿
+- [x] T005 [US1] `internal/service/shop/store_impl.go`：`PublicList`（包围盒预筛 + Haversine 计算列 + HAVING + 距离排序，research D1；区县模式 sort,id 排序）、`PublicDetail`（status/deleted 过滤）
+- [x] T006 [US1] 连线 `internal/controller/common/common_v1_store_list.go`、`common_v1_store_detail.go`（桩清零 ×2；ID string↔int64 转换走 parseID 同款语义）
+- [x] T007 [US1] `go test ./internal/service/shop/... ./internal/controller/...` 绿
 
 **Checkpoint**: 游客可找店——MVP 可独立验证。
 

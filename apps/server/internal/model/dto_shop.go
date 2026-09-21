@@ -153,6 +153,8 @@ type StoreItem struct {
 	Id            int64   `json:"id"`
 	StoreNo       string  `json:"storeNo"`
 	Name          string  `json:"name"`
+	ProvinceCode  string  `json:"provinceCode"`
+	CityCode      string  `json:"cityCode"`
 	DistrictCode  string  `json:"districtCode"`
 	DetailAddress string  `json:"detailAddress"`
 	Longitude     float64 `json:"longitude"`

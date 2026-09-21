@@ -73,3 +73,5 @@
 | 2026-09-21 | 01 | IRBACLogic 微扩 AdminUserDetail 方法 | api 有账号详情端点而接口漏定义；同 D6 模式 | `1ef20f5` |
 | 2026-09-21 | 01 | 评审修复轮（With fixes）：C1 访问日志脱敏（accesslog 既有文件，因本批登录/改密端点引入泄露面）；I1 HasPermission 补角色状态过滤（data-model §三 图纸同步勘误） | 代码评审发现，Critical/Important 合并前必修 | |
 | 2026-09-21 | 02 | IStoreLogic 微扩 AdminDetail 方法 | api 有门店管理详情端点而接口缺定义；同批次 01 D6 模式 | |
+| 2026-09-21 | 02 | model.StoreItem 微扩 ProvinceCode/CityCode 字段 | 两渠道详情 Res 均需省市区全栈而 DTO 仅有 districtCode | |
+| 2026-09-21 | 02 | 环境修复：测试库补建缺失的 store 表（另有 merchant/seller/shop 废弃表残留，未删） | 000031 未真正应用（历史迁移改写致账本失真）；非破坏性补建（不做 DROP，废弃表待用户裁定） | |
