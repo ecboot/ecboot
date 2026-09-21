@@ -31,12 +31,12 @@
 
 **Independent Test**: 造会员 → 查资料（脱敏+等级+成长值）→ 改昵称 → 登录记录含最近一条
 
-- [ ] T004 [P] [US1] `internal/service/user/profile_impl_test.go`（红）：资料脱敏（明文不出参）/等级名按成长值匹配/
+- [x] T004 [P] [US1] `internal/service/user/profile_impl_test.go`（红）：资料脱敏（明文不出参）/等级名按成长值匹配/
       改昵称后未传字段不变/登录记录 30 天窗口与分页倒序
-- [ ] T005 [US1] `internal/service/user/profile_impl.go`：`ProfileDetail`（脱敏+等级匹配）/`ProfileUpdate`/
+- [x] T005 [US1] `internal/service/user/profile_impl.go`：`ProfileDetail`（脱敏+等级匹配）/`ProfileUpdate`/
       `LoginLogs`；同时实现 `GrowthAdd`/`LevelRecalc`（内部方法, D6）
-- [ ] T006 [US1] 连线 `controller/user/user_v1_profile_{detail,update}.go` + `user_v1_login_log_list.go`（桩清零 ×3）
-- [ ] T007 [US1] `go test ./internal/service/user/...` 绿
+- [x] T006 [US1] 连线 `controller/user/user_v1_profile_{detail,update}.go` + `user_v1_login_log_list.go`（桩清零 ×3）
+- [x] T007 [US1] `go test ./internal/service/user/...` 绿
 
 **Checkpoint**: 会员资料闭环。
 

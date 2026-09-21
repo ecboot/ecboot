@@ -154,6 +154,7 @@ type ProfileDetail struct {
 	Avatar      string `json:"avatar"`
 	Gender      int    `json:"gender"`
 	PhoneMasked string `json:"phone" dc:"138****1234"`
+	HasPassword bool   `json:"hasPassword" dc:"是否已设密码(连线适配 011)"`
 	Level       int64  `json:"level" dc:"等级ID"`
 	LevelName   string `json:"levelName"`
 	GrowthValue int    `json:"growthValue"`
