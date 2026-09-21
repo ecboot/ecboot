@@ -56,3 +56,18 @@ func seedLoginLog(ctx context.Context, t *gtest.T, userId int64, daysAgo int, ch
 		userId, channel, status, daysAgo)
 	t.AssertNil(err)
 }
+
+// seedSpuForMember 建测试 SPU（会员域自包含 fixture——跨包不能复用 shop 的测试 helper）。
+func seedSpuForMember(ctx context.Context, t *gtest.T, suffix, price, image string, status int) int64 {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no=?", "UM-SPU-"+suffix)
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO product_spu(spu_no,name,category_id,brand_id,images,price_min,price_max,status) VALUES(?,?,1,1,?,?,?,?)",
+		"UM-SPU-"+suffix, "UM商品"+suffix, image, price, price, status)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
+func cleanupSpuForMember(ctx context.Context, t *gtest.T, suffix string) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no=?", "UM-SPU-"+suffix)
+}

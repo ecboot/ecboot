@@ -3,12 +3,15 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
+// FootprintClear 清空足迹
 func (c *ControllerV1) FootprintClear(ctx context.Context, req *v1.FootprintClearReq) (res *v1.FootprintClearRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = user.FootprintClear(ctx, middleware.CtxUserIdFrom(ctx)); err != nil {
+		return nil, err
+	}
+	return &v1.FootprintClearRes{Success: true}, nil
 }

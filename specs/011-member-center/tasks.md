@@ -62,11 +62,11 @@
 
 **Independent Test**: 收藏→列表价态→取消→再收藏复活→足迹清空
 
-- [ ] T012 [P] [US3] `favorite_impl_test.go`（红）：列表含实时价态（价格+可售）；**取消=软删**；
+- [x] T012 [P] [US3] `favorite_impl_test.go`（红）：列表含实时价态（价格+可售）；**取消=软删**；
       **再次收藏=复活**（无重复行）；足迹列表倒序含次数；清空；`Record` UPSERT（内部）
-- [ ] T013 [US3] `favorite_impl.go`：收藏 3 + 足迹 2 端点方法 + `Record`/`CleanExpired`
-- [ ] T014 [US3] 连线 5 端点（桩清零 ×5）
-- [ ] T015 [US3] `go test ./...` 绿
+- [x] T013 [US3] `favorite_impl.go`：收藏 3 + 足迹 2 端点方法 + `Record`/`CleanExpired`
+- [x] T014 [US3] 连线 5 端点（桩清零 ×5）
+- [x] T015 [US3] `go test ./...` 绿
 
 ---
 
