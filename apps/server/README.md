@@ -23,15 +23,19 @@ main.go / internal/app ── 装配与启动
 
 ```bash
 cd apps/server
-docker compose up -d                # MySQL 8.4(宿主13306) / Redis / Elasticsearch
+docker compose up -d                # 可选实例（MySQL+Redis+Elasticsearch）；若用需改 config.yaml 的 link
 make build                          # = go build ./...（宪法 IV）
 make test                           # = go test ./...
-make lint                           # golangci-lint（含 depguard 分层强制）
-make run                            # 启动（:8080，配置 manifest/config/config.yaml）
-make gen                            # gf gen dao（连接库生成 dao/model）
-make migrate-up                     # golang-migrate 应用迁移
-make migrate-fresh                  # 空库全量重放验证
+make lint                           # golangci-lint
+make run                            # 启动（:8080，配置 config/config.yaml）
+make gen                            # gf gen dao（连接应用库 ecboot 生成 dao/model）
+make migrate-up                     # golang-migrate 应用迁移（库 ecboot@127.0.0.1:3306）
+make migrate-fresh                  # 空库 ecboot_fresh 全量重放验证
 ```
+
+数据库统一在**应用库 `ecboot`**（`127.0.0.1:3306`，`root`/`root`）：应用配置、迁移、`gf gen dao`、Go 测试同源
+（测试 DSN 见 `internal/testutil/db.go`，可用 `ECBOOT_TEST_DSN` 覆盖）。连接串必须带
+`?loc=UTC&time_zone=UTC`——它同时钉住驱动解释与库会话时钟，切勿改成偏移量写法（GoFrame 会把 `+` 变空格）。
 
 ## 数据库
 

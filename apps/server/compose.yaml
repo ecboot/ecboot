@@ -11,7 +11,9 @@ services:
   mysql:
     image: 'mysql:8.4'
     environment:
-      - 'MYSQL_DATABASE=mydatabase'
+      # 库名统一为应用库 ecboot（2026-09-22）。默认运行时应用连的是宿主机 3306 上的 ecboot，
+      # 本服务是可选的容器化替代实例（宿主 13306）——用它就要同步改 config/config.yaml 的 link。
+      - 'MYSQL_DATABASE=ecboot'
       - 'MYSQL_PASSWORD=secret'
       - 'MYSQL_ROOT_PASSWORD=verysecret'
       - 'MYSQL_USER=myuser'

@@ -16,6 +16,8 @@ import (
 
 	"ecboot/internal/consts"
 	"ecboot/internal/errcode"
+
+	"ecboot/internal/testutil"
 )
 
 func init() {
@@ -24,7 +26,7 @@ func init() {
 	// 确定性测试配置（compose 基线, 与 service 层同源）
 	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
-			{Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase"},
+			{Link: testutil.DSN()},
 		},
 	})
 	gredis.SetConfig(&gredis.Config{Address: "127.0.0.1:6379", Db: 0})

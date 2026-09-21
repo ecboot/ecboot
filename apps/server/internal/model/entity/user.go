@@ -21,7 +21,7 @@ type User struct {
 	ShareCode       string      `json:"shareCode"       orm:"share_code"       ` // 个人推广码(唯一;NULL=未生成,唯一索引不参与)
 	Gender          int         `json:"gender"          orm:"gender"           ` // 性别:0未知 1男 2女
 	GrowthValue     uint        `json:"growthValue"     orm:"growth_value"     ` // 成长值(只增不减,累计列)
-	Level           int         `json:"level"           orm:"level"            ` // 会员等级(user_level_rule.id,未启体系为NULL)
+	Level           uint64      `json:"level"           orm:"level"            ` // 会员等级(user_level_rule.id,未启体系为NULL)
 	LastLoginAt     *gtime.Time `json:"lastLoginAt"     orm:"last_login_at"    ` // 最后登录时间(休眠分级依据;登录链路一次命中,免login_log聚合)
 	LastActiveAt    *gtime.Time `json:"lastActiveAt"    orm:"last_active_at"   ` // 最后活跃时间(登录/下单/浏览任一;休眠判定以此为准)
 	Status          int         `json:"status"          orm:"status"           ` // 账号状态:1正常 2禁用

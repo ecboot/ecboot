@@ -22,6 +22,8 @@ import (
 	"ecboot/api/shop/v1"
 	"ecboot/internal/errcode"
 	"ecboot/internal/middleware"
+
+	"ecboot/internal/testutil"
 )
 
 func init() {
@@ -30,7 +32,7 @@ func init() {
 	_ = os.Setenv("ECBOOT_MOCK", "true")
 	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
-			{Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase"},
+			{Link: testutil.DSN()},
 		},
 	})
 	gredis.SetConfig(&gredis.Config{Address: "127.0.0.1:6379", Db: 0})

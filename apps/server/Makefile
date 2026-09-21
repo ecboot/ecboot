@@ -18,10 +18,11 @@ gen:
 migrate-up:
 	migrate -path migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/ecboot" up
 
-# 空库全量重放验证（危险：drop 后重建）
+# 空库全量重放验证（危险：drop 后重建；独立库 ecboot_fresh, 不碰应用库）
+# 2026-09-22 统一到应用库所在实例（127.0.0.1:3306, root/root）——原指向容器的 13306/verysecret 与实际不符。
 migrate-fresh:
-	mysql -h 127.0.0.1 -P 13306 -uroot -pverysecret -e "DROP DATABASE IF EXISTS ecboot_fresh; CREATE DATABASE ecboot_fresh CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
-	migrate -path migrations -database "mysql://root:verysecret@tcp(127.0.0.1:13306)/ecboot_fresh" up
+	mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "DROP DATABASE IF EXISTS ecboot_fresh; CREATE DATABASE ecboot_fresh CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+	migrate -path migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/ecboot_fresh" up
 
 run:
 	go run main.go

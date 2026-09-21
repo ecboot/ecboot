@@ -87,7 +87,7 @@ Layer rules (see `docs/layer-contracts.md`):
 - Layer direction: `api/{channel}/v1` definitions → `internal/controller` → `internal/service/*` → `internal/repository` → `internal/dao|model` (generated); the four channel directories never reference each other; domain siblings (`service/user` ↔ `service/shop`) never import each other (domain events instead).
 - Version arbitration: Go module versions live in `go.mod` (single source); generated dao/model must never be hand-edited (regenerate instead).
 
-Local infrastructure is defined in `apps/server/compose.yaml`: MySQL 8.4 (db `mydatabase`, user `myuser`/`secret`, host port 13306), Redis (host port 6379), Elasticsearch 9.3.3 (security disabled). Start with `docker compose up -d`.
+Local infrastructure: **the application database is `ecboot` on MySQL 8.4 at `127.0.0.1:3306` (`root`/`root`)** — the app config, `make migrate-up`, `gf gen dao`, and the Go tests all point at this single database (unified 2026-09-22; tests previously used a separate `mydatabase` on a containerized instance, which caused migration/artifact drift). Test DSN lives in `apps/server/internal/testutil/db.go` (`ECBOOT_TEST_DSN` overrides). Redis is expected at `127.0.0.1:6379`. `apps/server/compose.yaml` can still stand up alternative MySQL/Redis/Elasticsearch containers (db `ecboot`, host port 13306) — if you use it, repoint the `link` in `apps/server/config/config.yaml` accordingly.
 
 Database migrations live in `apps/server/migrations/` (golang-migrate format `NNNNNN_name.up/down.sql`, 000001~000031, 68 tables). Schema design rationale: `docs/schema-design.md`.
 
@@ -122,7 +122,7 @@ Repo-wide validation: `pnpm run ready` (= `vp check && vp run -r test && vp run 
 
 `apps/server` is a GoFrame modular monolith: `api/{channel}/v1` definitions → `internal/controller` → `internal/service/{user,shop}` → `internal/repository` → `internal/dao|model` (generated), with `internal/middleware` (auth/response) and `internal/library` (technical components) as cross-cutting layers — assembled by `main.go`/`internal/app` into one deployable.
 
-Stack: Go + GoFrame v2 (web/config/logging), `gf gen dao` (ORM layer), golang-migrate (migrations), Redis (sessions/captcha/rate-limit), MySQL 8.4. GoFrame config lives in `manifest/config/config.yaml`.
+Stack: Go + GoFrame v2 (web/config/logging), `gf gen dao` (ORM layer), golang-migrate (migrations), Redis (sessions/captcha/rate-limit), MySQL 8.4. GoFrame config lives in `apps/server/config/config.yaml`.
 
 ### Frontends
 

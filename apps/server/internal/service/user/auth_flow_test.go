@@ -19,6 +19,8 @@ import (
 	"ecboot/internal/library/captcha"
 	"ecboot/internal/library/security"
 	"ecboot/internal/library/sms"
+
+	"ecboot/internal/testutil"
 )
 
 func init() {
@@ -30,7 +32,7 @@ func init() {
 	gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{
-				Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase",
+				Link: testutil.DSN(),
 			},
 		},
 	})

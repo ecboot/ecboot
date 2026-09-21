@@ -11,6 +11,8 @@ import (
 	gredis "github.com/gogf/gf/v2/database/gredis"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/test/gtest"
+
+	"ecboot/internal/testutil"
 )
 
 func init() {
@@ -22,7 +24,7 @@ func init() {
 	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{
-				Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase",
+				Link: testutil.DSN(),
 			},
 		},
 	})

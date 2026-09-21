@@ -17,13 +17,15 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 
 	"ecboot/internal/errcode"
+
+	"ecboot/internal/testutil"
 )
 
 func init() {
 	gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{
-				Link: "mysql:myuser:secret@tcp(127.0.0.1:13306)/mydatabase",
+				Link: testutil.DSN(),
 			},
 		},
 	})
