@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
@@ -21,6 +22,8 @@ import (
 )
 
 func init() {
+	// 时区口径统一（009 评审 C2）: 与库内 UTC 墙钟一致（见 main.go）
+	time.Local = time.UTC
 	// 测试显式开启 mock（fail-closed 语义下的白盒开关）
 	os.Setenv("ECBOOT_MOCK", "true")
 	// 确定性测试配置（不依赖 manifest/config 的本地差异——compose 基线环境）。

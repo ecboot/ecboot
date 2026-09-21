@@ -3,6 +3,7 @@ package shop
 import (
 	"context"
 	"os"
+	"time"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
@@ -13,6 +14,8 @@ import (
 )
 
 func init() {
+	// 时区口径统一（009 评审 C2）: 与库内 UTC 墙钟一致（见 main.go）
+	time.Local = time.UTC
 	os.Setenv("ECBOOT_MOCK", "true")
 	gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{

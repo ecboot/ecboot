@@ -475,11 +475,6 @@ func TestPublicFloors(t *testing.T) {
 // TestTimeRoundTrip 时段读写往返一致性（009 评审 C2）: 写入与读回为同一瞬时,
 // 且回显串可被 parseRFC3339 接受（编辑再提交不漂移）。
 func TestTimeRoundTrip(t *testing.T) {
-	// 评审 C2（待裁定）: Go 进程 Local(+08) 与 MySQL 会话时钟（UTC）不一致, 强类型时间列
-	// 读回瞬时偏移 8h, 回显再提交每轮再漂 8h。修复需统一时区口径（DSN loc/time_zone 或
-	// 库会话时区 + 存储语义决策, 属横切基础设施, 见 specs/PROGRESS.md 变更记录）。
-	// 本测试即该缺陷的灯: 口径统一后移除 Skip 即应转绿。
-	t.Skip("待时区口径裁定（评审 C2）: 见 specs/PROGRESS.md 变更记录")
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
 		const img = "t_rt_banner"

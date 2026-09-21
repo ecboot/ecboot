@@ -138,9 +138,9 @@
 
 - **C1（必修, 已修）**: `timeText`/`rbac_impl.rfc3339` 误用 gf 布局（`gtime.Format` 的 token 是 `Y-m-d H:i:s`，
   传 Go 布局产出字面串）→ 改标准库 `t.Time.Format(time.RFC3339)`；两处同源缺陷一并修
-- **C2（必修, 待裁定）**: 时区口径不一致（Go 进程 +08 vs MySQL 会话 UTC）致强类型时间列读回偏移 8h、
-  回显再提交每轮再漂 8h。修复需统一时区口径（DSN `loc`/`time_zone` 或库会话时区 + 存储语义决策），
-  属横切基础设施；**本批保留 `TestTimeRoundTrip` 为 Skip 状态作为该缺陷的灯**，口径统一后移除 Skip 即转绿
+- **C2（必修, 已修——用户裁定方案 A）**: 时区口径不一致（Go 进程 +08 vs MySQL 会话 UTC）致强类型时间列
+  读回偏移 8h、回显再提交每轮再漂 8h。修复：应用进程固定 UTC（`main.go` + 4 处测试基座
+  `time.Local = time.UTC`），与库内 UTC 墙钟及会话时钟对齐；`TestTimeRoundTrip` 已由 Skip 转绿
 - **I1（已修）**: service 层 status 白名单（`in.Status ∈ {0,1}`）三处 + 断言（域外值不落库）
 - **I2（已修）**: 时段清空改 `g.DB().Transaction` 包裹（防半更新）+ 置空语句补 `deleted=0` +
   Count 错误显式传播（原先 `cerr == nil && cnt == 0` 会在 Count 出错时穿透并误报成功）

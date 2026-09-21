@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
@@ -18,6 +19,8 @@ import (
 )
 
 func init() {
+	// 时区口径统一（009 评审 C2）: 与库内 UTC 墙钟一致（见 main.go）
+	time.Local = time.UTC
 	// 确定性测试配置（compose 基线, 与 service 层同源）
 	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
