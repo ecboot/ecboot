@@ -99,15 +99,16 @@ func InventoryAdjust(ctx context.Context, skuId int64, delta int, operator, rema
 	var after int
 	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		// 条件更新（防负）: inventory.total 为 INT UNSIGNED——不能写 `total + (-n) >= 0`
-		// （无符号负数运算触发 out of range, 错误码 52）。改为按 delta 符号分支:
-		//   delta >= 0: 永不为负, 仅判存在; delta < 0: total >= -delta（-delta 为正数常量）。
+		// （无符号负数运算触发 out of range, 错误码 52）。按 delta 符号分支:
+		//   delta >= 0: 无下溢风险, 仅判存在;
+		//   delta < 0 : 判「可售 >= 扣减量」（010 评审 I1: 仅判 total>=扣减量会漏护可售,
+		//               撞到表级 CHECK(chk_locked_le_total) 变成无业务码的系统错误）。
 		q := dao.Inventory.Ctx(ctx).Where(cols.SkuId, skuId)
 		if delta < 0 {
-			q = q.Where("total >= ?", -delta)
+			q = q.Where("total - locked >= ?", -delta)
 		}
 		res, e := q.
 			Data(do.Inventory{Total: gdb.Raw(fmt.Sprintf("total + (%d)", delta))}).
-			Fields(cols.Total).
 			Update()
 		if e != nil {
 			return gerror.Wrap(e, "调整库存失败")

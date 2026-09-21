@@ -147,7 +147,8 @@ func (i *ProductLogicImpl) AdminCategoryDelete(ctx context.Context, id int64) er
 
 func (i *ProductLogicImpl) AdminBrandList(ctx context.Context, status int, page model.PageReq) (*model.PageResult[model.BrandItem], error) {
 	page = page.Normalized()
-	m := dao.ProductBrand.Ctx(ctx)
+	// 010 评审 I5: 补软删过滤（FR-002 要求软删; 此前遗漏致已删品牌仍出现在后台列表）
+	m := dao.ProductBrand.Ctx(ctx).Where(dao.ProductBrand.Columns().Deleted, 0)
 	if status > 0 {
 		m = m.Where(dao.ProductBrand.Columns().Status, status)
 	}

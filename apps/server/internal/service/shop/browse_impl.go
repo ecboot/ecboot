@@ -126,13 +126,14 @@ func (i *ProductLogicImpl) Products(ctx context.Context, q model.ProductQuery) (
 	if err != nil {
 		return nil, err
 	}
-	orderBy := "sale_count desc, id asc"
+	// 排序口径对齐 api 契约（010 评审 I4）: 0综合 1销量 2价格 3上新。
+	orderBy := "sale_count desc, id asc" // 0 综合（默认按销量）
 	switch q.Sort {
+	case 1:
+		orderBy = "sale_count desc, id asc"
 	case 2:
 		orderBy = "price_min asc, id asc"
 	case 3:
-		orderBy = "price_min desc, id asc"
-	case 4:
 		orderBy = "id desc"
 	}
 	all, err := m.Page(page.Page, page.PageSize).Order(orderBy).All()
@@ -246,13 +247,14 @@ func (i *ProductLogicImpl) Search(ctx context.Context, keyword string, q model.P
 	if err != nil {
 		return nil, err
 	}
-	orderBy := "sale_count desc, id asc"
+	// 排序口径对齐 api 契约（010 评审 I4）: 0综合 1销量 2价格 3上新。
+	orderBy := "sale_count desc, id asc" // 0 综合（默认按销量）
 	switch q.Sort {
+	case 1:
+		orderBy = "sale_count desc, id asc"
 	case 2:
 		orderBy = "price_min asc, id asc"
 	case 3:
-		orderBy = "price_min desc, id asc"
-	case 4:
 		orderBy = "id desc"
 	}
 	all, err := m.Page(page.Page, page.PageSize).Order(orderBy).All()

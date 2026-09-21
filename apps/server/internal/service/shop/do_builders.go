@@ -13,6 +13,10 @@ func doCategory(in model.CategoryInput) *do.ProductCategory {
 	out := &do.ProductCategory{}
 	_ = gconv.Struct(in, out)
 	omitEmptyStrings(out)
+	if in.Status == 0 {
+		enabled := 1
+		out.Status = &enabled // 创建默认启用（零值覆盖防护——010 评审 C1: 缺此防护则落库 status=0 致 C 端不可见）
+	}
 	return out
 }
 
@@ -20,6 +24,10 @@ func doCategoryUpdate(in model.CategoryInput) *do.ProductCategory {
 	out := &do.ProductCategory{}
 	_ = gconv.Struct(in, out)
 	omitEmptyStrings(out)
+	// 010 评审 C2: parent_id/level 不在 api Update 契约内（客户端无法携带）——必须显式跳过,
+	// 否则每次"改名"都会把它们清零（分类被搬根 + level=0 且被禁用, C 端树消失）。
+	out.ParentId = nil
+	out.Level = nil
 	return out
 }
 
@@ -52,6 +60,17 @@ func doSpuUpdate(in model.SpuInput) *do.ProductSpu {
 	out := &do.ProductSpu{}
 	_ = gconv.Struct(in, out)
 	omitEmptyStrings(out)
+	// 010 评审 I2: 关联 ID 的零值来自"未传"（api 为空串 → optID 归一为 0）, 跳过以防静默清空关联；
+	// 局限: 无法经本接口"解除关联"（如需, 后续以显式语义解决——宁可不能解除, 不可静默破坏）。
+	if in.CategoryId == 0 {
+		out.CategoryId = nil
+	}
+	if in.BrandId == 0 {
+		out.BrandId = nil
+	}
+	if in.FreightTemplateId == 0 {
+		out.FreightTemplateId = nil
+	}
 	return out
 }
 

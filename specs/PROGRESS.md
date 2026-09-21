@@ -32,7 +32,7 @@
 | 01 | `specs/007-admin-base` | 后台账户与系统配置（登录/登出/刷新/资料/改密、admin_user、RBAC 角色、config、ping/短信调试桩） | 22 | — | 已实现（含会话 audience 安全修复） | ✅ | `45cd314` |
 | 02 | `specs/008-store` | 门店域（自提/核销载体：admin 管理 + common 查询） | 7 | 01 | 已实现（含 sonyflake 首次接线/附近检索） | ✅ | `9146dc6` |
 | 03 | `specs/009-logistics-ops` | 物流公司与运营装修（admin logistics/banner/floor + shop banner/floor） | 15 | 01 | 已实现（装修域新建接口/DTO；含投放与装配） | ✅ | `1034ace` |
-| 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | 已实现（连线收口 + 库存补齐，4 处契约适配） | ✅ | `102b69a` |
+| 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | 已实现（连线收口 + 库存补齐 + 评审修复轮） | ✅ | `d626fd9` |
 | 05 | `specs/011-member-center` | 会员中心（资料/地址/收藏/足迹/消息/积分/通知偏好/登录日志/邀请记录） | 21 | 01 | 接口已有，impl 待补 | ⬜ | |
 | 06 | `specs/012-trade-wiring` | 交易闭环连线（shop 购物车/订单/支付 + admin 订单发货/取消/备注 + user 优惠券） | 22 | 02 03 04 | **shop 侧 impl 已实现**，重连线 + admin 侧补 impl | ⬜ | |
 | 07 | `specs/013-after-sale` | 售后域（shop 申请/撤销售后 + admin 审核/收货/重退款） | 11 | 06 | 接口已有，impl 待补 | ⬜ | |
@@ -80,6 +80,8 @@
 | 2026-09-21 | 03 | **横切修复**：时区口径统一——DSN 补 `loc=Asia/Shanghai&time_zone='+08:00'`（驱动解释与库会话时钟对齐），修复"读回早 8h、回显再提交每轮漂 8h"；波及全部时间字段读写（config + 5 处测试基座） | 评审实测：Go 进程 +08 而库会话 UTC，gtime 按 Local 解析 UTC 墙钟 | |
 | 2026-09-21 | 03 | **C2 已修（用户裁定方案 A）**：应用进程固定 UTC（`main.go` 与 4 处测试基座显式 `time.Local = time.UTC`），与库内 UTC 墙钟及会话时钟对齐；`TestTimeRoundTrip` 由 Skip 转绿（往返同一瞬时、回显再提交不漂移） | 评审 C2 实证：Go Local(+08) 与库 UTC 不一致致读回偏移 8h 且每轮再漂 8h；用户裁定"应用进程统一 UTC" | |
 | 2026-09-21 | 04 | 库存实现两处技术决策：①base query 不设 Fields（会被 Count 复用生成 `COUNT(cols...)` 语法错误）；②防负条件不用 `total + (-n) >= 0`（inventory.total 为 INT UNSIGNED, 负数运算触发 out of range 错误码 52）→ 按 delta 符号分支（delta<0 用 `total >= -delta`） | 实现期实证（SQL 报错定位） | |
+| 2026-09-21 | 04 | 评审修复轮（With fixes）：C1 分类创建默认启用（DTO 加 Status 引入零值覆盖, 同 doBrand 先例补防护）/ C2 分类更新显式跳过 parent_id·level（api 契约无此二字段, 否则每次改名被搬根+禁用）/ I1 库存扣减防负升级为「可售 >= 扣减量」（原仅护 total, 撞表级 CHECK 报无业务码错误）/ I2 SPU 更新跳过零值关联 ID / I4 C 端排序对齐契约（3=上新, 原实现为价格降序）/ I5 后台品牌列表补软删过滤；补 4 项回归断言 | 独立评审 MySQL 实证：C1/C2 属"放活 005 遗产"时暴露的必然数据破坏；冒烟恰好未覆盖（C 端列表不筛分类 status） | |
+| 2026-09-21 | 04 | 跨批次债务记账（评审 I3 等）：①**公开路径不解析 Bearer** → `/shop/products/{id}` 的 viewerUserId 恒 0（005 的会员足迹在该链路是死代码, 涉 middleware, 跨批次）；②`AdminSpuListReq.Status` 的 0 同时表"下架"与"全部"（无法只筛下架, 契约问题）；③`AdminSkuCreateWithNo` 二次查询非原子；④库存列表未过滤软删 SKU；⑤`IInventoryLogic` 仍为无实现者死契约（同 I5 记录）；⑥`model.BrandItem` 兼作 C 端/管理端 DTO 职责混 | 评审逐条提出；均不在本批文件边界或需契约变更 | |
 | 2026-09-21 | 04 | 连线适配 4 处（按契约最小补充, 全为向后兼容的加字段/加函数, 不改既有签名）：`CategoryInput` +Status；`BrandItem` +Description/Sort/Status；`AdminProductItem` +BrandId；`AdminSkuDetail` +Weight/Barcode；新增 `AdminSkuCreateWithNo`（api 契约需 SkuNo 而既有方法仅返回 id——不改其签名以免破坏 005 测试 5 处调用） | 连线中发现 api 契约字段与既有 DTO/签名不匹配；spec 边界已预告"按契约最小适配并记账" | |
 | 2026-09-21 | 04 | 形态说明：库存新写采用**包级函数**（与 009 的 logistics/operation 同形态）；D1 的"跟随 struct"仅指商品域**连线**既有实现 | 保持 shop 域内两类形态的边界清晰（连线跟随既有、新写跟随 009 先例） | |
 | 2026-09-21 | 03 | 评审加固：I1 service 层 status 白名单（三处）+ I2 时段清空双语句改事务/补 deleted=0/Count 错误传播 + I4 测试清理改按 id 与 TF2- 前缀归并 | 同批评审实证（status=7/3/9 落库；残留 7 行） | |

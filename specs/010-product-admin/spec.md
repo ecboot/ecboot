@@ -118,11 +118,11 @@
 
 - **FR-009**: 系统 MUST 公开提供分类树、品牌列表、商品列表、商品详情、商品搜索；无需登录。
 - **FR-010**: 游客浏览 MUST 只见上架商品（下架商品不可见）；搜索与列表同口径。
-- **FR-011**: 商品列表 MUST 返回价格区间与可售标记（既有口径）。
+- **FR-011**: 商品列表 MUST 返回价格区间（`priceRange`）；**可售标记在详情侧逐 SKU（`sellable`）**，列表 DTO 不含该字段（012 评审勘误：原表述与契约不符）。
 
 **权限**
 
-- **FR-012**: 管理端 22 端点 MUST 按权限点校验（分类/品牌/SPU/SKU 四码 + `inventory:read`/`inventory:adjust`）：持权放行、无权拒绝、超管直通；查询仅要求登录。
+- **FR-012**: 管理端 22 端点 MUST 按权限点校验（分类/品牌/SPU/SKU 各 create/update/delete 三码 + `inventory:adjust`）：持权放行、无权拒绝、超管直通；**查询类端点仅要求登录**（种子中的 `*:read` 码本批未被使用——勘误）。
 
 ### Key Entities *(include if feature involves data)*
 

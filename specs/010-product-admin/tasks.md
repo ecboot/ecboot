@@ -123,3 +123,20 @@
 - 实现期两坑（记账）: Fields 被 Count 复用致 `COUNT(cols...)` 语法错误；`inventory.total` 为 INT UNSIGNED
   时 `total + (-n) >= 0` 触发 out of range(52) → 改按 delta 符号分支
 - 连线适配 4 处（向后兼容, 不改既有签名护 005 测试）
+
+## 评审修复轮（2026-09-21, With fixes → 已闭合）
+
+独立评审（含 MySQL 事务回滚实证）给出 With fixes，两个 Critical 均系"放活 005 遗产"时暴露：
+
+- **C1（必修, 已修）**: `CategoryInput` 本批新增 `Status` 引入零值覆盖 → 新建分类落库 `status=0`（禁用, C 端不可见）。
+  修：`doCategory` 创建期默认启用（同 `doBrand` 既有先例）；断言 `TestCategoryCreateDefaultsEnabled`。
+- **C2（必修, 已修）**: `doCategoryUpdate` 零值直写 → 每次改名把 `parent_id=0/level=0/status=0`（分类被搬根+禁用）。
+  api Update 契约无 parentId/level → 客户端无法携带。修：显式置 nil 跳过；断言 `TestCategoryUpdateKeepsUnsetCols`。
+- **I1（已修）**: 扣减仅护 `total` 未护可售 → 撞表级 `CHECK(chk_locked_le_total)` 报系统错误。
+  修：`delta<0` 分支判 `total - locked >= -delta`；断言 `TestInventoryAdjustAvailableGuard`（含到零与 delta=0）。
+- **I2（已修）**: `doSpuUpdate` 零值关联 ID 静默清空 → 跳过（局限：不能解除关联, 已注释）。
+- **I4（已修）**: C 端排序与契约不符（实现 3=价格降序, 契约 3=上新）→ 对齐 0综合/1销量/2价格/3上新（两处）。
+- **I5（已修）**: `AdminBrandList` 缺软删过滤 → 补 `deleted=0`；断言 `TestBrandListExcludesDeleted`。
+- **Minor 已处理**: Update 上 no-op 的 `Fields` 移除；spec FR-011/FR-012 措辞勘误；PROGRESS commit 记录更正。
+- **跨批次债务（记账）**: I3 公开路径不解析 Bearer（viewerUserId 恒 0, 涉 middleware）；`AdminSpuListReq.Status` 零值二义；
+  `AdminSkuCreateWithNo` 非原子；库存列表未过滤软删 SKU；`IInventoryLogic` 死契约；`BrandItem` 职责混。
