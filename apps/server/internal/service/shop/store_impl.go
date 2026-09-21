@@ -72,6 +72,13 @@ func PublicList(ctx context.Context, q model.StoreQuery) (*model.PageResult[mode
 	nearby := q.Longitude != 0 && q.Latitude != 0
 
 	if nearby {
+		// 经纬度域校验（评审 M4: 越界/NaN 会落 DB 错误而非参数错误）
+		if math.IsNaN(q.Longitude) || math.IsInf(q.Longitude, 0) || math.Abs(q.Longitude) > 180 {
+			return nil, errcode.New(errcode.CodeInvalidParam, "经度须在 -180~180")
+		}
+		if math.IsNaN(q.Latitude) || math.IsInf(q.Latitude, 0) || math.Abs(q.Latitude) > 90 {
+			return nil, errcode.New(errcode.CodeInvalidParam, "纬度须在 -90~90")
+		}
 		return publicListNearby(ctx, q, page)
 	}
 
@@ -122,7 +129,7 @@ func publicListNearby(ctx context.Context, q model.StoreQuery, page model.PageRe
 		Where("latitude BETWEEN ? AND ?", lat-deltaLat, lat+deltaLat).
 		Where("longitude BETWEEN ? AND ?", lng-deltaLng, lng+deltaLng).
 		Having("distance_m <= ?", float64(radiusKm)*1000).
-		Order("distance_m ASC").
+		Order("distance_m ASC, id ASC").
 		All()
 	if err != nil {
 		return nil, gerror.Wrap(err, "附近门店检索失败")
@@ -134,7 +141,8 @@ func publicListNearby(ctx context.Context, q model.StoreQuery, page model.PageRe
 	}
 	total := int64(len(all))
 	start := (page.Page - 1) * page.PageSize
-	if start > len(all) {
+	// 评审 I3: 超大 page 使 (page-1)*pageSize 溢出为负, 必须双向钳制（公开端点抗畸形入参）
+	if start < 0 || start > len(all) {
 		start = len(all)
 	}
 	end := start + page.PageSize
@@ -176,10 +184,12 @@ func isValidAreaCode(s string) bool {
 	return true
 }
 
-// coordOrNull 坐标 0 视为未录入（写入 NULL, 不参与附近检索; spec 边界）。
-func coordOrNull(v float64) any {
+// coordValue 坐标值: 0 视为未录入/清空。
+// gdb 对 do 结构体自动启用 OmitNilData（nil 在 SET 中被丢弃, Fields 白名单也救不回,
+// 评审 I2 实证）——故以 gdb.Raw("NULL") 显式置空: 非 nil 值不被 omit, 且为原生 SQL 片段。
+func coordValue(v float64) any {
 	if v == 0 {
-		return nil
+		return gdb.Raw("NULL")
 	}
 	return v
 }
@@ -216,8 +226,8 @@ func AdminCreate(ctx context.Context, in model.StoreInput) (int64, error) {
 			CityCode:      in.CityCode,
 			DistrictCode:  in.DistrictCode,
 			DetailAddress: in.DetailAddress,
-			Longitude:     coordOrNull(in.Longitude),
-			Latitude:      coordOrNull(in.Latitude),
+			Longitude:     coordValue(in.Longitude),
+			Latitude:      coordValue(in.Latitude),
 			BusinessHours: in.BusinessHours,
 			ContactPhone:  in.ContactPhone,
 			PickupEnabled: pickup,
@@ -240,14 +250,19 @@ func AdminCreate(ctx context.Context, in model.StoreInput) (int64, error) {
 // AdminUpdate 修改门店（FR-009）: 全量覆盖语义（后台表单提交完整档案——显式 Fields 白名单
 // 保证零值可写: 自提关闭/歇业态不被 omitempty 吞掉）; 目标不存在返 10006。
 func AdminUpdate(ctx context.Context, id int64, in model.StoreInput) error {
-	if in.ProvinceCode != "" && !isValidAreaCode(in.ProvinceCode) {
-		return errcode.New(errcode.CodeInvalidParam, "省区划码须为6位数字")
+	// 全量覆盖必填护栏（评审 I1: api 契约无法保证调用方全量提交, service 兜底防静默清空档案）
+	if in.Name == "" {
+		return errcode.New(errcode.CodeInvalidParam, "门店名称必填")
 	}
-	if in.CityCode != "" && !isValidAreaCode(in.CityCode) {
-		return errcode.New(errcode.CodeInvalidParam, "市区划码须为6位数字")
+	if in.DetailAddress == "" {
+		return errcode.New(errcode.CodeInvalidParam, "详细地址必填")
 	}
-	if in.DistrictCode != "" && !isValidAreaCode(in.DistrictCode) {
-		return errcode.New(errcode.CodeInvalidParam, "区县区划码须为6位数字")
+	if !isValidAreaCode(in.ProvinceCode) || !isValidAreaCode(in.CityCode) || !isValidAreaCode(in.DistrictCode) {
+		return errcode.New(errcode.CodeInvalidParam, "省/市/区县区划码须为6位数字")
+	}
+	// 状态白名单（评审 C1: 状态机仅 1营业/2歇业, 防域外值落库致门店静默消失）
+	if in.Status != 1 && in.Status != 2 {
+		return errcode.New(errcode.CodeInvalidParam, "门店状态须为1营业或2歇业")
 	}
 	pickup := 0
 	if in.PickupEnabled {
@@ -263,8 +278,8 @@ func AdminUpdate(ctx context.Context, id int64, in model.StoreInput) error {
 			CityCode:      in.CityCode,
 			DistrictCode:  in.DistrictCode,
 			DetailAddress: in.DetailAddress,
-			Longitude:     coordOrNull(in.Longitude),
-			Latitude:      coordOrNull(in.Latitude),
+			Longitude:     coordValue(in.Longitude),
+			Latitude:      coordValue(in.Latitude),
 			BusinessHours: in.BusinessHours,
 			ContactPhone:  in.ContactPhone,
 			PickupEnabled: pickup,

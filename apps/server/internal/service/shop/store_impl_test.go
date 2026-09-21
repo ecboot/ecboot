@@ -217,8 +217,12 @@ func TestAdminUpdateDelete(t *testing.T) {
 		defer cleanupStore(ctx, t, n)
 		id := seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat, 1)
 
-		// 改名 + 歇业
-		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{Name: n + "_x", Status: 2}))
+		// 改名 + 歇业（全量覆盖语义: 提交完整档案）
+		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{
+			Name: n + "_x", ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "测试地址", Longitude: tSearchLng, Latitude: tSearchLat,
+			PickupEnabled: true, Status: 2,
+		}))
 		d, err := AdminDetail(ctx, id)
 		t.AssertNil(err)
 		t.Assert(d.Name, n+"_x")
@@ -228,7 +232,8 @@ func TestAdminUpdateDelete(t *testing.T) {
 		// 关闭自提: 零值写入场景（do 的 omitempty 需显式 Fields 白名单才不吞零值）
 		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{
 			Name: n + "_x", ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
-			DetailAddress: "改后地址", PickupEnabled: false, Status: 2,
+			DetailAddress: "改后地址", Longitude: tSearchLng, Latitude: tSearchLat,
+			PickupEnabled: false, Status: 2,
 		}))
 		dc, err := AdminDetail(ctx, id)
 		t.AssertNil(err)
@@ -242,8 +247,11 @@ func TestAdminUpdateDelete(t *testing.T) {
 			t.AssertNE(it.Id, id)
 		}
 
-		// 不存在 → 10006
-		err = AdminUpdate(ctx, 999999999, model.StoreInput{Name: "x"})
+		// 不存在 → 10006（传完整档案以越过必填护栏, 直达存在性判定）
+		err = AdminUpdate(ctx, 999999999, model.StoreInput{
+			Name: "x", ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "x", Status: 1,
+		})
 		t.Assert(errCode(err), errcode.CodeNotFound)
 
 		// 软删 → 后台与游客均不可见
@@ -305,5 +313,133 @@ func TestAdminListFilters(t *testing.T) {
 		t.AssertNil(err)
 		t.Assert(len(res.List), 1)
 		t.Assert(res.Total, 2)
+	})
+}
+
+// ---- 评审修复轮断言 ----
+
+// TestAdminUpdateGuards 修改护栏（评审 C1/I1）: status 域外与全量覆盖必填缺失均拒绝。
+func TestAdminUpdateGuards(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const n = "t_upd_guard"
+		defer cleanupStore(ctx, t, n)
+		id := seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat, 1)
+
+		full := model.StoreInput{
+			Name: n, ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "测试地址", Longitude: tSearchLng, Latitude: tSearchLat,
+			PickupEnabled: true, Status: 1,
+		}
+		// status 域外（状态机仅 1/2）→ 10001
+		bad := full
+		bad.Status = 0
+		t.Assert(errCode(AdminUpdate(ctx, id, bad)), errcode.CodeInvalidParam)
+		// 全量覆盖必填缺失 → 10001（评审 I1 护栏）
+		missing := full
+		missing.Name = ""
+		t.Assert(errCode(AdminUpdate(ctx, id, missing)), errcode.CodeInvalidParam)
+		// 未落库: 状态与名称保持不变
+		d, err := AdminDetail(ctx, id)
+		t.AssertNil(err)
+		t.Assert(d.Status, 1)
+		t.Assert(d.Name, n)
+	})
+}
+
+// TestAdminUpdateClearCoords 坐标清零（评审 I2: gdb 丢 nil, 需显式置空）。
+func TestAdminUpdateClearCoords(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const n = "t_upd_coord"
+		defer cleanupStore(ctx, t, n)
+		id := seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat+0.0045, 1)
+
+		// 前置: 附近检索可命中
+		res, err := PublicList(ctx, model.StoreQuery{Longitude: tSearchLng, Latitude: tSearchLat})
+		t.AssertNil(err)
+		hit := false
+		for _, it := range res.List {
+			if it.Id == id {
+				hit = true
+			}
+		}
+		t.Assert(hit, true)
+
+		// 清空坐标（传 0）
+		t.AssertNil(AdminUpdate(ctx, id, model.StoreInput{
+			Name: n, ProvinceCode: "330000", CityCode: "330100", DistrictCode: "330108",
+			DetailAddress: "测试地址", Longitude: 0, Latitude: 0, Status: 1,
+		}))
+		rec, err := g.DB().GetOne(ctx, "SELECT longitude, latitude FROM store WHERE id=?", id)
+		t.AssertNil(err)
+		t.Assert(rec["longitude"].IsNil(), true)
+		t.Assert(rec["latitude"].IsNil(), true)
+
+		// 清空后附近检索不再命中（无坐标排除）
+		res, err = PublicList(ctx, model.StoreQuery{Longitude: tSearchLng, Latitude: tSearchLat})
+		t.AssertNil(err)
+		for _, it := range res.List {
+			t.AssertNE(it.Id, id)
+		}
+	})
+}
+
+// TestPublicListPagingBounds 附近检索分页边界（评审 I3: 超大 page 不得 panic）。
+func TestPublicListPagingBounds(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const n = "t_page_b"
+		defer cleanupStore(ctx, t, n)
+		seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat, 1)
+
+		// 溢出边界（(page-1)*pageSize 溢出为负）
+		res, err := PublicList(ctx, model.StoreQuery{
+			Longitude: tSearchLng, Latitude: tSearchLat,
+			PageReq: model.PageReq{Page: 922337203685477582, PageSize: 10},
+		})
+		t.AssertNil(err)
+		t.Assert(len(res.List), 0)
+
+		// page 超范围
+		res, err = PublicList(ctx, model.StoreQuery{
+			Longitude: tSearchLng, Latitude: tSearchLat,
+			PageReq: model.PageReq{Page: 9999, PageSize: 10},
+		})
+		t.AssertNil(err)
+		t.Assert(len(res.List), 0)
+	})
+}
+
+// TestPublicListCoordinatesGuard 经纬度域校验（评审 M4）: 非法值返 10001 而非 DB 错误。
+func TestPublicListCoordinatesGuard(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		_, err := PublicList(ctx, model.StoreQuery{Longitude: 120, Latitude: 999})
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
+		_, err = PublicList(ctx, model.StoreQuery{Longitude: 999, Latitude: 30})
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
+	})
+}
+
+// TestPublicListOnlyOneCoord 经纬度只传其一视为未提供附近检索（spec 边界）。
+func TestPublicListOnlyOneCoord(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const n = "t_one_coord"
+		defer cleanupStore(ctx, t, n)
+		seedStore(ctx, t, n, "330108", tSearchLng, tSearchLat, 1)
+
+		// 只传经度 + 区县 → 回退区县筛选（非附近模式不带距离）
+		res, err := PublicList(ctx, model.StoreQuery{DistrictCode: "330108", Longitude: tSearchLng})
+		t.AssertNil(err)
+		found := false
+		for _, it := range res.List {
+			if it.Name == n {
+				found = true
+				t.Assert(it.DistanceM, int64(0))
+			}
+		}
+		t.Assert(found, true)
 	})
 }
