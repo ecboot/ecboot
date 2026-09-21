@@ -3,38 +3,25 @@
 // 足迹重复浏览=更新 last_view_at 与 view_count（UPSERT），保留期 90 天物理清理（idx last_view_at 扫描）。
 package user
 
-import "context"
+import (
+	"context"
+
+	"ecboot/internal/model"
+)
 
 // IFavoriteLogic 收藏。
 type IFavoriteLogic interface {
-	List(ctx context.Context, userId int64, page PageQuery) (*PageResult[FavoriteItem], error) // 含实时价态
-	Add(ctx context.Context, userId, spuId int64) error                                        // 复活语义
-	Remove(ctx context.Context, userId, spuId int64) error                                     // 软删
+	List(ctx context.Context, userId int64, page model.PageReq) (*model.PageResult[model.FavoriteItem], error) // 含实时价态
+	Add(ctx context.Context, userId, spuId int64) error                                                        // 复活语义
+	Remove(ctx context.Context, userId, spuId int64) error                                                     // 软删
 }
 
 // IFootprintLogic 足迹。
 type IFootprintLogic interface {
-	List(ctx context.Context, userId int64, page PageQuery) (*PageResult[FootprintItem], error)
+	List(ctx context.Context, userId int64, page model.PageReq) (*model.PageResult[model.FootprintItem], error)
 	Clear(ctx context.Context, userId int64) error
 	// Record 浏览上报（重复浏览=UPSERT 更新 last_view_at/view_count; 由商品详情接口调用）。
 	Record(ctx context.Context, userId, spuId int64) error
 	// CleanExpired 90 天清理（定时任务入口）。
 	CleanExpired(ctx context.Context) (int64, error)
-}
-
-type FavoriteItem struct {
-	SpuId    int64  `json:"spuId"`
-	Name     string `json:"name"`
-	Image    string `json:"image"`
-	Price    string `json:"price" dc:"现价(元)"`
-	Sellable bool   `json:"sellable"`
-	Invalid  bool   `json:"invalid" dc:"已下架标注"`
-}
-
-type FootprintItem struct {
-	SpuId      int64  `json:"spuId"`
-	Name       string `json:"name"`
-	Image      string `json:"image"`
-	Price      string `json:"price"`
-	LastViewAt string `json:"lastViewAt"`
 }

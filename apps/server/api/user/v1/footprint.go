@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	FootprintItem struct {
@@ -13,10 +17,10 @@ type (
 
 	FootprintListReq struct {
 		g.Meta `path:"/footprints" method:"GET" summary:"浏览足迹"`
-		PageReq
+		model.PageReq
 	}
 	FootprintListRes struct {
-		PageRes
+		model.PageRes
 		List []FootprintItem `json:"list"`
 	}
 

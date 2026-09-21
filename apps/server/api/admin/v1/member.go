@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 会员列表（手机号精确检索; 脱敏展示）
@@ -9,7 +13,7 @@ type (
 		Phone   string `json:"phone" dc:"完整手机号精确匹配"`
 		Status  int    `json:"status" dc:"1正常 2禁用"`
 		Keyword string `json:"keyword" dc:"昵称/ID"`
-		PageReq
+		model.PageReq
 	}
 	AdminMemberItem struct {
 		UserId    string `json:"userId"`
@@ -20,7 +24,7 @@ type (
 		CreatedAt string `json:"createdAt" dc:"注册时间"`
 	}
 	AdminMemberListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminMemberItem `json:"list"`
 	}
 

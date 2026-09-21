@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	FavoriteItem struct {
@@ -14,10 +18,10 @@ type (
 
 	FavoriteListReq struct {
 		g.Meta `path:"/favorites" method:"GET" summary:"收藏列表"`
-		PageReq
+		model.PageReq
 	}
 	FavoriteListRes struct {
-		PageRes
+		model.PageRes
 		List []FavoriteItem `json:"list"`
 	}
 

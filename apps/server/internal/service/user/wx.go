@@ -6,6 +6,7 @@ package user
 
 import (
 	"context"
+	"ecboot/internal/model"
 	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -16,31 +17,26 @@ import (
 	"ecboot/internal/library/sms"
 )
 
-// WxIdentity 微信侧身份（真实渠道由 WxClient 实现 code2session 换取）。
-type WxIdentity struct {
-	Openid  string
-	Unionid string
-	Phone   string // getPhoneNumber 一键取号结果（mock 模式由命令显式传入）
-}
+// model.WxIdentity 微信侧身份（真实渠道由 WxClient 实现 code2session 换取）。
 
 // WxClient 微信能力抽象（真实接入另立特性, 只补实现）。
 type WxClient interface {
-	Code2Session(ctx context.Context, wxCode string) (*WxIdentity, error)
+	Code2Session(ctx context.Context, wxCode string) (*model.WxIdentity, error)
 }
 
 // mockWxClient 开发态实现: openid = mock-{wxCode}, 手机号由调用方传入。
 type mockWxClient struct{}
 
-func (m *mockWxClient) Code2Session(ctx context.Context, wxCode string) (*WxIdentity, error) {
-	return &WxIdentity{Openid: "mock-" + wxCode}, nil
+func (m *mockWxClient) Code2Session(ctx context.Context, wxCode string) (*model.WxIdentity, error) {
+	return &model.WxIdentity{Openid: "mock-" + wxCode}, nil
 }
 
 // ErrWxBindConflict 微信身份与既有账号绑定冲突（人工渠道）。
 var ErrWxBindConflict = errcode.New(errcode.CodeWxBindConflict, "该手机号已绑定其他微信身份,请联系人工客服处理")
 
 // WxLogin 微信登录（含归并）。phone/smsCode 为 mock 模式开发字段或归并核验字段。
-func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*LoginOutcome, error) {
-	var ident *WxIdentity
+func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*model.LoginOutcome, error) {
+	var ident *model.WxIdentity
 	var err error
 	if mockEnabled(ctx) {
 		ident, err = (&mockWxClient{}).Code2Session(ctx, wxCode)
@@ -66,7 +62,7 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 			return nil, sErr
 		}
 		touchLogin(ctx, userId, channel, true, "")
-		return &LoginOutcome{Token: token, RefreshToken: refresh, UserId: userId}, nil
+		return &model.LoginOutcome{Token: token, RefreshToken: refresh, UserId: userId}, nil
 	}
 
 	// ② 未绑定 → 手机号优先归并（必须能取得手机号 + 短信码核验, mock 亦验——评审 C5 fail-closed）
@@ -105,7 +101,7 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 			return nil, sErr
 		}
 		touchLogin(ctx, userId, channel, true, "")
-		return &LoginOutcome{Token: token, RefreshToken: refresh, UserId: userId}, nil
+		return &model.LoginOutcome{Token: token, RefreshToken: refresh, UserId: userId}, nil
 	}
 
 	// ③ 全新用户 → 新建（含微信身份）
@@ -136,7 +132,7 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 		return nil, sErr
 	}
 	touchLogin(ctx, res, channel, true, "")
-	return &LoginOutcome{Token: token, RefreshToken: refresh, UserId: res, IsNew: true}, nil
+	return &model.LoginOutcome{Token: token, RefreshToken: refresh, UserId: res, IsNew: true}, nil
 }
 
 // ensureNotDormant 休眠分级: 微信静默路径 ≥ 一级阈值 → 拒绝并引导短信通道（FR-013）。

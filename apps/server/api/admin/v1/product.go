@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 分类树（含禁用）
@@ -60,7 +64,7 @@ type (
 	AdminBrandListReq struct {
 		g.Meta `path:"/brands" method:"GET" summary:"品牌列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminBrandItem struct {
 		Id          string `json:"id"`
@@ -71,7 +75,7 @@ type (
 		Status      int    `json:"status"`
 	}
 	AdminBrandListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminBrandItem `json:"list"`
 	}
 
@@ -116,7 +120,7 @@ type (
 		Status     int    `json:"status" dc:"0下架 1上架(空=全部)"`
 		CategoryId string `json:"categoryId" dc:"分类筛选"`
 		Keyword    string `json:"keyword" dc:"名称/编码"`
-		PageReq
+		model.PageReq
 	}
 	AdminSpuItem struct {
 		SpuId      string `json:"spuId"`
@@ -129,7 +133,7 @@ type (
 		CreatedAt  string `json:"createdAt"`
 	}
 	AdminSpuListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminSpuItem `json:"list"`
 	}
 

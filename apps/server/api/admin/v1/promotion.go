@@ -1,13 +1,17 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// ---------- 优惠券模板 ----------
 	AdminCouponListReq struct {
 		g.Meta `path:"/coupons" method:"GET" summary:"券模板列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminCouponItem struct {
 		Id            string `json:"id"`
@@ -23,7 +27,7 @@ type (
 		Status        int    `json:"status"`
 	}
 	AdminCouponListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminCouponItem `json:"list"`
 	}
 
@@ -73,7 +77,7 @@ type (
 	AdminCouponRecordListReq struct {
 		g.Meta `path:"/coupons/{id}/records" method:"GET" summary:"券记录"`
 		Id     string `json:"id" v:"required" dc:"券ID"`
-		PageReq
+		model.PageReq
 	}
 	AdminCouponRecordItem struct {
 		UserCouponId string `json:"userCouponId"`
@@ -83,7 +87,7 @@ type (
 		CreatedAt    string `json:"createdAt" dc:"领取时间"`
 	}
 	AdminCouponRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminCouponRecordItem `json:"list"`
 	}
 
@@ -99,7 +103,7 @@ type (
 	AdminFullReductionListReq struct {
 		g.Meta `path:"/full-reductions" method:"GET" summary:"满减活动列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminFullReductionItem struct {
 		Id        string `json:"id"`
@@ -109,7 +113,7 @@ type (
 		Status    int    `json:"status"`
 	}
 	AdminFullReductionListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminFullReductionItem `json:"list"`
 	}
 

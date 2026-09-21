@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 // 管理端订单摘要结构（渠道隔离: 不跨渠道引用 shop 包）
 type AdminOrderItemBrief struct {
@@ -33,7 +37,7 @@ type (
 		UserKeyword string `json:"userKeyword" dc:"用户ID/手机号(精确)"`
 		StartTime   string `json:"startTime" dc:"下单起 RFC3339"`
 		EndTime     string `json:"endTime" dc:"下单止"`
-		PageReq
+		model.PageReq
 	}
 	AdminOrderItem struct {
 		OrderNo   string                `json:"orderNo"`
@@ -44,7 +48,7 @@ type (
 		CreatedAt string                `json:"createdAt"`
 	}
 	AdminOrderListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminOrderItem `json:"list"`
 	}
 

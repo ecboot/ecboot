@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 三级分类树（禁用不返回）
@@ -20,7 +24,7 @@ type (
 	// 品牌列表（启用）
 	BrandListReq struct {
 		g.Meta `path:"/brands" method:"GET" summary:"品牌列表"`
-		PageReq
+		model.PageReq
 	}
 	BrandItem struct {
 		Id   string `json:"id"`
@@ -28,7 +32,7 @@ type (
 		Logo string `json:"logo" dc:"Logo"`
 	}
 	BrandListRes struct {
-		PageRes
+		model.PageRes
 		List []BrandItem `json:"list"`
 	}
 
@@ -40,7 +44,7 @@ type (
 		Sort       int    `json:"sort" dc:"排序:0综合 1销量 2价格 3上新" d:"0"`
 		PriceMin   string `json:"priceMin" dc:"价格区间下限(元)"`
 		PriceMax   string `json:"priceMax" dc:"价格区间上限(元)"`
-		PageReq
+		model.PageReq
 	}
 	ProductItem struct {
 		SpuId      string `json:"spuId"`
@@ -50,7 +54,7 @@ type (
 		SaleCount  int    `json:"saleCount" dc:"销量"`
 	}
 	ProductListRes struct {
-		PageRes
+		model.PageRes
 		List []ProductItem `json:"list"`
 	}
 
@@ -94,10 +98,10 @@ type (
 		CategoryId string `json:"categoryId" dc:"分类筛选"`
 		BrandId    string `json:"brandId" dc:"品牌筛选"`
 		Sort       int    `json:"sort" dc:"排序:0综合 1销量 2价格 3上新" d:"0"`
-		PageReq
+		model.PageReq
 	}
 	ProductSearchRes struct {
-		PageRes
+		model.PageRes
 		List []ProductItem `json:"list"`
 	}
 
@@ -106,7 +110,7 @@ type (
 		g.Meta `path:"/products/{spuId}/reviews" method:"GET" summary:"商品评价列表"`
 		SpuId  string `json:"spuId" v:"required" dc:"SPU ID"`
 		Score  int    `json:"score" dc:"星级筛选1-5"`
-		PageReq
+		model.PageReq
 	}
 	ReviewItem struct {
 		ReviewId  string            `json:"reviewId"`
@@ -120,7 +124,7 @@ type (
 		CreatedAt string            `json:"createdAt" dc:"评价时间"`
 	}
 	ProductReviewListRes struct {
-		PageRes
+		model.PageRes
 		Summary ReviewSummary `json:"summary" dc:"评价汇总"`
 		List    []ReviewItem  `json:"list"`
 	}

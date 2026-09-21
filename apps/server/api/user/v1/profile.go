@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	ProfileDetailReq struct {
@@ -39,7 +43,7 @@ type (
 	PointLogListReq struct {
 		g.Meta  `path:"/point-logs" method:"GET" summary:"积分流水"`
 		BizType int `json:"bizType" dc:"类型筛选:1签到 2消费获得 3下单消耗 4退款回退 5分享获得 6评价获得 7注册赠送 8邀请奖励 9过期扣减"`
-		PageReq
+		model.PageReq
 	}
 	PointLogItem struct {
 		BizType      int    `json:"bizType"`
@@ -49,7 +53,7 @@ type (
 		CreatedAt    string `json:"createdAt"`
 	}
 	PointLogListRes struct {
-		PageRes
+		model.PageRes
 		List []PointLogItem `json:"list"`
 	}
 )

@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 库存列表（可售/锁定）
@@ -8,7 +12,7 @@ type (
 		g.Meta  `path:"/inventories" method:"GET" summary:"库存列表"`
 		SkuId   string `json:"skuId" dc:"SKU筛选"`
 		Keyword string `json:"keyword" dc:"商品名/编码"`
-		PageReq
+		model.PageReq
 	}
 	AdminInventoryItem struct {
 		SkuId     string `json:"skuId"`
@@ -20,7 +24,7 @@ type (
 		WarnCount int    `json:"warnCount" dc:"预警阈值"`
 	}
 	AdminInventoryListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminInventoryItem `json:"list"`
 	}
 
@@ -39,10 +43,10 @@ type (
 	// 预警列表（可售≤阈值）
 	AdminInventoryWarnReq struct {
 		g.Meta `path:"/inventories/warnings" method:"GET" summary:"库存预警列表"`
-		PageReq
+		model.PageReq
 	}
 	AdminInventoryWarnRes struct {
-		PageRes
+		model.PageRes
 		List []AdminInventoryItem `json:"list"`
 	}
 )

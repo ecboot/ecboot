@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 门店列表（管理）
@@ -8,7 +12,7 @@ type (
 		g.Meta  `path:"/stores" method:"GET" summary:"门店列表"`
 		Status  int    `json:"status" dc:"状态筛选"`
 		Keyword string `json:"keyword" dc:"名称/编码"`
-		PageReq
+		model.PageReq
 	}
 	AdminStoreItem struct {
 		Id            string `json:"id"`
@@ -24,7 +28,7 @@ type (
 		Status        int    `json:"status" dc:"1营业 2歇业"`
 	}
 	AdminStoreListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminStoreItem `json:"list"`
 	}
 

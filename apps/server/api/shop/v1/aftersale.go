@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 申请售后（按订单项; 仅退款/退货退款）
@@ -28,10 +32,10 @@ type (
 	AfterSaleListReq struct {
 		g.Meta `path:"/after-sales" method:"GET" summary:"售后列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AfterSaleListRes struct {
-		PageRes
+		model.PageRes
 		List []AfterSaleListItem `json:"list"`
 	}
 

@@ -1,12 +1,16 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 拼团活动列表（进行中）
 	GroupBuyListReq struct {
 		g.Meta `path:"/activities/group-buys" method:"GET" summary:"拼团活动列表"`
-		PageReq
+		model.PageReq
 	}
 	GroupBuySku struct {
 		SkuId      string `json:"skuId"`
@@ -23,14 +27,14 @@ type (
 		EndTime    string        `json:"endTime" dc:"活动截止"`
 	}
 	GroupBuyListRes struct {
-		PageRes
+		model.PageRes
 		List []GroupBuyItem `json:"list"`
 	}
 
 	// 秒杀列表（进行中与预告）
 	FlashSaleListReq struct {
 		g.Meta `path:"/activities/flash-sales" method:"GET" summary:"秒杀活动列表"`
-		PageReq
+		model.PageReq
 	}
 	FlashSaleSku struct {
 		SkuId       string `json:"skuId"`
@@ -46,14 +50,14 @@ type (
 		Items      []FlashSaleSku `json:"items" dc:"场次商品"`
 	}
 	FlashSaleListRes struct {
-		PageRes
+		model.PageRes
 		List []FlashSaleItem `json:"list"`
 	}
 
 	// 砍价活动列表
 	BargainActivityListReq struct {
 		g.Meta `path:"/activities/bargains" method:"GET" summary:"砍价活动列表"`
-		PageReq
+		model.PageReq
 	}
 	BargainSku struct {
 		SkuId         string `json:"skuId"`
@@ -70,14 +74,14 @@ type (
 		EndTime    string       `json:"endTime"`
 	}
 	BargainActivityListRes struct {
-		PageRes
+		model.PageRes
 		List []BargainActivityItem `json:"list"`
 	}
 
 	// 助力活动列表
 	AssistListReq struct {
 		g.Meta `path:"/activities/assists" method:"GET" summary:"助力活动列表"`
-		PageReq
+		model.PageReq
 	}
 	AssistActivityItem struct {
 		ActivityId    string `json:"activityId"`
@@ -87,7 +91,7 @@ type (
 		EndTime       string `json:"endTime"`
 	}
 	AssistListRes struct {
-		PageRes
+		model.PageRes
 		List []AssistActivityItem `json:"list"`
 	}
 

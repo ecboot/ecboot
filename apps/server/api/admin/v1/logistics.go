@@ -1,13 +1,17 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 物流公司字典列表
 	AdminLogisticsListReq struct {
 		g.Meta `path:"/logistics-companies" method:"GET" summary:"物流公司列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminLogisticsItem struct {
 		Id           string `json:"id"`
@@ -17,7 +21,7 @@ type (
 		Status       int    `json:"status"`
 	}
 	AdminLogisticsListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminLogisticsItem `json:"list"`
 	}
 

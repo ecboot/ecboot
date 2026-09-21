@@ -1,12 +1,16 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 近 30 天登录记录（安全中心; FR-023）
 	LoginLogListReq struct {
 		g.Meta `path:"/login-logs" method:"GET" summary:"登录记录"`
-		PageReq
+		model.PageReq
 	}
 	LoginLogItem struct {
 		Channel   int    `json:"channel" dc:"1小程序 2H5"`
@@ -16,7 +20,7 @@ type (
 		CreatedAt string `json:"createdAt" dc:"登录时间"`
 	}
 	LoginLogListRes struct {
-		PageRes
+		model.PageRes
 		List []LoginLogItem `json:"list"`
 	}
 )

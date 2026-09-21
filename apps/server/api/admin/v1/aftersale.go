@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 售后列表（状态筛选）
@@ -8,7 +12,7 @@ type (
 		g.Meta `path:"/after-sales" method:"GET" summary:"售后列表"`
 		Status int `json:"status" dc:"状态筛选"`
 		Type   int `json:"type" dc:"类型筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminAfterSaleItem struct {
 		AfterSaleNo  string `json:"afterSaleNo"`
@@ -21,7 +25,7 @@ type (
 		CreatedAt    string `json:"createdAt"`
 	}
 	AdminAfterSaleListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminAfterSaleItem `json:"list"`
 	}
 

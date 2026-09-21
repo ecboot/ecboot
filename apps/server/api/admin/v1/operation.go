@@ -1,13 +1,17 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 轮播管理
 	AdminBannerListReq struct {
 		g.Meta   `path:"/banners" method:"GET" summary:"轮播列表"`
 		Position int `json:"position" dc:"位置筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminBannerItem struct {
 		Id        string `json:"id"`
@@ -20,7 +24,7 @@ type (
 		Status    int    `json:"status"`
 	}
 	AdminBannerListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminBannerItem `json:"list"`
 	}
 
@@ -65,7 +69,7 @@ type (
 	// 楼层管理
 	AdminFloorListReq struct {
 		g.Meta `path:"/floors" method:"GET" summary:"楼层列表"`
-		PageReq
+		model.PageReq
 	}
 	AdminFloorItem struct {
 		Id        string         `json:"id"`
@@ -76,7 +80,7 @@ type (
 		Status    int            `json:"status"`
 	}
 	AdminFloorListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminFloorItem `json:"list"`
 	}
 

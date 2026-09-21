@@ -1,12 +1,16 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 角色 CRUD
 	AdminRoleListReq struct {
 		g.Meta `path:"/roles" method:"GET" summary:"角色列表"`
-		PageReq
+		model.PageReq
 	}
 	AdminRoleItem struct {
 		Id          string `json:"id"`
@@ -16,7 +20,7 @@ type (
 		Status      int    `json:"status"`
 	}
 	AdminRoleListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminRoleItem `json:"list"`
 	}
 
@@ -86,7 +90,7 @@ type (
 		g.Meta  `path:"/admin-users" method:"GET" summary:"后台账号列表"`
 		Status  int    `json:"status" dc:"状态筛选"`
 		Keyword string `json:"keyword" dc:"用户名/姓名"`
-		PageReq
+		model.PageReq
 	}
 	AdminUserItem struct {
 		Id            string   `json:"id"`
@@ -98,7 +102,7 @@ type (
 		LastLoginTime string   `json:"lastLoginTime"`
 	}
 	AdminUserListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminUserItem `json:"list"`
 	}
 

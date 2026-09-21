@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 提交评价（一项一评; 004 契约, 复用 V12 表）
@@ -30,7 +34,7 @@ type (
 	// 我的评价
 	MyReviewListReq struct {
 		g.Meta `path:"/reviews/mine" method:"GET" summary:"我的评价"`
-		PageReq
+		model.PageReq
 	}
 	MyReviewItem struct {
 		ReviewId    string `json:"reviewId"`
@@ -43,7 +47,7 @@ type (
 		CreatedAt   string `json:"createdAt"`
 	}
 	MyReviewListRes struct {
-		PageRes
+		model.PageRes
 		List []MyReviewItem `json:"list"`
 	}
 )

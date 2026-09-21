@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 门店列表（区县筛选或经纬度附近检索, 距离排序）—— contracts/common-api.md
@@ -10,7 +14,7 @@ type (
 		Longitude    float64 `json:"longitude" dc:"经度(附近检索)"`
 		Latitude     float64 `json:"latitude" dc:"纬度"`
 		RadiusKm     int     `json:"radiusKm" dc:"半径公里,默认10" d:"10"`
-		PageReq
+		model.PageReq
 	}
 	StoreItem struct {
 		Id            string `json:"id" dc:"门店ID"`
@@ -23,7 +27,7 @@ type (
 		Status        int    `json:"status" dc:"状态:1营业 2歇业"`
 	}
 	StoreListRes struct {
-		PageRes
+		model.PageRes
 		List []StoreItem `json:"list"`
 	}
 

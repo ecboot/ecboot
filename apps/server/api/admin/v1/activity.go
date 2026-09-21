@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 // 拼团/秒杀/砍价/助力四类活动的管理契约。
 // 四类活动同构（活动 → 场次商品 → 状态），结构刻意对齐，降低实现与认知成本。
@@ -10,7 +14,7 @@ type (
 	AdminGroupBuyListReq struct {
 		g.Meta `path:"/group-buys" method:"GET" summary:"拼团活动列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminGroupBuyItem struct {
 		Id        string `json:"id"`
@@ -23,7 +27,7 @@ type (
 		Status    int    `json:"status"`
 	}
 	AdminGroupBuyListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminGroupBuyItem `json:"list"`
 	}
 
@@ -90,7 +94,7 @@ type (
 	AdminFlashSaleListReq struct {
 		g.Meta `path:"/flash-sales" method:"GET" summary:"秒杀活动列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminFlashSaleItem struct {
 		Id        string `json:"id"`
@@ -100,7 +104,7 @@ type (
 		Status    int    `json:"status"`
 	}
 	AdminFlashSaleListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminFlashSaleItem `json:"list"`
 	}
 
@@ -151,7 +155,7 @@ type (
 	AdminBargainListReq struct {
 		g.Meta `path:"/bargains" method:"GET" summary:"砍价活动列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminBargainItem struct {
 		Id        string `json:"id"`
@@ -162,7 +166,7 @@ type (
 		Status    int    `json:"status"`
 	}
 	AdminBargainListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminBargainItem `json:"list"`
 	}
 
@@ -214,7 +218,7 @@ type (
 	AdminAssistListReq struct {
 		g.Meta `path:"/assists" method:"GET" summary:"助力活动列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminAssistItem struct {
 		Id            string `json:"id"`
@@ -228,7 +232,7 @@ type (
 		Status        int    `json:"status"`
 	}
 	AdminAssistListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminAssistItem `json:"list"`
 	}
 

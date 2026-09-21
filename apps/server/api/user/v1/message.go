@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	MessageItem struct {
@@ -16,10 +20,10 @@ type (
 	MessageListReq struct {
 		g.Meta `path:"/messages" method:"GET" summary:"站内信列表"`
 		IsRead int `json:"isRead" dc:"已读筛选:0未读 1已读(空=全部)"`
-		PageReq
+		model.PageReq
 	}
 	MessageListRes struct {
-		PageRes
+		model.PageRes
 		List        []MessageItem `json:"list"`
 		UnreadCount int           `json:"unreadCount" dc:"未读数"`
 	}

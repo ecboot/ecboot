@@ -1,13 +1,17 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 风控规则列表
 	AdminRiskRuleListReq struct {
 		g.Meta `path:"/risk-rules" method:"GET" summary:"风控规则列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminRiskRuleItem struct {
 		Id            string `json:"id"`
@@ -18,7 +22,7 @@ type (
 		Status        int    `json:"status"`
 	}
 	AdminRiskRuleListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminRiskRuleItem `json:"list"`
 	}
 
@@ -61,7 +65,7 @@ type (
 		g.Meta       `path:"/risk-records" method:"GET" summary:"风控事件列表"`
 		UserId       string `json:"userId" dc:"命中用户"`
 		AppealStatus int    `json:"appealStatus" dc:"申诉状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminRiskRecordItem struct {
 		Id           string `json:"id"`
@@ -75,7 +79,7 @@ type (
 		CreatedAt    string `json:"createdAt"`
 	}
 	AdminRiskRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminRiskRecordItem `json:"list"`
 	}
 

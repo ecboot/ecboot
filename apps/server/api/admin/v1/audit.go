@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 操作审计日志
@@ -10,7 +14,7 @@ type (
 		Module    string `json:"module" dc:"业务模块"`
 		StartTime string `json:"startTime" dc:"起 RFC3339"`
 		EndTime   string `json:"endTime" dc:"止"`
-		PageReq
+		model.PageReq
 	}
 	AdminOperationLogItem struct {
 		Id           string `json:"id"`
@@ -25,7 +29,7 @@ type (
 		CreatedAt    string `json:"createdAt"`
 	}
 	AdminOperationLogListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminOperationLogItem `json:"list"`
 	}
 
@@ -33,7 +37,7 @@ type (
 	AdminLoginLogListReq struct {
 		g.Meta   `path:"/admin-login-logs" method:"GET" summary:"后台登录审计"`
 		Username string `json:"username" dc:"用户名"`
-		PageReq
+		model.PageReq
 	}
 	AdminLoginLogItem struct {
 		Username    string `json:"username"`
@@ -43,7 +47,7 @@ type (
 		CreatedAt   string `json:"createdAt"`
 	}
 	AdminLoginLogListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminLoginLogItem `json:"list"`
 	}
 )

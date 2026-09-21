@@ -6,6 +6,7 @@ package user
 import (
 	"context"
 	"crypto/rand"
+	"ecboot/internal/model"
 	"fmt"
 	"math/big"
 	"os"
@@ -97,16 +98,9 @@ func SendSmsCode(ctx context.Context, phone, captchaKey, captchaCode string) (in
 
 // ---------- 短信验证码登录（注册即登录, US3 / FR-010/012/013） ----------
 
-type LoginOutcome struct {
-	Token        string
-	RefreshToken string
-	UserId       int64
-	IsNew        bool
-}
-
 // SmsLogin 短信验证码登录：校验(一次性)→查/建账号→休眠核身→时间戳+日志→发会话。
 // 码校验失败计 fail 计数（达上限锁定, FR-009）。
-func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*LoginOutcome, error) {
+func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*model.LoginOutcome, error) {
 	if !validPhone(phone) {
 		return nil, errcode.New(errcode.CodeInvalidParam, "手机号格式不正确")
 	}
@@ -181,7 +175,7 @@ func SmsLogin(ctx context.Context, phone, smsCode string, channel int) (*LoginOu
 	// 时间戳与登录日志（成功）
 	touchLogin(ctx, userId, channel, true, "")
 
-	return &LoginOutcome{Token: token, RefreshToken: refreshToken, UserId: userId, IsNew: isNew}, nil
+	return &model.LoginOutcome{Token: token, RefreshToken: refreshToken, UserId: userId, IsNew: isNew}, nil
 }
 
 // touchLogin 更新最后登录/活跃时间并写登录日志。

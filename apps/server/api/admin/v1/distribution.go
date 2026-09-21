@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 推广员列表（审核/冻结入口）
@@ -8,7 +12,7 @@ type (
 		g.Meta  `path:"/distributors" method:"GET" summary:"推广员列表"`
 		Status  int    `json:"status" dc:"1待审 2通过 3冻结"`
 		Keyword string `json:"keyword" dc:"用户昵称/ID"`
-		PageReq
+		model.PageReq
 	}
 	AdminDistributorItem struct {
 		Id        string `json:"id"`
@@ -20,7 +24,7 @@ type (
 		AuditTime string `json:"auditTime"`
 	}
 	AdminDistributorListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminDistributorItem `json:"list"`
 	}
 
@@ -49,7 +53,7 @@ type (
 	// 佣金规则列表
 	AdminDistRuleListReq struct {
 		g.Meta `path:"/commission-rules" method:"GET" summary:"佣金规则列表"`
-		PageReq
+		model.PageReq
 	}
 	AdminDistRuleItem struct {
 		Id         string `json:"id"`
@@ -60,7 +64,7 @@ type (
 		Status     int    `json:"status"`
 	}
 	AdminDistRuleListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminDistRuleItem `json:"list"`
 	}
 
@@ -103,7 +107,7 @@ type (
 		g.Meta  `path:"/commission-records" method:"GET" summary:"佣金记录"`
 		Status  int    `json:"status" dc:"状态筛选"`
 		OrderNo string `json:"orderNo" dc:"订单号"`
-		PageReq
+		model.PageReq
 	}
 	AdminDistRecordItem struct {
 		OrderNo     string `json:"orderNo"`
@@ -115,7 +119,7 @@ type (
 		SettleTime  string `json:"settleTime"`
 	}
 	AdminDistRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminDistRecordItem `json:"list"`
 	}
 
@@ -123,7 +127,7 @@ type (
 	AdminWithdrawListReq struct {
 		g.Meta `path:"/withdraws" method:"GET" summary:"提现列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	AdminWithdrawItem struct {
 		WithdrawNo string `json:"withdrawNo"`
@@ -133,7 +137,7 @@ type (
 		CreatedAt  string `json:"createdAt"`
 	}
 	AdminWithdrawListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminWithdrawItem `json:"list"`
 	}
 
@@ -165,7 +169,7 @@ type (
 	// 邀请激励记录
 	AdminInviteRecordListReq struct {
 		g.Meta `path:"/invite-records" method:"GET" summary:"邀请激励记录"`
-		PageReq
+		model.PageReq
 	}
 	AdminInviteRecordItem struct {
 		Inviter    string `json:"inviter" dc:"邀请人(脱敏昵称)"`
@@ -175,7 +179,7 @@ type (
 		CreatedAt  string `json:"createdAt"`
 	}
 	AdminInviteRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []AdminInviteRecordItem `json:"list"`
 	}
 )

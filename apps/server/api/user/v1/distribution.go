@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+
+	"ecboot/internal/model"
+)
 
 type (
 	// 申请成为推广员
@@ -28,7 +32,7 @@ type (
 	}
 	DistRelationReq struct {
 		g.Meta `path:"/distribution/relations" method:"GET" summary:"我的邀请关系"`
-		PageReq
+		model.PageReq
 	}
 	DistRelationRes struct {
 		Inviter  map[string]string     `json:"inviter" dc:"直接上级(无则为空)"`
@@ -62,10 +66,10 @@ type (
 	DistRecordListReq struct {
 		g.Meta `path:"/distribution/records" method:"GET" summary:"佣金记录"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	DistRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []DistRecordItem `json:"list"`
 	}
 
@@ -89,10 +93,10 @@ type (
 	DistAccountLogListReq struct {
 		g.Meta  `path:"/distribution/account/logs" method:"GET" summary:"账户流水"`
 		BizType int `json:"bizType" dc:"类型筛选"`
-		PageReq
+		model.PageReq
 	}
 	DistAccountLogListRes struct {
-		PageRes
+		model.PageRes
 		List []DistAccountLogItem `json:"list"`
 	}
 
@@ -114,10 +118,10 @@ type (
 	WithdrawListReq struct {
 		g.Meta `path:"/distribution/withdraws" method:"GET" summary:"提现列表"`
 		Status int `json:"status" dc:"状态筛选"`
-		PageReq
+		model.PageReq
 	}
 	WithdrawListRes struct {
-		PageRes
+		model.PageRes
 		List []WithdrawItem `json:"list"`
 	}
 
@@ -130,10 +134,10 @@ type (
 	}
 	InviteRecordListReq struct {
 		g.Meta `path:"/distribution/invite-records" method:"GET" summary:"邀请激励记录"`
-		PageReq
+		model.PageReq
 	}
 	InviteRecordListRes struct {
-		PageRes
+		model.PageRes
 		List []InviteRecordItem `json:"list"`
 	}
 
