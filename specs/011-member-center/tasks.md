@@ -102,8 +102,8 @@
 
 ## Phase 8: Polish & 批次收尾（DoD 全项）
 
-- [ ] T024 `make test` 全绿 + golangci-lint 本批文件零问题
-- [ ] T025 `make check-stub` 对账：user 34→13（本批 21 清零）；`make migrate-fresh` 重放验证；
+- [x] T024 `make test` 全绿 + golangci-lint 本批文件零问题
+- [x] T025 `make check-stub` 对账：user 34→13（本批 21 清零）；`make migrate-fresh` 重放验证；
       按 quickstart 冒烟；更新 PROGRESS 批次 05 状态 ✅ 与完成 commit（同 commit）并提交
 
 ## Dependencies & Execution Order
@@ -124,3 +124,14 @@
 - **越权防护是硬约束**：所有方法以会话 userId 收口, 他人资源按"不存在"处理（不泄露存在性）
 - 手机号明文不得出参或落日志（个保法）
 - 本批文件边界（PROGRESS 防偏离条款 3）：plan.md「Source Code」小节 + specs/011-member-center/ + specs/PROGRESS.md
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（7 包, 批次 01~04 全部零退化）；本批文件 golangci-lint 0 issues
+- `make check-stub` 对账: **user 34→13（本批 21 端点全清, SC-001 达标）**；四渠道剩余 117 桩
+- **空库全量重放零失败**（36 迁移含新增 000036, SC-004 达标）
+- 冒烟 7/7: 资料(成长值)/地址(唯一默认+电话脱敏 138****2222)/**收藏(取消后再收藏复活 total=1)**/
+  消息(**未读 2→read-all→0**)/偏好(**默认全开→关闭短信**)/积分(balance=120)/邀请与登录记录
+- 实现期 TDD 抓住 3 处: AddressCreate 漏设 user_id(1364)/invite_record 的 uk(new_user_id) 一人只能被邀一次/
+  fixture 清理键按 inviter 会误删同邀请人的其他记录
+- 环境事项: 冒烟时发现服务连宿主 6379 而数据写在容器 Redis(45355) → 对齐配置后通过（已清理临时配置）
