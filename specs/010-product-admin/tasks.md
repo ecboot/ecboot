@@ -72,10 +72,10 @@
 
 ### Implementation for US3（连线, 无新逻辑）
 
-- [ ] T011 [US3] 连线 `shop_v1_category_tree.go`、`shop_v1_brand_list.go`、`shop_v1_product_list.go`、
+- [x] T011 [US3] 连线 `shop_v1_category_tree.go`、`shop_v1_brand_list.go`、`shop_v1_product_list.go`、
       `shop_v1_product_detail.go`（viewerUserId 从 ctx 取, 未登录=0）、`shop_v1_product_search.go`
       （桩清零 ×5；公开——白名单已有）
-- [ ] T012 [US3] `go test ./...` 绿 + 确认下架商品在列表/搜索不可见（复用既有 005 测试断言）
+- [x] T012 [US3] `go test ./...` 绿 + 确认下架商品在列表/搜索不可见（复用既有 005 测试断言）
 
 ---
 
