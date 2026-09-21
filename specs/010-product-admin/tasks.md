@@ -81,7 +81,7 @@
 
 ## Phase 5: User Story 4 - 权限断言 (Priority: P2)
 
-- [ ] T013 [P] [US4] `internal/middleware/permission_test.go` 补商品域码断言：无权账号对
+- [x] T013 [P] [US4] `internal/middleware/permission_test.go` 补商品域码断言：无权账号对
       `product:spu:create`/`product:sku:create`/`inventory:adjust` 等均拒 10005、超管放行；
       核对 22 个管理端点挂点与 contracts 一致（写操作挂、查询不挂、C 端公开）
 
@@ -89,8 +89,8 @@
 
 ## Phase 6: Polish & 批次收尾（DoD 全项）
 
-- [ ] T014 `make test` 全绿 + golangci-lint 本批文件零问题
-- [ ] T015 `make check-stub` 对账：admin 91→69、shop 40→35（本批 27 清零）；按 quickstart 冒烟；
+- [x] T014 `make test` 全绿 + golangci-lint 本批文件零问题
+- [x] T015 `make check-stub` 对账：admin 91→69、shop 40→35（本批 27 清零）；按 quickstart 冒烟；
       更新 specs/PROGRESS.md 批次 04 状态 ✅ 与完成 commit（同 commit）并提交 `feat(010-product-admin): <收尾>`
 
 ## Dependencies & Execution Order
@@ -111,3 +111,15 @@
 - **不改既有实现语义**（005 商品 / 006 交易链路）——连线时若发现签名或字段不匹配, 按契约做最小适配并记账
 - 禁止手改 `internal/dao`、`internal/model/entity|do`
 - 本批文件边界（PROGRESS 防偏离条款 3）：plan.md「Source Code」小节 + specs/010-product-admin/ + specs/PROGRESS.md；越界先记账
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（7 包, 005/006 零退化——SC-004 达标）；本批文件 golangci-lint 0 issues
+  （列出的问题均在 005 既有测试文件 `product_impl_test.go`，属批次外既有债务）
+- `make check-stub` 对账: admin 91→69、shop 40→35（本批 27 端点全清——SC-001 达标）；四渠道剩余 139 桩
+- 冒烟 11/11: 建类目/品牌/SPU(编码 SP0000000157)/SKU(编码 SK0000000247)/上架/库存调整+5(返回 totalAfter=5)/
+  库存列表(可售推导 5)/**流水留痕(change_type=5, operator=admin:1, remark, 快照)**/C 端列表与详情(sellable)/
+  无权 10005×2/仅登录可查/致负 30007
+- 实现期两坑（记账）: Fields 被 Count 复用致 `COUNT(cols...)` 语法错误；`inventory.total` 为 INT UNSIGNED
+  时 `total + (-n) >= 0` 触发 out of range(52) → 改按 delta 符号分支
+- 连线适配 4 处（向后兼容, 不改既有签名护 005 测试）

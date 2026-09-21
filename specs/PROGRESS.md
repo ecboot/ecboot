@@ -32,7 +32,7 @@
 | 01 | `specs/007-admin-base` | 后台账户与系统配置（登录/登出/刷新/资料/改密、admin_user、RBAC 角色、config、ping/短信调试桩） | 22 | — | 已实现（含会话 audience 安全修复） | ✅ | `45cd314` |
 | 02 | `specs/008-store` | 门店域（自提/核销载体：admin 管理 + common 查询） | 7 | 01 | 已实现（含 sonyflake 首次接线/附近检索） | ✅ | `9146dc6` |
 | 03 | `specs/009-logistics-ops` | 物流公司与运营装修（admin logistics/banner/floor + shop banner/floor） | 15 | 01 | 已实现（装修域新建接口/DTO；含投放与装配） | ✅ | `1034ace` |
-| 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | **impl 覆盖 24/27**（005 遗产）→ 本批=连线收口 + 库存补齐 | 🔶 | |
+| 04 | `specs/010-product-admin` | 商品目录后台与 C 端浏览收口（admin spu/sku/类目/品牌/库存 + shop 浏览连线） | 27 | 01 | 已实现（连线收口 + 库存补齐，4 处契约适配） | ✅ | `102b69a` |
 | 05 | `specs/011-member-center` | 会员中心（资料/地址/收藏/足迹/消息/积分/通知偏好/登录日志/邀请记录） | 21 | 01 | 接口已有，impl 待补 | ⬜ | |
 | 06 | `specs/012-trade-wiring` | 交易闭环连线（shop 购物车/订单/支付 + admin 订单发货/取消/备注 + user 优惠券） | 22 | 02 03 04 | **shop 侧 impl 已实现**，重连线 + admin 侧补 impl | ⬜ | |
 | 07 | `specs/013-after-sale` | 售后域（shop 申请/撤销售后 + admin 审核/收货/重退款） | 11 | 06 | 接口已有，impl 待补 | ⬜ | |

@@ -117,3 +117,27 @@ func TestRequirePermOperationCodes(t *testing.T) {
 		}
 	})
 }
+
+// TestRequirePermProductCodes 商品与库存权限码拦截（010-product-admin US4, SC-003）:
+// 无权账号对商品域四码与库存调整码均拒 10005; 超管全放行。
+func TestRequirePermProductCodes(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		superId := seedMWAdmin(ctx, t, "t_mw_pd_s", 1)
+		plainId := seedMWAdmin(ctx, t, "t_mw_pd_p", 0)
+		defer cleanupMWAdmin(ctx, t, "t_mw_pd_s")
+		defer cleanupMWAdmin(ctx, t, "t_mw_pd_p")
+
+		superCtx := context.WithValue(ctx, consts.CtxUserId, superId)
+		plainCtx := context.WithValue(ctx, consts.CtxUserId, plainId)
+		for _, code := range []string{
+			"product:category:create", "product:brand:update", "product:spu:create",
+			"product:spu:update", "product:spu:delete", "product:sku:create",
+			"product:sku:delete", "inventory:adjust",
+		} {
+			err := RequirePerm(plainCtx, code)
+			t.Assert(errCodeOf(err), errcode.CodeForbidden)
+			t.AssertNil(RequirePerm(superCtx, code))
+		}
+	})
+}
