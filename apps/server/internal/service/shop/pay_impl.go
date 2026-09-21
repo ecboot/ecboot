@@ -50,6 +50,10 @@ const (
 // payChannelInstance 渠道实例（mock; 真实渠道按入参选择——另立特性）。
 func payChannelInstance(_ int) paychannel.Channel { return paychannel.NewMock() }
 
+// errPayOrderNotPayable 回调命中"不可支付的支付单"（已关闭/已失败）——仅作事务内信号,
+// 由事务外转为告警 + 契约错误码（评审 Critical: 不得当幂等吞掉）。
+var errPayOrderNotPayable = gerror.New("支付单已关闭或已失败")
+
 // yuanToFen 元 → 分（复用项目 money 库: 内部一律 int64 分运算）。
 func yuanToFen(yuan string) (int64, error) {
 	fen, err := money.FromYuanString(yuan)
@@ -233,6 +237,7 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 	processed := false  // 是否真正推进（process_status=1）
 	dirtyOrderNo := ""  // 资金已入账但订单不可推进的脏态订单号（评审 C3b）
 	var dirtyOrderId int64
+	closedPayNo := ""   // 命中已关闭/已失败支付单的支付号（评审 Critical）
 	err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		res, e := dao.PayOrder.Ctx(ctx).
 			Where(pcols.PayNo, payload.PayNo).
@@ -246,8 +251,18 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 			return gerror.Wrap(e, "更新支付单失败")
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
-			// 已处理（或已关闭）→ 幂等应答（不二次推进; 留档由事务外统一落, 评审 I2）
-			return nil
+			// 评审 Critical: affected=0 有**两种成因**, 此前被混为一谈以致静默资损。
+			// ① status=20 → 真的已处理, 幂等应答 ✓
+			// ② status∈{90已关闭, 30支付失败} → 渠道是就**旧单**扣的款（用户在浏览器/微信里扫的还是旧码）,
+			//    钱真的到了。此时若照旧 `return nil`, 渠道收到 SUCCESS、支付单停在 90、订单停在 10、
+			//    库存不核销、且 C3b 的口径（pay=20 且 order=90）也捞不到 → "钱付了、单没了、无人知道"。
+			//    C3a 的关单逻辑正是主动制造 ② 的路径, 故必须在此处与幂等区分开。
+			cur, ce := dao.PayOrder.Ctx(ctx).Fields(pcols.Status).Where(pcols.PayNo, payload.PayNo).Value()
+			if ce == nil && cur.Int() == payStatusSuccess {
+				return nil // ① 真幂等
+			}
+			closedPayNo = payload.PayNo // ② 交事务外告警与留档（不得应答 SUCCESS）
+			return errPayOrderNotPayable
 		}
 		// 订单推进（条件 status=10; 已取消 → 不推进, 记脏态）
 		ocols := dao.TradeOrder.Columns()
@@ -307,15 +322,22 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 	// 留档（事务外, 评审 I2）: 事务回滚也留——"回调来过但没处理成"正是对账最需要的一行。
 	writeCallbackLog(ctx, channel, payload.PayNo, 1, raw, processed)
 	if err != nil {
+		// 评审 Critical: 命中已关闭/已失败支付单——钱可能真的到了, 不得应答 SUCCESS（渠道须收到 FAIL 并留痕）。
+		if closedPayNo != "" {
+			g.Log().Errorf(ctx,
+				"[资金异常] 支付成功回调命中已关闭支付单, 须人工核对并退款: pay_no=%s order_no=%s",
+				closedPayNo, rec[pcols.OrderNo].String())
+			return errcode.New(errcode.CodeStatusNotAllowed, "支付单已关闭, 需人工核对退款")
+		}
 		return err
 	}
 
 	// 评审 C3b: 脏态资金对账标记——钱已入账（支付单保持 20, 不得篡改事实）而订单不可推进。
-	// 该场景此前除一条会被事务吞掉的留档外没有任何标记, 无人知道要退款。现在:
-	//   ① 上面那行留档 process_status=0（机器可查, 对账口径:
-	//      pay_order.status=20 且 trade_order.status=90 且存在 notify_type=1/process_status=0 的留档）;
-	//   ② 这里再打一条 Error 级日志（告警可捞, 前缀固定）。
-	// 注: 不写 trade_order_log 标记行——该表经 OrderDetail 直接暴露给 C 端时间线, 会泄露内部资金文案。
+	// 对账口径（收敛为一条, 覆盖 ② 与 ③ 两种形态）:
+	//   **存在 notify_type=1 且 process_status=0 的留档** 即"回调来过但没处理成":
+	//   ② 已关闭支付单命中（pay=90/30, 见上）  ③ 订单已取消/不可推进（pay=20 而 order≠20）。
+	// 此处再打一条固定前缀的 Error 级告警（可捞）; 不写 trade_order_log 标记行——该表经 OrderDetail
+	// 直接暴露给 C 端时间线, 会泄露内部资金文案。
 	if dirtyOrderNo != "" {
 		g.Log().Errorf(ctx, "[资金异常] 支付成功但订单不可推进, 待退款对账: pay_no=%s order_no=%s order_id=%d",
 			payload.PayNo, dirtyOrderNo, dirtyOrderId)

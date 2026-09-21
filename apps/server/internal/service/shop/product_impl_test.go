@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	gdb.SetConfig(gdb.Config{
+	_ = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			{
 				Link: testutil.DSN(),
@@ -38,42 +38,9 @@ func init() {
 
 // ---- 测试数据工具（自建+清理, research D6） ----
 
-const (
-	testBrandName = "T-测试品牌"
-	testCatName   = "T-测试三级分类"
-	testSpuName   = "T-测试商品"
-)
+// 注: 原 catalogSuite / catalogTeardown / testBrandName 等 helper 长期**无人调用**（golangci unused 判定），
+// 于 2026-09-22 清理——各用例自带内联 fixture, 不需要这层包装（如需恢复见 git 历史）。
 
-func catalogSuite(t *gtest.T) (ctx context.Context, brandId, catId, spuId int64) {
-	ctx = context.Background()
-	// 前置清理（按测试命名约定; SKU 经 SPU 关联删, 连带清残留编码行）
-	g.DB().Exec(ctx, "DELETE ps FROM product_sku ps JOIN product_spu s ON ps.spu_id=s.id WHERE s.name LIKE 'T-测试%'")
-	g.DB().Exec(ctx, "DELETE FROM product_spu WHERE name LIKE 'T-测试%'")
-	g.DB().Exec(ctx, "DELETE FROM product_sku WHERE sku_no LIKE 'T-SKU%'")
-	g.DB().Exec(ctx, "DELETE FROM product_brand WHERE name LIKE 'T-测试%'")
-	g.DB().Exec(ctx, "DELETE FROM product_category WHERE name LIKE 'T-测试%'")
-
-	// 品牌与三级分类（level=3, parent 用 0 简化树断言独立）
-	res, err := g.DB().Model("product_brand").Ctx(ctx).Data(g.Map{"name": testBrandName, "status": 1}).InsertAndGetId()
-	t.AssertNil(err)
-	brandId = res
-	res, err = g.DB().Model("product_category").Ctx(ctx).Data(g.Map{
-		"parent_id": 0, "name": testCatName, "level": 3, "sort": 999, "status": 1,
-	}).InsertAndGetId()
-	t.AssertNil(err)
-	catId = res
-	return
-}
-
-func catalogTeardown(ctx context.Context, t *gtest.T, spuId int64) {
-	g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM (SELECT id FROM product_sku WHERE spu_id=?) x)", spuId)
-	g.DB().Exec(ctx, "DELETE FROM product_sku WHERE spu_id=?", spuId)
-	g.DB().Exec(ctx, "DELETE FROM product_spu WHERE id=?", spuId)
-	g.DB().Exec(ctx, "DELETE FROM product_brand WHERE name=?", testBrandName)
-	g.DB().Exec(ctx, "DELETE FROM product_category WHERE name=?", testCatName)
-}
-
-// svcIProduct 便捷引用（实现注册后由实现提供; 测试直接构造实现结构）。
 func TestCategoryLifecycle(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()

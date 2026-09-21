@@ -114,5 +114,19 @@ I4 券领取悲观锁 · I6 取消流水列名 · I7 券门槛与过期 · I8 us
 
 ### 待裁定（跨批, 已记账）
 
-- `user.level` 列类型 TINYINT 与自身注释（存 `user_level_rule.id` BIGINT）矛盾 → 规则 id > 127 时等级更新报 1264；生产修复需迁移裁定（批次 05 域）
-- `make lint` 全量非零（16 条跨批）；批次 04 测试的库存孤儿行泄漏已修
+- ~~`user.level` 列类型 TINYINT 与自身注释（存 `user_level_rule.id` BIGINT）矛盾~~ → **已修**：迁移 000037 放宽为 BIGINT UNSIGNED（用户裁定"按推荐执行"），并移除测试侧规避 hack
+- ~~`make lint` 全量非零（16 条跨批）~~ → **已修**：全量 golangci-lint **0 issues**
+- 批次 04 测试的库存孤儿行泄漏已修；数据库已统一到应用库 `ecboot`（含时区双侧锁 UTC）
+
+### 独立评审第二轮（续作, 2026-09-22）
+
+对上轮修复轮做独立评审 → **With fixes**（1 Critical + 5 Important + 4 Minor）,**已逐条修复并复验**：
+
+- [x] **Critical** 已关闭支付单命中成功回调不再静默 SUCCESS（区分幂等/已关闭；报错 + `[资金异常]` 告警 + 对账口径收敛）
+- [x] **Important#2** `Create` 回滚改**提交标志**（消除早退路径的连接/事务悬置）
+- [x] **Important#3** 订单项三个**行分摊列**按构成分摊（保和 + 尾差记末行）
+- [x] **Important#4** 秒杀路径明确拒绝（原产出永远无法支付的单）；批次 09 待办清单写入注释
+- [x] **Important#5** I4/I10 补上回归测试（此前声称有实则零测试）；图纸 pay_order 状态勘误
+- [x] **Important#6** 死代码清理（`catalogSuite`/`catalogTeardown` 等）
+- [x] **Minor** 匿名留档按 id 窗口清理、金额断言改恒等式、lint 归零
+- [x] 验证: `go test ./...` 两连跑全绿；`golangci-lint` 0 issues; 桩数 96 无回归

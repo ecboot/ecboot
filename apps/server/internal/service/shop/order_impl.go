@@ -61,6 +61,15 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		return nil, errcode.New(errcode.CodeInvalidParam, "缺少幂等凭证")
 	}
 
+	// 评审 Important: 秒杀玩法（批次 09/10 营销域）尚未接线——原分支只锁活动库存、**不锁 inventory**,
+	// 且 collectLines 恒用 product_sku.price（从不读 flash_sale_item.flash_price, 而 000018 的契约是
+	// "秒杀价经 trade_order_item.price 快照承载"）。这样的单 ① 按原价计费 ② 支付回调的库存核销必然
+	// 未命中（I1 判定为账实不符）→ 整单回滚, 即**永远无法支付**。与其产出无法履约的单, 不如明确拒绝。
+	// 待批次 09 接通「秒杀价快照 + inventory 锁 + 取消时回补 sold_count」后删除本闸（PROGRESS §五 已记账）。
+	if in.FlashSaleItemId > 0 {
+		return nil, errcode.New(errcode.CodeActivityInvalid, "秒杀玩法未上线")
+	}
+
 	// ---- 事务外预备: 收货地址快照 ----
 	addr, err := dao.UserAddress.Ctx(ctx).
 		Where(dao.UserAddress.Columns().Id, in.AddressId).
@@ -78,8 +87,13 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	if err != nil {
 		return nil, err
 	}
+	// 评审 Important（修复轮自查漏项）: 用**提交标志**兜底回滚, 不再依赖"每条错误路径都记得给 err 赋值"
+	// 这种易漏的不变量——原写法在 `len(lines)==0`（任何客户端 POST 空购买项即可触发）与"收货地限售"
+	// 两条早退路径上漏赋值, 于是 BEGIN 之后既不提交也不回滚, 事务与连接一直悬到请求 ctx 被取消归还;
+	// 长生命周期 ctx 的调用方（定时任务/后台 worker）会真实泄漏, 且一旦有人把判空挪到取锁之后即变持锁泄漏。
+	committed := false
 	defer func() {
-		if err != nil {
+		if !committed {
 			_ = tx.Rollback()
 		}
 	}()
@@ -108,24 +122,8 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	// 步骤3: 库存锁定
 	// 012 修复轮 I11: 条件更新**必须判 RowsAffected**——未命中即库存不足。
 	// 原实现只看 error（条件不命中时 error 为 nil, 行数为 0）, 于是库存 1 也能下 2 件的单（静默超卖）。
-	// 注: 本函数 defer 以 `err != nil` 判回滚, 故所有错误路径都必须给 err 赋值, 否则事务泄漏。
+	// 回滚由函数头的 `committed` 标志兜底（见事务开头的注释）, 此处无需关心 err 赋值约定。
 	for _, ln := range lines {
-		if in.FlashSaleItemId > 0 {
-			// 秒杀: 活动分账条件更新
-			var fsRes sql.Result
-			if fsRes, err = tx.Model("flash_sale_item").Ctx(ctx).
-				Where("id", in.FlashSaleItemId).
-				Where("stock_count - sold_count >= ?", ln.Quantity).
-				Data(g.Map{"sold_count": gdb.Raw("sold_count + " + fmt.Sprint(ln.Quantity))}).
-				Update(); err != nil {
-				return nil, err
-			}
-			if n, _ := fsRes.RowsAffected(); n == 0 {
-				err = errcode.New(errcode.CodeSoldOut, "秒杀库存不足")
-				return nil, err
-			}
-			continue
-		}
 		// 普通/拼团/砍价: inventory 锁定（条件更新防超卖）
 		var invRes sql.Result
 		if invRes, err = tx.Model("inventory").Ctx(ctx).
@@ -204,26 +202,35 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	// ---- 步骤6: 订单项快照（行分摊, 尾差记末行） ----
 	// 012 修复轮 C4a: sku_no/spu_name/sku_name/original_price 均为**非空无默认值列**（000006），
 	// 原实现漏写 → 每次下单报 1364 回滚（该端点此前零测试 + 冒烟未覆盖下单, 故长期未暴露）。
+	// 012 修复轮（评审 Important）: 三个**行分摊列**按各自构成分别分摊——表契约（000019/000020）
+	// 明写"合计=订单头对应明细, 尾差记末行", 而原实现只写聚合列, 三列恒 0.00:
+	// 订单头显示"券抵 5 元"而每行 coupon_amount=0, 售后按行取数（trade_order_item 是售后金额依据）即对不上。
 	lineFens := lineFensOf(lines)
-	promoAlloc := money.AllocateProRata(promotionFen, lineFens)
+	couponAlloc := money.AllocateProRata(couponFen, lineFens)
+	frAlloc := money.AllocateProRata(fullReductionFen, lineFens)
+	pointAlloc := money.AllocateProRata(pointFen, lineFens)
 	for idx, ln := range lines {
-		linePromo := promoAlloc[idx]
+		// 逐构成分摊后求和: 各构成的分摊和恒等于订单头对应值（AllocateProRata 保和）, 故行 promo 和 == promotionFen
+		linePromo := couponAlloc[idx] + frAlloc[idx] + pointAlloc[idx]
 		linePay := ln.LineFen - linePromo
 		if _, err = tx.Model("trade_order_item").Ctx(ctx).Data(g.Map{
-			"order_no":         orderNo,
-			"order_id":         orderId,
-			"spu_id":           ln.SpuId,
-			"sku_id":           ln.SkuId,
-			"sku_no":           ln.SkuNo,
-			"spu_name":         ln.SpuName,
-			"sku_name":         ln.SkuName,
-			"sku_image":        ln.SkuImage,
-			"quantity":         ln.Quantity,
-			"sku_specs":        mustJSON(ln.Specs),
-			"original_price":   money.ToYuanString(ln.PriceFen),
-			"price":            money.ToYuanString(ln.PriceFen),
-			"promotion_amount": money.ToYuanString(linePromo),
-			"pay_amount":       money.ToYuanString(linePay),
+			"order_no":              orderNo,
+			"order_id":              orderId,
+			"spu_id":                ln.SpuId,
+			"sku_id":                ln.SkuId,
+			"sku_no":                ln.SkuNo,
+			"spu_name":              ln.SpuName,
+			"sku_name":              ln.SkuName,
+			"sku_image":             ln.SkuImage,
+			"quantity":              ln.Quantity,
+			"sku_specs":             mustJSON(ln.Specs),
+			"original_price":        money.ToYuanString(ln.PriceFen),
+			"price":                 money.ToYuanString(ln.PriceFen),
+			"coupon_amount":         money.ToYuanString(couponAlloc[idx]),
+			"full_reduction_amount": money.ToYuanString(frAlloc[idx]),
+			"point_amount":          money.ToYuanString(pointAlloc[idx]),
+			"promotion_amount":      money.ToYuanString(linePromo),
+			"pay_amount":            money.ToYuanString(linePay),
 		}).Insert(); err != nil {
 			return nil, err
 		}
@@ -247,6 +254,7 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
+	committed = true
 
 	return &model.OrderCreated{
 		OrderNo:   orderNo,

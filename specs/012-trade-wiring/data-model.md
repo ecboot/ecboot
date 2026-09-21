@@ -24,7 +24,7 @@
 | order_no / order_id / user_id | 关联 | — |
 | pay_channel | 渠道 | mock（006 的 paychannel） |
 | amount | 应付金额（decimal） | **回调金额校验基准** |
-| status | 10 待支付 / 20 成功 / 30 关闭 | 条件更新推进 |
+| status | 10 待支付 / 20 成功 / 30 支付失败 / 90 已关闭 | 条件更新推进（口径以 000007 列注释为准；修复轮勘误: 原图纸误写"30 关闭"） |
 | channel_trade_no / success_time / closed_time / fail_reason | 渠道与结果 | 回调填 |
 
 ### pay_callback_log（只追加，对账依据）

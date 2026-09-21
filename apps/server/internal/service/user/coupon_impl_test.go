@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -162,5 +163,51 @@ func TestCouponUsableConsumeReturn(t *testing.T) {
 		t.Assert(rec["status"].Int(), 1)
 		t.Assert(rec["order_no"].String(), "")
 		t.Assert(rec["expire_time"].String(), before.String()) // 有效期不变
+	})
+}
+
+// TestCouponReceiveConcurrentLimit 并发领取限领（评审 I4 补测）: 并发下"个人限领"必须成立。
+// 关键点: 模板 total_count=0（不限量）时**防超发的条件更新整段被跳过**, 于是限领校验是唯一闸门——
+// 原实现用普通 SELECT 读已领数, RR 隔离下两个并发事务都读到 mine=0 都放行 → 同一用户领到 2 张。
+// 修复: 先对模板行加悲观锁（LockUpdate）串行化同模板领取, 并以锁定读（FOR UPDATE）取已领数。
+func TestCouponReceiveConcurrentLimit(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const phone = "13900009001"
+		defer cleanupMember(ctx, t, phone)
+		defer cleanupCoupon(ctx, t, "T-券并发")
+		uid := seedMember(ctx, t, phone, "并发领取", 0)
+
+		// total_count=0 不限量 + per_limit=1
+		cid := seedCoupon(ctx, t, "T-券并发", "0.00", "1.00", 0, 1, 2, 30)
+
+		const n = 8
+		var wg sync.WaitGroup
+		errs := make([]error, n)
+		start := make(chan struct{})
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start // 尽量同时开跑
+				_, errs[idx] = Receive(ctx, uid, cid)
+			}(i)
+		}
+		close(start)
+		wg.Wait()
+
+		// 恰好 1 张: 其余全部 50001
+		ok := 0
+		for _, e := range errs {
+			if e == nil {
+				ok++
+			} else {
+				t.Assert(errCode(e), errcode.CodeCouponSoldOut)
+			}
+		}
+		t.Assert(ok, 1)
+		cnt, err := g.DB().GetValue(ctx, "SELECT COUNT(*) FROM user_coupon WHERE user_id=? AND coupon_id=?", uid, cid)
+		t.AssertNil(err)
+		t.Assert(cnt.Int(), 1)
 	})
 }

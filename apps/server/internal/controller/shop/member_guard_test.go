@@ -134,7 +134,13 @@ func TestOrderCreateController(t *testing.T) {
 		})
 		t.AssertNil(err)
 		t.Assert(out.OrderNo != "", true)
-		t.Assert(out.PayAmount, "20.00")
+		// 金额只钉恒等式（不写死"20.00"——满减取全局最早在架活动, 那是环境假设; 评审 Minor）
+		hdr, err := g.DB().GetOne(ctx,
+			"SELECT total_amount, promotion_amount, pay_amount FROM trade_order WHERE order_no=?", out.OrderNo)
+		t.AssertNil(err)
+		t.Assert(hdr["total_amount"].String(), "20.00")
+		t.Assert(hdr["pay_amount"].Float64(), hdr["total_amount"].Float64()-hdr["promotion_amount"].Float64())
+		t.Assert(out.PayAmount, hdr["pay_amount"].String())
 
 		// 未登录 → 10003（不得到达 service）
 		_, err = c.OrderCreate(context.Background(), &v1.OrderCreateReq{

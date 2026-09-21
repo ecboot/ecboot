@@ -44,16 +44,30 @@ func seedPayFixture(ctx context.Context, t *gtest.T, userId int64, orderNo strin
 	return orderId, 990000001
 }
 
+// cleanupPayFixture 按支付单号联表清理留档（留档表只追加, 不清理会跨轮累积致计数断言失真）。
+// 匿名留档（pay_no='' 的非法报文行）不走这里——它无支付单号可归属, 见 maxCallbackLogId/cleanupCallbackLogsAfter。
 func cleanupPayFixture(ctx context.Context, t *gtest.T, orderNo string) {
-	// 012 修复轮: 回调留档按 pay_order 联表清理（留档表只追加, 不清理会跨轮累积致计数断言失真）;
-	// 另清 pay_no='' 的行（报文非法时无支付单号可关联, 见 TestPayNotifyMalformedBodyLogged）。
 	_, _ = g.DB().Exec(ctx,
 		"DELETE l FROM pay_callback_log l JOIN pay_order p ON l.pay_no=p.pay_no WHERE p.order_no=?", orderNo)
-	_, _ = g.DB().Exec(ctx, "DELETE FROM pay_callback_log WHERE pay_no=''")
 	_, _ = g.DB().Exec(ctx, "DELETE FROM trade_order_log WHERE order_no=?", orderNo)
 	_, _ = g.DB().Exec(ctx, "DELETE FROM trade_order_item WHERE order_no=?", orderNo)
 	_, _ = g.DB().Exec(ctx, "DELETE FROM pay_order WHERE order_no=?", orderNo)
 	_, _ = g.DB().Exec(ctx, "DELETE FROM trade_order WHERE order_no=?", orderNo)
+}
+
+// maxCallbackLogId 当前留档最大 ID —— 用于按**窗口**清理匿名留档（pay_no='' 的行没有归属键,
+// 全库 `DELETE ... WHERE pay_no=''` 会误伤并行运行的其他包, 评审 Minor 指出）。
+func maxCallbackLogId(ctx context.Context) int64 {
+	v, err := g.DB().GetValue(ctx, "SELECT COALESCE(MAX(id),0) FROM pay_callback_log")
+	if err != nil {
+		return 0
+	}
+	return v.Int64()
+}
+
+// cleanupCallbackLogsAfter 清掉 id 大于给定值**且无支付单号**的留档（只作用于本用例新产生的匿名行）。
+func cleanupCallbackLogsAfter(ctx context.Context, id int64) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM pay_callback_log WHERE id > ? AND pay_no = ''", id)
 }
 
 // TestPayCreate 发起支付（FR-005）: 待付款订单成功（返回 mock 唤起参数）; 非待付款/他人 → 拒绝。

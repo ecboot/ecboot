@@ -204,6 +204,52 @@ func TestPayNotifyDuplicateStillLogged(t *testing.T) {
 	})
 }
 
+// TestPayNotifyClosedPayOrder 已关闭支付单收到成功回调（评审 Critical）:
+// 必须**不得**当作"幂等已处理"应答 SUCCESS —— 渠道是就旧单扣的款, 钱真的到了。
+// 场景（C3a 主动制造）: Create 两次 → 第一张被置 90([已关闭]), 用户在浏览器/微信里扫的仍是第一张码。
+// 修复前行为: affected=0 → 直接 return nil → 渠道收到 SUCCESS、支付单停在 90、订单停在 10、
+// 库存未核销、**无任何告警**（且 C3b 的对账口径"pay=20 且 order=90"也捞不到它）→ 钱付了、单没了、无人知道。
+func TestPayNotifyClosedPayOrder(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const h1 = "PAY-CLOSE-1"
+		defer cleanupPointUser(ctx, t, h1)
+		uid := seedPointUser(ctx, t, h1)
+		orderId, skuId := seedPayFixture(ctx, t, uid, "T-PAY-CLOSED", 10000)
+		defer cleanupPayFixture(ctx, t, "T-PAY-CLOSED")
+		_, _ = g.DB().Exec(ctx, "UPDATE inventory SET total=10, locked=2 WHERE sku_id=?", skuId)
+
+		first, err := NewPayLogic().Create(ctx, uid, "T-PAY-CLOSED", 1)
+		t.AssertNil(err)
+		if _, err = NewPayLogic().Create(ctx, uid, "T-PAY-CLOSED", 1); err != nil { // 第二张把第一张置 90
+			t.Fatal(err)
+		}
+
+		body, _ := json.Marshal(map[string]any{
+			"payNo": first.PayNo, "channelTradeNo": "CH-CLOSE", "amountFen": 10000, "success": true,
+		})
+		err = NewPayLogic().HandlePayNotify(ctx, "mock", body)
+		t.AssertNE(err, nil) // 必须报错（渠道应答 FAIL）, 不得静默 SUCCESS
+
+		// 支付单停在 90; 订单停在 10; 库存未核销
+		paySt, err := g.DB().GetValue(ctx, "SELECT status FROM pay_order WHERE pay_no=?", first.PayNo)
+		t.AssertNil(err)
+		t.Assert(paySt.Int(), 90)
+		orderSt, err := g.DB().GetValue(ctx, "SELECT status FROM trade_order WHERE id=?", orderId)
+		t.AssertNil(err)
+		t.Assert(orderSt.Int(), 10)
+		inv, err := g.DB().GetOne(ctx, "SELECT total, locked FROM inventory WHERE sku_id=?", skuId)
+		t.AssertNil(err)
+		t.Assert(inv["total"].Int(), 10)
+		t.Assert(inv["locked"].Int(), 2)
+		// 对账标记: 留档 process_status=0（未处理）——机器可查
+		ps, err := g.DB().GetValue(ctx,
+			"SELECT process_status FROM pay_callback_log WHERE pay_no=? AND notify_type=1", first.PayNo)
+		t.AssertNil(err)
+		t.Assert(ps.Int(), 0)
+	})
+}
+
 // TestPayNotifyMalformedBodyLogged 非法报文留档（I2）: raw_body 为 JSON NOT NULL,
 // 非 JSON 原文直接入库报 3140 且被吞 → 最该留档的场景反而零记录。
 func TestPayNotifyMalformedBodyLogged(t *testing.T) {
@@ -215,6 +261,8 @@ func TestPayNotifyMalformedBodyLogged(t *testing.T) {
 		_, _ = seedPayFixture(ctx, t, uid, "T-PAY-I2", 10000)
 		defer cleanupPayFixture(ctx, t, "T-PAY-I2")
 
+		before := maxCallbackLogId(ctx)
+		defer cleanupCallbackLogsAfter(ctx, before)
 		const bad = "{not-json-payload"
 		err := NewPayLogic().HandlePayNotify(ctx, "mock", []byte(bad))
 		t.AssertNE(err, nil)
@@ -236,9 +284,11 @@ func TestRefundNotifyStateMachine(t *testing.T) {
 			asWait = "T-AS-WAIT"
 			asNone = "T-AS-NONE"
 		)
+		logStart := maxCallbackLogId(ctx)
+		defer cleanupCallbackLogsAfter(ctx, logStart) // 匿名留档（渠道标记失败那条）按 id 窗口清
 		cleanup := func() {
 			_, _ = g.DB().Exec(ctx, "DELETE FROM after_sale_order WHERE after_sale_no IN (?,?,?)", asOK, asWait, asNone)
-			_, _ = g.DB().Exec(ctx, "DELETE FROM pay_callback_log WHERE pay_no LIKE 'PAY-T-AS%' OR pay_no=''")
+			_, _ = g.DB().Exec(ctx, "DELETE FROM pay_callback_log WHERE pay_no LIKE 'PAY-T-AS%'")
 		}
 		cleanup()
 		defer cleanup()

@@ -22,13 +22,6 @@ import (
 	"ecboot/internal/library/sms"
 )
 
-const (
-	smsCodeKeyPrefix  = "captcha:sms:"
-	smsIntervalPrefix = "captcha:sms:interval:"
-	failCountPrefix   = "captcha:fail:"
-	mockSmsPrefix     = "mock:sms:"
-)
-
 // 配置兜底默认（system_config 是覆盖层, 缺失/停用回退此处——宪法 V）。
 const (
 	defSmsTTLSeconds  = 300
