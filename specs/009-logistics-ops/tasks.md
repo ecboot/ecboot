@@ -101,8 +101,8 @@
 
 ## Phase 7: Polish & 批次收尾（DoD 全项）
 
-- [ ] T018 `make test` 全绿 + golangci-lint 本批文件零问题（宪法 IV）
-- [ ] T019 `make check-stub` 对账：admin 104→91、shop 42→40（本批 15 清零）；按 quickstart 序列冒烟；更新 specs/PROGRESS.md 批次 03 状态 ✅ 与完成 commit（同 commit）并提交 `feat(009-logistics-ops): <收尾描述>`
+- [x] T018 `make test` 全绿 + golangci-lint 本批文件零问题（宪法 IV）
+- [x] T019 `make check-stub` 对账：admin 104→91、shop 42→40（本批 15 清零）；按 quickstart 序列冒烟；更新 specs/PROGRESS.md 批次 03 状态 ✅ 与完成 commit（同 commit）并提交 `feat(009-logistics-ops): <收尾描述>`
 
 ## Dependencies & Execution Order
 
@@ -122,3 +122,13 @@
 - 禁止手改 `internal/dao`、`internal/model/entity|do`（生成物）
 - 本批文件边界（PROGRESS 防偏离条款 3）：plan.md「Source Code」小节所列文件 + specs/009-logistics-ops/ + specs/PROGRESS.md；越界先记账再动
 - 中文参数冒烟须 URL 编码（批次 02 教训）
+
+## 完成记录（2026-09-21）
+
+- 全量 `go test ./...` 绿（7 包）；本批文件 golangci-lint 0 issues（修 2 处 unused：shop 包 parseID 与 seedFloor）
+- `make check-stub` 对账: admin 104→91、shop 42→40（本批 15 端点全清）；四渠道剩余 166 桩
+- 冒烟 12/12: 物流 CRUD/40012/停用保留；轮播投放三态（长期 in/未到 out/过期 out）/位置域外 10001/停用 out；
+  楼层装配（有效 SPU 出 name/image/price, 失效剔除, 下架剔除）/无权 10005×2/公开性
+- 实现期发现: **既有 fixture `setupTradeFixture` 已失效**（000034 给 product_spu 加 spu_no 非空列后不再可用——
+  亦解释其被 lint 判 unused）→ 本批写自包含 fixture, 未修批次外既有 fixture（防偏离条款 3）
+- 契约对齐: 轮播位置与楼层类型创建后不可改（api Update Req 无这两字段, spec 已修正）

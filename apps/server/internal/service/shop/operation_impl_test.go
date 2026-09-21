@@ -161,16 +161,6 @@ func cleanupBanner(ctx context.Context, t *gtest.T, images ...string) {
 	}
 }
 
-func seedFloor(ctx context.Context, t *gtest.T, title string, floorType, status int) int64 {
-	_, _ = g.DB().Exec(ctx, "DELETE FROM `operation_floor` WHERE title=?", title)
-	res, err := g.DB().Exec(ctx,
-		"INSERT INTO `operation_floor`(floor_type,title,config,sort,status) VALUES(?,?,NULL,0,?)",
-		floorType, title, status)
-	t.AssertNil(err)
-	id, _ := res.LastInsertId()
-	return id
-}
-
 func cleanupFloor(ctx context.Context, t *gtest.T, titles ...string) {
 	for _, ti := range titles {
 		_, _ = g.DB().Exec(ctx, "DELETE FROM `operation_floor` WHERE title=?", ti)
