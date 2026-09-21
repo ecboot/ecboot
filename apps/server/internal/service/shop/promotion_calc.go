@@ -64,8 +64,10 @@ func calcPointDeductFen(ctx context.Context, userId int64, use bool, maxFen int6
 	if !use || maxFen <= 0 {
 		return 0
 	}
+	// 012 前置修复（批次 05 评审债务）: point_account 表**无 deleted 列**（V19 建表 + V26 仅加
+	// last_earned_at）——原查询必报错并被静默吞掉, 致积分抵扣恒为 0。该表无软删语义, 直接按 user_id 查。
 	rec, err := g.DB().GetOne(ctx,
-		"SELECT balance FROM point_account WHERE user_id=? AND deleted=0", userId)
+		"SELECT balance FROM point_account WHERE user_id=?", userId)
 	if err != nil || rec.IsEmpty() {
 		return 0
 	}
