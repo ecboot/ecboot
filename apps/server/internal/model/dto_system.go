@@ -64,7 +64,7 @@ type TradeDashboard struct {
 type MemberDashboard struct {
 	NewCount     int64 `json:"newCount"`
 	ActiveCount  int64 `json:"activeCount"`
-	DormantCount int64 `json:"dormantCount" dc:"≥90天口径"`
+	DormantCount int64 `json:"dormantCount" dc:"休眠(阈值读 system_config dormant.tier1.days, 缺省90天)"`
 }
 
 type ProductDashboard struct {

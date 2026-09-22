@@ -122,10 +122,20 @@ func TestDashboardMember(t *testing.T) {
 		t.Assert(afterAct.ActiveCount, act.ActiveCount+1) // 1 天前活跃计入（默认近 30 天窗）
 		t.Assert(afterAct.DormantCount, act.DormantCount) // 但不是休眠（<90 天）——双口径互斥验证
 
-		// N6/I4 三轮收口: **100 天前活跃不得计入 ActiveCount**——这才是"默认窗是有限窗口"的
-		// 判别式断言（原断言在"全量"与"近30天"两种实现下都恰好 +1, 原理上不可能区分; 复审全量变异不红实证）
-		t.Assert(afterAct.ActiveCount, act.ActiveCount+1) // ph（100 天前活跃）未使活跃再 +1
-		// 反向: 100 天前活跃者只在休眠口径出现（上面已断言 DormantCount 记账在 ph 上）
+		// N6/I4 **三轮收口修正**: 判别式断言必须"插入一个 **窗口外** 活跃用户后 ActiveCount **不变**"——
+		// 这才是有限窗 vs 全量的分辨点。前两轮的写法（对"1 天前活跃"取 +1）在两种实现下都成立,
+		// 原理上不可区分（复审全量变异实证不红; 且上轮那行与上一行逐字重复=纯冗余）。
+		const ph3 = "TF-DB-OLD-PH"
+		_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph3)
+		_, err = g.DB().Exec(ctx,
+			"INSERT INTO `user`(nickname,phone,phone_hash,growth_value,status,last_active_at) "+
+				"VALUES('TF-DB-OLD','x',?,0,1,DATE_SUB(NOW(), INTERVAL 100 DAY))", ph3)
+		t.AssertNil(err)
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph3) }()
+		afterOld, err := logic.Member(ctx, "", "")
+		t.AssertNil(err)
+		t.Assert(afterOld.ActiveCount, afterAct.ActiveCount) // **100 天前活跃 → 活跃数不变**（全量实现下会 +1 → 红）
+		t.Assert(afterOld.DormantCount, afterAct.DormantCount+1) // 而计入休眠（阈值 90 内）
 
 		// 休眠: 全量口径（不受窗口）——100 天前活跃行必被计入
 		t.Assert(act.DormantCount >= 1, true)
@@ -222,7 +232,12 @@ func TestDashboardDormantThresholdFromConfig(t *testing.T) {
 				"VALUES('TF-DB-CFG','x',?,0,1,DATE_SUB(NOW(), INTERVAL 5 DAY))", ph)
 		t.AssertNil(err)
 
-		// 读原阈值并改为 2（模拟运营在后台改配置）
+		// 读原阈值并改为 2（模拟运营在后台改配置）。
+		// 潜在 flake 说明（复审 Minor）: 本测试临时改**共享** system_config 键, 而并行 user 包的
+		// wx.ensureNotDormant 读同一键 → 理论上可互相干扰。**取值方向已选安全侧**: 调**小**阈值
+		// 只会让更多用户被判休眠, 而并行用例的期望恰是"长期未活跃→拒绝", 故不会制造假失败;
+		// 若改**大**（如 9999）则会与并行期望相反 → 严禁。
+		// 已在 PROGRESS §六 登记为观测项（跨包共享配置的通用隐患）。
 		orig, err := g.DB().GetValue(ctx,
 			"SELECT value FROM system_config WHERE code='dormant.tier1.days'")
 		t.AssertNil(err)
