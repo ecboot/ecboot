@@ -124,23 +124,49 @@ func TestAdminCouponLifecycle(t *testing.T) {
 		_, err = logic.AdminDetail(ctx, 999999999)
 		t.Assert(errCode(err), errcode.CodeNotFound)
 
-		// C 端首页"可领券"含该券
-		idx, err := NewMarketingLogic().Index(ctx)
+		// C1 回归（评审修复）: validType=2 的券 valid_start_at/valid_end_at 恒 NULL——
+		// 原实现对 GTime() 直接解引用, 列表/详情 panic。建一张并列表/详情, 必须正常。
+		const n2 = "TF-券NULL日期"
+		defer cleanupCouponFixture(ctx, n2)
+		_, err = logic.AdminCreate(ctx, model.CouponInput{
+			Name: n2, Type: 2, Discount: "5.00", ValidType: 2, ValidDays: 7,
+		})
+		t.AssertNil(err)
+		list2, err := logic.AdminList(ctx, 0, model.PageReq{Page: 1, PageSize: 50})
+		t.AssertNil(err) // 不 panic
+		hit2 := false
+		for _, it := range list2.List {
+			if it.Name == n2 {
+				hit2 = true
+				t.Assert(it.ValidType, 2)
+			}
+		}
+		t.Assert(hit2, true)
+		id2v, err := g.DB().GetValue(ctx, "SELECT id FROM coupon WHERE name=?", n2)
+		t.AssertNil(err)
+		d2, err := logic.AdminDetail(ctx, id2v.Int64())
+		t.AssertNil(err)
+		t.Assert(d2.ValidType, 2)
+
+		// C 端"可领券"含该券（用 PublicList 分页口径断言, 不受首页 3 条限额的环境挤占影响;
+		// PublicList 与首页券块同源同口径——M7 补实现后正好互为验证）
+		pub, err := logic.PublicList(ctx, model.PageReq{Page: 1, PageSize: 100})
 		t.AssertNil(err)
 		hit := false
-		for _, c := range idx.Coupons {
+		for _, c := range pub.List {
 			if c.Name == n {
 				hit = true
 			}
 		}
 		t.Assert(hit, true)
 
-		// 停发 → C 端即时消失
-		t.AssertNil(logic.AdminUpdate(ctx, cid, model.CouponInput{Status: 0}))
-		idx, err = NewMarketingLogic().Index(ctx)
+		// 停发 → C 端即时消失（显式 status=0; I6 三态语义: nil 不动, 0 才停）
+		zero := 0
+		t.AssertNil(logic.AdminUpdate(ctx, cid, model.CouponInput{Status: &zero}))
+		pub, err = logic.PublicList(ctx, model.PageReq{Page: 1, PageSize: 100})
 		t.AssertNil(err)
 		hit = false
-		for _, c := range idx.Coupons {
+		for _, c := range pub.List {
 			if c.Name == n {
 				hit = true
 			}
@@ -166,5 +192,15 @@ func TestAdminCouponLifecycle(t *testing.T) {
 			"SELECT COUNT(*) FROM user_coupon uc JOIN coupon c ON uc.coupon_id=c.id WHERE c.name=?", n)
 		t.AssertNil(err)
 		t.Assert(keep.Int(), 1) // 领取行未级联删
+
+		// I6 回归（独立段）: 部分更新（只改名, 不传 status）不得静默停发
+		const n3 = "TF-券部分更新"
+		defer cleanupCouponFixture(ctx, n3)
+		cid3 := seedCoupon(ctx, t, n3, 1)
+		t.AssertNil(logic.AdminUpdate(ctx, cid3, model.CouponInput{Name: n3 + "-改名"}))
+		d3, err := logic.AdminDetail(ctx, cid3)
+		t.AssertNil(err)
+		t.Assert(d3.Status, 1)     // 启停未被触碰（原实现无条件写 status → 静默停发）
+		t.Assert(d3.Name, n3+"-改名")
 	})
 }

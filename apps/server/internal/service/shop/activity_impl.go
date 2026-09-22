@@ -25,13 +25,21 @@ func NewActivityLogic() *ActivityLogicImpl { return &ActivityLogicImpl{} }
 
 // ---------- 通用校验与装配 ----------
 
-// activityTimeCheck 活动时间窗（start<end; 格式由 gtime 解析失败即报错）。
+// activityTimeCheck 活动时间窗。M8（评审修复）: 部分更新语义——非空侧才校验格式,
+// 双非空才比较顺序（原实现传其一时另一侧按空解析报"时间格式非法", 误导且 Update 契约声明可选）。
 func activityTimeCheck(start, end string) error {
-	s, e := gtime.New(start), gtime.New(end)
-	if s == nil || e == nil || s.Timestamp() == 0 || e.Timestamp() == 0 {
-		return errcode.New(errcode.CodeInvalidParam, "时间格式非法")
+	var s, e *gtime.Time
+	if start != "" {
+		if s = gtime.New(start); s == nil || s.Timestamp() == 0 {
+			return errcode.New(errcode.CodeInvalidParam, "开始时间格式非法")
+		}
 	}
-	if !e.After(s) {
+	if end != "" {
+		if e = gtime.New(end); e == nil || e.Timestamp() == 0 {
+			return errcode.New(errcode.CodeInvalidParam, "结束时间格式非法")
+		}
+	}
+	if s != nil && e != nil && !e.After(s) {
 		return errcode.New(errcode.CodeInvalidParam, "活动开始必须早于结束")
 	}
 	return nil
@@ -44,6 +52,20 @@ func moneyYuanCheck(v string, field string) (int64, error) {
 		return 0, errcode.New(errcode.CodeInvalidParam, field+"金额非法")
 	}
 	return fen, nil
+}
+
+// spuExistsCheck SPU 存在且未删（M13: 拼团/砍价创建的归属校验）。
+func spuExistsCheck(ctx context.Context, spuId int64) error {
+	n, err := dao.ProductSpu.Ctx(ctx).
+		Where(dao.ProductSpu.Columns().Id, spuId).
+		Where(dao.ProductSpu.Columns().Deleted, 0).Count()
+	if err != nil {
+		return gerror.Wrap(err, "查询SPU失败")
+	}
+	if n == 0 {
+		return errcode.New(errcode.CodeProductNotFound, "SPU不存在或已删除")
+	}
+	return nil
 }
 
 // skuExistsCheck SKU 存在且未删。
@@ -137,11 +159,16 @@ func activityDelete(ctx context.Context, table string, id int64) error {
 }
 
 // activityTimeUpdate 通用时间窗/名称/状态修改。
+// I3（评审修复）: affected=0 有两种语义——"不存在"与"同值无变化"（MySQL 不计同值行）,
+// 直接判行数会把同值更新误报 50003（评审探针 P2 实证）→ 前置存在性 Count, 更新本身幂等成功。
 func activityTimeUpdate(ctx context.Context, table string, id int64, in model.ActivityTimeInput) error {
 	if in.StartTime != "" || in.EndTime != "" {
 		if err := activityTimeCheck(in.StartTime, in.EndTime); err != nil {
 			return err
 		}
+	}
+	if err := activityMustExist(ctx, table, id); err != nil {
+		return err
 	}
 	data := g.Map{}
 	if in.Name != "" {
@@ -153,15 +180,14 @@ func activityTimeUpdate(ctx context.Context, table string, id int64, in model.Ac
 	if in.EndTime != "" {
 		data["end_time"] = gtime.New(in.EndTime)
 	}
-	data["status"] = in.Status
-	res, err := g.DB().Model(table).Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
-	if err != nil {
-		return gerror.Wrap(err, "修改活动失败")
+	if in.Status != nil { // I6: 三态——nil 不修改启停
+		data["status"] = *in.Status
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return errcode.New(errcode.CodeActivityNotFound, "活动不存在")
+	if len(data) == 0 {
+		return nil
 	}
-	return nil
+	_, err := g.DB().Model(table).Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
+	return gerror.Wrap(err, "修改活动失败")
 }
 
 // activityMustExist 活动存在且未删（SetItems 前置）。
@@ -250,13 +276,16 @@ func (i *ActivityLogicImpl) FullReductionUpdate(ctx context.Context, id int64, i
 	if err := activityMustExist(ctx, "promotion_activity", id); err != nil {
 		return err
 	}
+	// 时间字段: 全量更新语义（Create/Update 同一表单提交, api 两字段都随单提交）
+	data := g.Map{
+		"name":       in.Name,
+		"start_time": gtime.New(in.StartTime),
+		"end_time":   gtime.New(in.EndTime),
+	}
+	if in.Status != nil { // I6: 三态——nil 不修改启停
+		data["status"] = *in.Status
+	}
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		data := g.Map{
-			"name":       in.Name,
-			"start_time": gtime.New(in.StartTime),
-			"end_time":   gtime.New(in.EndTime),
-			"status":     in.Status,
-		}
 		if _, e := tx.Model("promotion_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update(); e != nil {
 			return gerror.Wrap(e, "修改满减活动失败")
 		}
@@ -279,11 +308,18 @@ func (i *ActivityLogicImpl) FullReductionDelete(ctx context.Context, id int64) e
 func fullReductionCheck(ctx context.Context, in model.PromotionActivityInput) error {
 	seen := map[string]bool{}
 	for _, l := range in.Ladders {
-		if _, err := moneyYuanCheck(l.Threshold, "门槛"); err != nil {
+		th, err := moneyYuanCheck(l.Threshold, "门槛")
+		if err != nil {
 			return err
 		}
-		if _, err := moneyYuanCheck(l.Discount, "优惠"); err != nil {
+		dc, err := moneyYuanCheck(l.Discount, "优惠")
+		if err != nil {
 			return err
+		}
+		// I5（评审修复）: "减"不得超过"满"——配置面拦住负应付（满100减200 经计价直通
+		// payFen=total-promotion 无下限 → 负应付订单; 计价封顶属 012 文件, 已挂账）
+		if dc > th {
+			return errcode.New(errcode.CodeInvalidParam, "优惠金额不得超过门槛金额")
 		}
 		if seen[l.Threshold] {
 			return errcode.New(errcode.CodeLadderDup, "档位门槛重复")
@@ -376,6 +412,9 @@ func (i *ActivityLogicImpl) GroupBuyCreate(ctx context.Context, in model.GroupBu
 	if err := activityTimeCheck(in.StartTime, in.EndTime); err != nil {
 		return 0, err
 	}
+	if err := spuExistsCheck(ctx, in.SpuId); err != nil { // M13: 不挂悬空 SPU
+		return 0, err
+	}
 	// 拼团表时间列为 valid_start_at/valid_end_at（000017, 与其余活动表不同名——勘察实证）
 	return activityCreate(ctx, "group_buy_activity", g.Map{
 		"name":           in.Name,
@@ -401,7 +440,10 @@ func (i *ActivityLogicImpl) GroupBuyUpdate(ctx context.Context, id int64, in mod
 			return err
 		}
 	}
-	data := g.Map{"status": in.Status}
+	if err := activityMustExist(ctx, "group_buy_activity", id); err != nil { // I3: 同值更新不得误报不存在
+		return err
+	}
+	data := g.Map{}
 	if in.Name != "" {
 		data["name"] = in.Name
 	}
@@ -417,14 +459,14 @@ func (i *ActivityLogicImpl) GroupBuyUpdate(ctx context.Context, id int64, in mod
 	if in.EndTime != "" {
 		data["valid_end_at"] = gtime.New(in.EndTime)
 	}
-	res, err := g.DB().Model("group_buy_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
-	if err != nil {
-		return gerror.Wrap(err, "修改拼团活动失败")
+	if in.Status != nil { // I6: 三态
+		data["status"] = *in.Status
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return errcode.New(errcode.CodeActivityNotFound, "拼团活动不存在")
+	if len(data) == 0 {
+		return nil
 	}
-	return nil
+	_, err := g.DB().Model("group_buy_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
+	return gerror.Wrap(err, "修改拼团活动失败")
 }
 
 func (i *ActivityLogicImpl) GroupBuyDelete(ctx context.Context, id int64) error {
@@ -540,25 +582,57 @@ func (i *ActivityLogicImpl) FlashSaleSetItems(ctx context.Context, id int64, ite
 		seen[it.SkuId] = true
 	}
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		// 已售保护: 现有行中"被订单引用且已售"的 SKU 必须保留在提交集合里（锁定读复核防并发下单）
+		// C2（评审修复）: **diff 语义, 不再全删重插**——原实现 LockUpdate 只拦"移除已售行",
+		// 随后的全删+重插把**保留的已售行**也删行重建 → sold_count 清零、
+		// trade_order_item.flash_sale_item_id 悬空（限购累计/取消回补/售后回补全部失配,
+		// 活动库存账清零可超卖——恰是本防线要防的账实悬空, 评审探针 P3 实证）。
+		// 改为: 保留行**原位 UPDATE**（只改价格/限量/限购, sold_count 天然不动）,
+		// 删除提交集合外的行, 新 SKU INSERT。锁定读整集合复核防并发下单竞态。
 		old, e := tx.Model("flash_sale_item").Ctx(ctx).
-			Where("activity_id", id).Where("sold_count > 0").LockUpdate().All()
+			Where("activity_id", id).LockUpdate().All()
 		if e != nil {
-			return gerror.Wrap(e, "查询已售场次失败")
+			return gerror.Wrap(e, "查询场次商品失败")
+		}
+		bySku := map[int64]model.ActivitySkuInput{}
+		for _, it := range items {
+			bySku[it.SkuId] = it
+		}
+		// 已售保护: sold_count>0 的行不得移除（必须在提交集合里）
+		for _, r := range old {
+			if r["sold_count"].Int() > 0 {
+				if _, ok := bySku[r["sku_id"].Int64()]; !ok {
+					return errcode.New(errcode.CodeActivityInvalid, "场次商品已被抢购, 不可移除")
+				}
+			}
 		}
 		for _, r := range old {
 			skuId := r["sku_id"].Int64()
-			if !seen[skuId] {
-				return errcode.New(errcode.CodeActivityInvalid, "场次商品已被抢购, 不可移除")
+			it, keep := bySku[skuId]
+			if !keep {
+				if _, e = tx.Model("flash_sale_item").Ctx(ctx).Where("id", r["id"].Int64()).Delete(); e != nil {
+					return gerror.Wrap(e, "移除场次商品失败")
+				}
+				continue
 			}
-		}
-		if _, e = tx.Model("flash_sale_item").Ctx(ctx).Where("activity_id", id).Delete(); e != nil {
-			return gerror.Wrap(e, "清空场次商品失败")
-		}
-		for _, it := range items {
+			// 保留行: 原位更新配置（sold_count 不在写入集 → 守恒）
 			perLimit := it.PerLimit
 			if perLimit == 0 {
-				perLimit = 1 // 缺省 1（表默认同值, 显式写清语义）
+				perLimit = 1 // 缺省 1
+			}
+			if _, e = tx.Model("flash_sale_item").Ctx(ctx).Where("id", r["id"].Int64()).Data(g.Map{
+				"flash_price": it.FlashPrice,
+				"stock_count": it.StockCount,
+				"per_limit":   perLimit,
+			}).Update(); e != nil {
+				return gerror.Wrap(e, "更新场次商品失败")
+			}
+			delete(bySku, skuId)
+		}
+		// 剩余 = 新增 SKU
+		for _, it := range bySku {
+			perLimit := it.PerLimit
+			if perLimit == 0 {
+				perLimit = 1
 			}
 			if _, e = tx.Model("flash_sale_item").Ctx(ctx).Data(g.Map{
 				"activity_id": id,
@@ -585,6 +659,9 @@ func (i *ActivityLogicImpl) BargainList(ctx context.Context, status int, page mo
 
 func (i *ActivityLogicImpl) BargainCreate(ctx context.Context, in model.BargainActivityInput) (int64, error) {
 	if err := activityTimeCheck(in.StartTime, in.EndTime); err != nil {
+		return 0, err
+	}
+	if err := spuExistsCheck(ctx, in.SpuId); err != nil { // M13
 		return 0, err
 	}
 	return activityCreate(ctx, "bargain_activity", g.Map{
@@ -620,7 +697,10 @@ func (i *ActivityLogicImpl) BargainUpdate(ctx context.Context, id int64, in mode
 			return err
 		}
 	}
-	data := g.Map{"status": in.Status}
+	if err := activityMustExist(ctx, "bargain_activity", id); err != nil { // I3
+		return err
+	}
+	data := g.Map{}
 	if in.Name != "" {
 		data["name"] = in.Name
 	}
@@ -630,14 +710,14 @@ func (i *ActivityLogicImpl) BargainUpdate(ctx context.Context, id int64, in mode
 	if in.EndTime != "" {
 		data["end_time"] = gtime.New(in.EndTime)
 	}
-	res, err := g.DB().Model("bargain_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
-	if err != nil {
-		return gerror.Wrap(err, "修改砍价活动失败")
+	if in.Status != nil { // I6: 三态
+		data["status"] = *in.Status
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return errcode.New(errcode.CodeActivityNotFound, "砍价活动不存在")
+	if len(data) == 0 {
+		return nil
 	}
-	return nil
+	_, err := g.DB().Model("bargain_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
+	return gerror.Wrap(err, "修改砍价活动失败")
 }
 
 func (i *ActivityLogicImpl) BargainDelete(ctx context.Context, id int64) error {
@@ -759,7 +839,11 @@ func (i *ActivityLogicImpl) AssistList(ctx context.Context, status int, page mod
 		out.List[i].RewardType = ri.rtype
 		out.List[i].RequiredCount = ri.reqCnt
 		if ri.rtype == 1 {
-			out.List[i].RewardDesc = "邀 " + intToString(ri.reqCnt) + " 人得券「" + names[ri.ref] + "」"
+			name := names[ri.ref]
+			if name == "" {
+				name = "奖励券已删除" // M13: 券被删后不出现空引号
+			}
+			out.List[i].RewardDesc = "邀 " + intToString(ri.reqCnt) + " 人得券「" + name + "」"
 		} else {
 			out.List[i].RewardDesc = "邀 " + intToString(ri.reqCnt) + " 人得 " + intToString(ri.points) + " 积分"
 		}
@@ -807,7 +891,10 @@ func (i *ActivityLogicImpl) AssistUpdate(ctx context.Context, id int64, in model
 	if in.RequiredCount != 0 && in.RequiredCount < 1 {
 		return errcode.New(errcode.CodeInvalidParam, "所需人数必须大于 0")
 	}
-	data := g.Map{"status": in.Status}
+	if err := activityMustExist(ctx, "assist_activity", id); err != nil { // I3
+		return err
+	}
+	data := g.Map{}
 	if in.Name != "" {
 		data["name"] = in.Name
 	}
@@ -823,14 +910,14 @@ func (i *ActivityLogicImpl) AssistUpdate(ctx context.Context, id int64, in model
 	if in.EndTime != "" {
 		data["end_time"] = gtime.New(in.EndTime)
 	}
-	res, err := g.DB().Model("assist_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
-	if err != nil {
-		return gerror.Wrap(err, "修改助力活动失败")
+	if in.Status != nil { // I6: 三态
+		data["status"] = *in.Status
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return errcode.New(errcode.CodeActivityNotFound, "助力活动不存在")
+	if len(data) == 0 {
+		return nil
 	}
-	return nil
+	_, err := g.DB().Model("assist_activity").Ctx(ctx).Where("id", id).Where("deleted", 0).Data(data).Update()
+	return gerror.Wrap(err, "修改助力活动失败")
 }
 
 func (i *ActivityLogicImpl) AssistDelete(ctx context.Context, id int64) error {

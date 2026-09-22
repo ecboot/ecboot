@@ -512,7 +512,7 @@ type CouponInput struct {
 	ValidStartAt string
 	ValidEndAt   string
 	ValidDays    int
-	Status       int `dc:"启停(仅 AdminUpdate 消费; 016 契约微扩 D3-③: api Update Req 有 status 而 DTO 漏)"`
+	Status       *int `dc:"启停(nil=不修改启停; 0停发 1启用——016 评审 I6: 三态化, 未传不得静默停发)"`
 }
 
 type CouponRecordItem struct {
@@ -577,7 +577,7 @@ type PromotionActivityInput struct {
 	Name      string
 	StartTime string
 	EndTime   string
-	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-④: api Update Req 有 status 而 DTO 漏)"`
+	Status    *int `dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 	Ladders   []PromotionLadder
 	Scopes    []PromotionScope
 }
@@ -589,14 +589,14 @@ type GroupBuyInput struct {
 	PerLimit  int
 	StartTime string
 	EndTime   string
-	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑤)"`
+	Status    *int `dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 }
 
 type ActivityTimeInput struct {
 	Name      string
 	StartTime string
 	EndTime   string
-	Status    int
+	Status    *int `dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 }
 
 type BargainActivityInput struct {
@@ -604,7 +604,7 @@ type BargainActivityInput struct {
 	SpuId     int64
 	StartTime string
 	EndTime   string
-	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑥)"`
+	Status    *int `dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 }
 
 type ActivitySkuInput struct {
@@ -628,7 +628,7 @@ type AssistActivityInput struct {
 	PerLimit      int
 	StartTime     string
 	EndTime       string
-	Status        int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑦)"`
+	Status        *int `dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 }
 
 type ReviewCreateInput struct {

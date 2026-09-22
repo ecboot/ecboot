@@ -27,6 +27,18 @@ func seedRouteAdmin(ctx context.Context, t *gtest.T, username string) int64 {
 	return id
 }
 
+// seedRouteAdmin2 造非超管（is_super=0, 无任何角色绑定 → HasPermission 恒 false）。
+// I4 对照组用: 挂了 RequirePerm 的端点必须回 10005, 漏挂即红。
+func seedRouteAdmin2(ctx context.Context, t *gtest.T, username string) int64 {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM admin_user WHERE username=?", username)
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO admin_user(username,password_hash,real_name,is_super,status) VALUES(?,?,?,?,1)",
+		username, "x", "无权限对照管理员", 0)
+	t.AssertNil(err)
+	id, _ := res.LastInsertId()
+	return id
+}
+
 // TestMarketingAdminEndpointsReachable 30 端点可达性（每类抽全 4 动作形态: GET/POST/PUT/DELETE）。
 func TestMarketingAdminEndpointsReachable(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
@@ -82,6 +94,35 @@ func TestMarketingAdminEndpointsReachable(t *testing.T) {
 		// 对照 1: 未登录 → 必须 10003（证明鉴权在位）
 		body := doReq(ctx, t, base, "", "GET", "/admin/coupons", "")
 		t.Assert(strings.Contains(body, "\"code\":10003"), true)
+
+		// 对照 2（I4, 评审修复）: **非超管**（is_super=0、无任何角色）→ 必须回 10005。
+		// 原先只测超管（is_super 对任意 code 直通）——漏挂/错挂 RequirePerm 永不产生 10005,
+		// 测试结构性守不住权限挂载（评审变异实证: 删掉 RequirePerm 测试仍绿）。
+		// 非超管无权限 → 挂了 RequirePerm 的端点必回 10005; 漏挂的端点会 200/业务码 → 当场红。
+		noPermId := seedRouteAdmin2(ctx, t, "ROUTE-MKT-NOPERMC")
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM admin_user WHERE id=?", noPermId) }()
+		noPermToken, _, err := security.NewSessionManager("admin", 7).Create(ctx, noPermId)
+		t.AssertNil(err)
+		probe := []struct{ method, path, body string }{
+			{"GET", "/admin/coupons", ""},
+			{"POST", "/admin/coupons", `{"name":"X","type":2,"discount":"1.00","validType":2,"validDays":1}`},
+			{"PUT", "/admin/coupons/999999999", `{"name":"X"}`},
+			{"DELETE", "/admin/coupons/999999999", ""},
+			{"GET", "/admin/full-reductions", ""},
+			{"POST", "/admin/full-reductions", `{"name":"X","startTime":"2026-01-01 00:00:00","endTime":"2026-12-01 00:00:00","ladders":[{"threshold":"100.00","discount":"10.00"}]}`},
+			{"GET", "/admin/group-buys", ""},
+			{"PUT", "/admin/group-buys/999999999/items", `{"items":[]}`},
+			{"GET", "/admin/flash-sales", ""},
+			{"PUT", "/admin/flash-sales/999999999", `{"name":"X"}`},
+			{"GET", "/admin/bargains", ""},
+			{"PUT", "/admin/bargains/999999999/items", `{"items":[]}`},
+			{"GET", "/admin/assists", ""},
+			{"DELETE", "/admin/assists/999999999", ""},
+		}
+		for _, c := range probe {
+			body := doReq(ctx, t, base, noPermToken, c.method, c.path, c.body)
+			t.Assert(strings.Contains(body, "\"code\":10005"), true) // 每个权限点都真的在位
+		}
 
 		// 清理探活可能创建成功的 TF-WIRE 数据（按精确名, 子表先删）
 		_, _ = g.DB().Exec(ctx, "DELETE FROM promotion_activity_scope WHERE activity_id IN (SELECT id FROM promotion_activity WHERE name LIKE 'TF-WIRE%')")

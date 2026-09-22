@@ -58,7 +58,7 @@ type (
 		Discount   string `json:"discount" dc:"抵扣"`
 		TotalCount int    `json:"totalCount" dc:"总量"`
 		PerLimit   int    `json:"perLimit" dc:"限领"`
-		Status     int    `json:"status" dc:"1启用 0停发"`
+		Status     *int   `json:"status" dc:"启停(nil=不修改; 0停发 1启用; 016 评审 I6 三态化)"`
 	}
 	AdminCouponUpdateRes struct {
 		Success bool `json:"success"`
@@ -151,7 +151,7 @@ type (
 		Name      string                     `json:"name" dc:"名称"`
 		StartTime string                     `json:"startTime" dc:"开始"`
 		EndTime   string                     `json:"endTime" dc:"结束"`
-		Status    int                        `json:"status" dc:"状态"`
+		Status    *int                       `json:"status" dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 		Ladders   []AdminFullReductionLadder `json:"ladders" dc:"档位(全量替换)"`
 		Scopes    []AdminFullReductionScope  `json:"scopes" dc:"范围(全量替换)"`
 	}

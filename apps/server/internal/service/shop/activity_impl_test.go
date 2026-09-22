@@ -90,11 +90,18 @@ func TestAdminFullReductionRoundTrip(t *testing.T) {
 		t.Assert(errCode(err), errcode.CodeInvalidParam)
 
 		// 全量替换: 2 档 → 1 档, 范围换全场（不落行=全场口径）
+		st := 1
 		t.AssertNil(logic.FullReductionUpdate(ctx, id, model.PromotionActivityInput{
-			Name: n, StartTime: "2026-01-01 00:00:00", EndTime: "2026-12-31 23:59:59", Status: 1,
+			Name: n, StartTime: "2026-01-01 00:00:00", EndTime: "2026-12-31 23:59:59", Status: &st,
 			Ladders: []model.PromotionLadder{{Threshold: "300.00", Discount: "50.00"}},
 			Scopes:  nil,
 		}))
+		// I5 回归: "减"不得超过"满"（满100减200 → 10001; 计价侧封顶属 012 挂账, 配置面拦住）
+		_, err = logic.FullReductionCreate(ctx, model.PromotionActivityInput{
+			Name: n, StartTime: "2026-01-01 00:00:00", EndTime: "2026-12-31 23:59:59",
+			Ladders: []model.PromotionLadder{{Threshold: "100.00", Discount: "200.00"}},
+		})
+		t.Assert(errCode(err), errcode.CodeInvalidParam)
 		d, err = logic.FullReductionDetail(ctx, id)
 		t.AssertNil(err)
 		t.Assert(len(d.Ladders), 1)
@@ -123,9 +130,7 @@ func TestAdminFlashSaleItems(t *testing.T) {
 		defer cleanupActivityFixture(ctx, n)
 		const h1 = "ADM-FS-1"
 		defer cleanupPointUser(ctx, t, h1)
-		uid := seedPointUser(ctx, t, h1)
-		defer cleanupOrderCreate(ctx, uid)
-		addrId := seedUserAddress(ctx, t, uid)
+		_ = seedPointUser(ctx, t, h1)
 
 		logic := NewActivityLogic()
 		actId, err := logic.FlashSaleCreate(ctx, model.ActivityTimeInput{
@@ -172,30 +177,39 @@ func TestAdminFlashSaleItems(t *testing.T) {
 		t.AssertNil(err)
 		t.Assert(cnt.Int(), 1)
 
-		// 已售保护: sku 场次被真实订单消耗后 → 禁止移除该行
-		// （活动改为进行中, 走真实下单占 sold_count）
-		_, err = g.DB().Exec(ctx, "UPDATE flash_sale_activity SET start_time=DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id=?", actId)
-		t.AssertNil(err)
-		_, itemId := seedFlashSale(ctx, t, "TF-占位秒杀", f.SkuId, "5.00", 10, -10, 60) // 独立场次供下单
-		out, err := NewOrderLogic().Create(ctx, uid, model.OrderCreateInput{
-			RequestToken: "T-ADM-FS-1", AddressId: addrId, SkuId: f.SkuId, Quantity: 1, FlashSaleItemId: itemId,
-		})
-		t.AssertNil(err)
-		defer cleanupPayFixture(ctx, t, out.OrderNo)
-		// 回到目标活动: 尝试全量替换为空（移除唯一场次商品, 该行已被 sku 买过 → sold 口径在目标活动仍为 0,
-		// 保护以"被订单项引用"为准）→ 该 sku 未在目标活动售出, 允许; 再造"已售"场景: 直接置 sold_count=1 模拟
+		// 已售保护 + C2 回归（评审修复）: 置 sold_count=1 模拟已售
+		// ① 移除已售行 → 拒绝; ② **保留已售行**的替换 → 行 id 不变 + sold_count 守恒
+		// （原全删重插实现把保留行也删了重建: 行 id 变、sold_count 清零、订单引用悬空——评审探针 P3）
 		_, err = g.DB().Exec(ctx, "UPDATE flash_sale_item SET sold_count=1 WHERE activity_id=?", actId)
+		t.AssertNil(err)
+		oldRow, err := g.DB().GetOne(ctx, "SELECT id, sold_count FROM flash_sale_item WHERE activity_id=? AND sku_id=?", actId, f.SkuId)
 		t.AssertNil(err)
 		err = logic.FlashSaleSetItems(ctx, actId, []model.ActivitySkuInput{
 			{SkuId: sku2, FlashPrice: "4.00", StockCount: 5},
 		})
-		t.Assert(errCode(err), errcode.CodeActivityInvalid) // 已售行不得移除
-		// 未售场景可替换（还原 sold_count=0 后成功）
-		_, err = g.DB().Exec(ctx, "UPDATE flash_sale_item SET sold_count=0 WHERE activity_id=?", actId)
-		t.AssertNil(err)
+		t.Assert(errCode(err), errcode.CodeActivityInvalid) // ① 已售行不得移除
+		// ② 保留已售行（改价）+ 换入新 SKU → 成功
 		t.AssertNil(logic.FlashSaleSetItems(ctx, actId, []model.ActivitySkuInput{
+			{SkuId: f.SkuId, FlashPrice: "6.00", StockCount: 20, PerLimit: 1},
 			{SkuId: sku2, FlashPrice: "4.00", StockCount: 5},
 		}))
+		keptRow, err := g.DB().GetOne(ctx, "SELECT id, sold_count, flash_price, stock_count FROM flash_sale_item WHERE activity_id=? AND sku_id=?", actId, f.SkuId)
+		t.AssertNil(err)
+		t.Assert(keptRow["id"].Int64(), oldRow["id"].Int64())   // 行 id 不变（原位更新, 引用不悬空）
+		t.Assert(keptRow["sold_count"].Int(), oldRow["sold_count"].Int()) // sold_count 守恒
+		t.Assert(keptRow["flash_price"].String(), "6.00")       // 配置确实更新
+		t.Assert(keptRow["stock_count"].Int(), 20)
+
+		// I3 回归: **同值更新**不得误报"不存在"（affected=0 是无变化不是缺失）
+		st := 1
+		t.AssertNil(logic.FlashSaleUpdate(ctx, actId, model.ActivityTimeInput{
+			Name: n, StartTime: "2026-01-01 00:00:00", EndTime: "2099-12-31 23:59:59", Status: &st,
+		}))
+		// I6 回归: Status 不传（nil）→ 启停不变
+		t.AssertNil(logic.FlashSaleUpdate(ctx, actId, model.ActivityTimeInput{Name: n}))
+		fs2, err := g.DB().GetValue(ctx, "SELECT status FROM flash_sale_activity WHERE id=?", actId)
+		t.AssertNil(err)
+		t.Assert(fs2.Int(), 1)
 
 		// 软删 → C 端消失（SC-3）
 		t.AssertNil(logic.FlashSaleDelete(ctx, actId))

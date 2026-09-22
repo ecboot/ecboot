@@ -14,27 +14,34 @@ import (
 	"testing"
 
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/gclient"
 	"github.com/gogf/gf/v2/test/gtest"
 
 	"ecboot/internal/library/security"
 )
 
 // doReq 发一次请求并返回响应体（token 为空则不带凭证）。
+// I4（016 评审修复）: 补 PUT/DELETE——原实现只认 GET/POST, 其余方法全部降级成 GET,
+// 13 个 PUT/DELETE 探活实发 GET（404 空洞通过）, 测试形同虚设。
 func doReq(ctx context.Context, t *gtest.T, base, token, method, path, body string) string {
 	cli := g.Client()
 	if token != "" {
 		cli = cli.SetHeader("Authorization", "Bearer "+token)
 	}
-	if method == "POST" {
-		res, err := cli.Post(ctx, base+path, body)
-		t.AssertNil(err)
-		if res == nil {
-			return ""
-		}
-		defer func() { _ = res.Close() }()
-		return res.ReadAllString()
+	var (
+		res *gclient.Response
+		err error
+	)
+	switch method {
+	case "POST":
+		res, err = cli.Post(ctx, base+path, body)
+	case "PUT":
+		res, err = cli.Put(ctx, base+path, body)
+	case "DELETE":
+		res, err = cli.Delete(ctx, base+path)
+	default: // GET
+		res, err = cli.Get(ctx, base+path)
 	}
-	res, err := cli.Get(ctx, base+path)
 	t.AssertNil(err)
 	if res == nil {
 		return ""

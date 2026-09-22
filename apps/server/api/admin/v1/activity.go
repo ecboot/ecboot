@@ -54,7 +54,7 @@ type (
 		PerLimit  int    `json:"perLimit" dc:"限购"`
 		StartTime string `json:"startTime" dc:"开始"`
 		EndTime   string `json:"endTime" dc:"结束"`
-		Status    int    `json:"status" dc:"1启用 0停用"`
+		Status    *int   `json:"status" dc:"启停(nil=不修改; 0停用 1启用; 016 评审 I6 三态化)"`
 	}
 	AdminGroupBuyUpdateRes struct {
 		Success bool `json:"success"`
@@ -126,7 +126,7 @@ type (
 		Name      string `json:"name" dc:"名称"`
 		StartTime string `json:"startTime" dc:"开始"`
 		EndTime   string `json:"endTime" dc:"结束"`
-		Status    int    `json:"status" dc:"状态"`
+		Status    *int   `json:"status" dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 	}
 	AdminFlashSaleUpdateRes struct {
 		Success bool `json:"success"`
@@ -189,7 +189,7 @@ type (
 		Name      string `json:"name" dc:"名称"`
 		StartTime string `json:"startTime" dc:"开始"`
 		EndTime   string `json:"endTime" dc:"结束"`
-		Status    int    `json:"status" dc:"状态"`
+		Status    *int   `json:"status" dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 	}
 	AdminBargainUpdateRes struct {
 		Success bool `json:"success"`
@@ -261,7 +261,7 @@ type (
 		PerLimit      int    `json:"perLimit" dc:"每人可发起"`
 		StartTime     string `json:"startTime" dc:"开始"`
 		EndTime       string `json:"endTime" dc:"结束"`
-		Status        int    `json:"status" dc:"状态"`
+		Status        *int   `json:"status" dc:"启停(nil=不修改; 016 评审 I6 三态化)"`
 	}
 	AdminAssistUpdateRes struct {
 		Success bool `json:"success"`
