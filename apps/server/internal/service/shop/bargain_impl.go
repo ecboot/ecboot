@@ -104,40 +104,50 @@ func (i *BargainLogicImpl) Launch(
 	if err != nil {
 		return nil, err
 	}
-	data := do.BargainRecord{
-		BargainNo:    bargainNo,
-		ItemId:       bargainItemId,
-		UserId:       userId,
-		CurrentPrice: money.ToYuanString(curFen),
-		CutCount:     1, // 发起即首刀
-		Status:       status,
-		ExpireTime:   expire,
-		// OrderNo: 不写 → 默认 NULL（见函数头 C1 说明）
-	}
-	if status == 2 {
-		data.SuccessTime = gtime.Now()
-	}
-	res, err := dao.BargainRecord.Ctx(ctx).Data(data).Insert()
-	if err != nil {
-		// 1062 → 业务码（uk_bargain_no 等唯一键兜底; sonyflake 后撞键概率已可忽略, 纯防御）
-		if isDupKey(err) {
-			return nil, errcode.New(errcode.CodeTooFrequent, "发起过于频繁, 请稍后再试")
+	// 砍价单与首刀流水**同一事务**（复审新发现-2）: 原先 record 先提交、流水后插——
+	// 流水插入失败（非 1062）会残留 cut_count=1 而无流水行, 违反本轮守恒不变量
+	// （Σ帮砍流水 == 起始价 − 当前价; M2 同款收编, Cut/Help 已是事务而 Launch 漏了）。
+	var out *model.BargainLaunchResult
+	if err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		data := do.BargainRecord{
+			BargainNo:    bargainNo,
+			ItemId:       bargainItemId,
+			UserId:       userId,
+			CurrentPrice: money.ToYuanString(curFen),
+			CutCount:     1, // 发起即首刀
+			Status:       status,
+			ExpireTime:   expire,
+			// OrderNo: 不写 → 默认 NULL（见函数头 C1 说明）
 		}
-		return nil, gerror.Wrap(err, "创建砍价单失败")
+		if status == 2 {
+			data.SuccessTime = gtime.Now()
+		}
+		res, e := dao.BargainRecord.Ctx(ctx).Data(data).Insert()
+		if e != nil {
+			// 1062 → 业务码（uk_bargain_no 等唯一键兜底; sonyflake 后撞键概率已可忽略, 纯防御）
+			if isDupKey(e) {
+				return errcode.New(errcode.CodeTooFrequent, "发起过于频繁, 请稍后再试")
+			}
+			return gerror.Wrap(e, "创建砍价单失败")
+		}
+		recId, e := res.LastInsertId()
+		if e != nil {
+			return gerror.Wrap(e, "读取砍价单ID失败")
+		}
+		// 首刀记入帮砍流水（发起者本人; 与后续帮砍同构, 故进度列表自然含首刀）
+		if _, e = dao.BargainHelper.Ctx(ctx).Data(do.BargainHelper{
+			RecordId:     recId,
+			HelperUserId: userId,
+			CutAmount:    money.ToYuanString(per),
+		}).Insert(); e != nil {
+			return gerror.Wrap(e, "记录首刀失败")
+		}
+		out = &model.BargainLaunchResult{RecordId: recId, CurrentPrice: money.ToYuanString(curFen)}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
-	recId, err := res.LastInsertId()
-	if err != nil {
-		return nil, gerror.Wrap(err, "读取砍价单ID失败")
-	}
-	// 首刀记入帮砍流水（发起者本人; 与后续帮砍同构, 故进度列表自然含首刀）
-	if _, e := dao.BargainHelper.Ctx(ctx).Data(do.BargainHelper{
-		RecordId:     recId,
-		HelperUserId: userId,
-		CutAmount:    money.ToYuanString(per),
-	}).Insert(); e != nil {
-		return nil, gerror.Wrap(e, "记录首刀失败")
-	}
-	return &model.BargainLaunchResult{RecordId: recId, CurrentPrice: money.ToYuanString(curFen)}, nil
+	return out, nil
 }
 
 // Progress 砍价进度（FR-008）: 公开; 帮砍列表昵称脱敏; 超时**惰性判定**（不改表）。

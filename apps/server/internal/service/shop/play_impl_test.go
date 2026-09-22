@@ -726,3 +726,76 @@ func TestMarketingLists(t *testing.T) {
 		t.Assert(hitAssist, true)
 	})
 }
+
+// TestBargainOrderConcurrentDoublePlace 复审新发现-7 守卫: 同一砍价单**并发**下单必须恰一次成交。
+// 串行重复下单由事务外 loadBargainForOrder 的 status 校验兜住; 并发双花由下单事务内
+// 步骤5.5 的条件置位（status 2→3, 判行数）兜住——本用例钉住的正是后者。
+func TestBargainOrderConcurrentDoublePlace(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		f := setupTradeFixture(t)
+		defer cleanupFixture(ctx, f)
+		const h1, h2, h3 = "BGC2-1", "BGC2-2", "BGC2-3"
+		defer cleanupPointUser(ctx, t, h1)
+		defer cleanupPointUser(ctx, t, h2)
+		defer cleanupPointUser(ctx, t, h3)
+		u1 := seedPointUser(ctx, t, h1)
+		u2 := seedPointUser(ctx, t, h2)
+		u3 := seedPointUser(ctx, t, h3)
+		defer cleanupOrderCreate(ctx, u1)
+
+		const name = "TF-砍价并发下单"
+		defer cleanupBargain(ctx, name)
+		_, itemId := seedBargain(ctx, t, name, f.SpuId, f.SkuId, "100.00", "60.00", 3)
+		out, err := NewBargainLogic().Launch(ctx, u1, itemId)
+		t.AssertNil(err)
+		_, err = NewBargainLogic().Cut(ctx, u2, out.RecordId)
+		t.AssertNil(err)
+		_, err = NewBargainLogic().Cut(ctx, u3, out.RecordId)
+		t.AssertNil(err) // 到底价
+
+		addrId := seedUserAddress(ctx, t, u1)
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		orderNos := make([]string, 2)
+		start := make(chan struct{})
+		for i := 0; i < 2; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				created, e := NewOrderLogic().Create(ctx, u1, model.OrderCreateInput{
+					RequestToken:    fmt.Sprintf("T-BGC2-%d", idx),
+					AddressId:       addrId,
+					SkuId:           f.SkuId,
+					Quantity:        1,
+					BargainRecordId: out.RecordId,
+				})
+				if e == nil {
+					orderNos[idx] = created.OrderNo
+				}
+				errs[idx] = e
+			}(i)
+		}
+		close(start)
+		wg.Wait()
+
+		success := 0
+		for i := 0; i < 2; i++ {
+			if errs[i] == nil {
+				success++
+			} else {
+				t.Assert(errCode(errs[i]), errcode.CodeBargainUnpayable) // 失败方必须是 40004
+			}
+		}
+		t.Assert(success, 1) // 恰一次成交
+
+		rec, err := g.DB().GetOne(ctx, "SELECT order_no FROM bargain_record WHERE id=?", out.RecordId)
+		t.AssertNil(err)
+		winner := orderNos[0]
+		if winner == "" {
+			winner = orderNos[1]
+		}
+		t.Assert(rec["order_no"].String(), winner) // 回填的必是成交那张单
+	})
+}
