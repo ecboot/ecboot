@@ -9,6 +9,8 @@ package bootstrap
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/frame/g"
+
 	"ecboot/internal/model"
 	"ecboot/internal/service/shop"
 	"ecboot/internal/service/user"
@@ -34,4 +36,42 @@ func (couponQueryAdapter) UsableForOrder(
 		out = append(out, model.UsableCouponBrief(it))
 	}
 	return out, nil
+}
+
+// ---------- 分销资金域装配（017 批次 11） ----------
+
+func init() {
+	// 正向: 订单确认收货 → 佣金计提（SettleOrder, 归因+规则命中在 user 域）
+	shop.CommissionSettle = commissionSettleAdapter{}
+	// 反向: 售后完成 → 佣金冲销（批次 07 投递侧的消费端落地; 适配器把 afterSaleNo 还原为订单项集合）
+	shop.CommissionReverse = commissionReverseAdapter{}
+}
+
+// commissionSettleAdapter 正向计提适配。
+type commissionSettleAdapter struct{}
+
+func (commissionSettleAdapter) OnOrderConfirmed(ctx context.Context, orderNo string) {
+	if err := user.NewDistributionLogic().SettleOrder(ctx, orderNo); err != nil {
+		g.Log().Errorf(ctx, "[佣金计提] 确认收货计提失败(事件已投递, 需人工核对): order_no=%s err=%v", orderNo, err)
+	}
+}
+
+// commissionReverseAdapter 冲销适配: user 域冲销按 order_item_id 粒度,
+// 适配器把 shop 投递的 (orderNo, afterSaleNo, refundFen) 还原为该订单的订单项集合逐项冲销。
+type commissionReverseAdapter struct{}
+
+func (commissionReverseAdapter) ReverseForAfterSale(ctx context.Context, orderNo, afterSaleNo string, refundFen int64) {
+	ids, err := g.DB().Model("trade_order_item").Ctx(ctx).
+		Fields("id").Where("order_no", orderNo).All()
+	if err != nil {
+		g.Log().Errorf(ctx, "[佣金冲销] 订单项查询失败(需人工核对): order_no=%s after_sale_no=%s err=%v", orderNo, afterSaleNo, err)
+		return
+	}
+	logic := user.NewDistributionLogic()
+	for _, r := range ids {
+		if err = logic.ReverseOnRefund(ctx, r["id"].Int64()); err != nil {
+			g.Log().Errorf(ctx, "[佣金冲销] 冲销失败(需人工核对): order_no=%s order_item_id=%d err=%v",
+				orderNo, r["id"].Int64(), err)
+		}
+	}
 }

@@ -3,13 +3,19 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
-// AdminWithdrawPay 打款结果登记（成功核销 / 失败回退）
+// AdminWithdrawPay 打款登记（成功 40 渠道单号幂等 / 失败 60 回退）。
 func (c *ControllerV1) AdminWithdrawPay(ctx context.Context, req *v1.AdminWithdrawPayReq) (res *v1.AdminWithdrawPayRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermDistributionWithdrawPay); err != nil {
+		return nil, err
+	}
+	if err = user.NewDistributionAdminLogic().AdminWithdrawPay(ctx, req.WithdrawNo, req.Success, req.ChannelOrderNo, req.FailReason); err != nil {
+		return nil, err
+	}
+	return &v1.AdminWithdrawPayRes{Success: true}, nil
 }

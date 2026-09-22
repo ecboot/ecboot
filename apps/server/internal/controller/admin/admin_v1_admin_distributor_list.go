@@ -3,13 +3,29 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/model"
+	"ecboot/internal/service/user"
 )
 
-// AdminDistributorList 推广员列表（审核/冻结入口）
+// AdminDistributorList 推广员列表。
 func (c *ControllerV1) AdminDistributorList(ctx context.Context, req *v1.AdminDistributorListReq) (res *v1.AdminDistributorListRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermDistributionRead); err != nil {
+		return nil, err
+	}
+	out, err := user.NewDistributionAdminLogic().AdminDistributorList(ctx, req.Status, req.Keyword, model.PageReq{Page: req.Page, PageSize: req.PageSize})
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.AdminDistributorListRes{List: make([]v1.AdminDistributorItem, 0, len(out.List))}
+	res.Total = out.Total
+	for _, it := range out.List {
+		res.List = append(res.List, v1.AdminDistributorItem{
+			Id: fmtID(it.Id), UserId: fmtID(it.UserId), Nickname: it.Nickname,
+			Level: 0, Status: it.Status, ApplyTime: it.ApplyTime, AuditTime: it.AuditTime,
+		})
+	}
+	return res, nil
 }

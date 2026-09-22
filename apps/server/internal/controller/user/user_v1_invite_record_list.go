@@ -9,10 +9,9 @@ import (
 	"ecboot/internal/service/user"
 )
 
-// InviteRecordList 邀请激励记录（仅本人; 被邀请人脱敏）
+// InviteRecordList 邀请激励记录。
 func (c *ControllerV1) InviteRecordList(ctx context.Context, req *v1.InviteRecordListReq) (res *v1.InviteRecordListRes, err error) {
-	out, err := user.InviteRecords(ctx, middleware.CtxUserIdFrom(ctx),
-		model.PageReq{Page: req.Page, PageSize: req.PageSize})
+	out, err := user.NewDistributionLogic().InviteRecords(ctx, middleware.CtxUserIdFrom(ctx), model.PageReq{Page: req.Page, PageSize: req.PageSize})
 	if err != nil {
 		return nil, err
 	}
@@ -20,8 +19,7 @@ func (c *ControllerV1) InviteRecordList(ctx context.Context, req *v1.InviteRecor
 	res.Total = out.Total
 	for _, it := range out.List {
 		res.List = append(res.List, v1.InviteRecordItem{
-			NewUser: it.NewUser, RewardDesc: it.RewardDesc,
-			Status: it.Status, CreatedAt: it.CreatedAt,
+			NewUser: it.NewUser, RewardDesc: it.RewardDesc, Status: it.Status, CreatedAt: it.CreatedAt,
 		})
 	}
 	return res, nil

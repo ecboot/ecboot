@@ -64,6 +64,13 @@ type ICommissionReverse interface {
 	ReverseForAfterSale(ctx context.Context, orderNo, afterSaleNo string, refundFen int64)
 }
 
+// ICommissionSettle 佣金计提事件出口（017 分销资金）: 订单确认收货时投递, 分销域按归因+规则计提。
+// 归属: shop 域定义, 分销域实现并装配; 未注入则降级告警（计提可由补偿任务回补, 事件不承载资金）。
+type ICommissionSettle interface {
+	// OnOrderConfirmed 订单确认收货后投递（幂等由分销域订单项粒度查重保证）。
+	OnOrderConfirmed(ctx context.Context, orderNo string)
+}
+
 // IRiskHit 风控命中判定（015 营销 C 端）: 帮砍/助力入口调用。
 // 归属: shop 域定义; 实现属**批次 12**（风控规则引擎）→ 未装配时**放行 + 告警**（不阻塞玩法可用）。
 // 依据: 迁移 000029 两处注释明写"砍价/助力是被刷重灾区——帮砍/助力入口须挂风控"（schema 级要求）。
@@ -88,6 +95,7 @@ var (
 	NotifyEnq         INotifyEnqueue
 	CouponQuery       ICouponQuery
 	CommissionReverse ICommissionReverse
+	CommissionSettle  ICommissionSettle
 	RiskHit           IRiskHit
 	AssistReward      IAssistReward
 )

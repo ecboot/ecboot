@@ -3,13 +3,16 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
-// DistStatus 推广员状态与等级
+// DistStatus 我的推广员状态。
 func (c *ControllerV1) DistStatus(ctx context.Context, req *v1.DistStatusReq) (res *v1.DistStatusRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	st, err := user.NewDistributionLogic().Status(ctx, middleware.CtxUserIdFrom(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DistStatusRes{Status: st.Status, Level: st.Level}, nil
 }

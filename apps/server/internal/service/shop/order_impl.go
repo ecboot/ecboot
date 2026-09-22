@@ -682,6 +682,13 @@ func (i *OrderLogicImpl) Confirm(ctx context.Context, userId int64, orderNo stri
 		OperatorType: 2, // 2=用户（表注释: 1系统 2用户 3管理员）
 		OperatorId:   fmt.Sprintf("user:%d", userId),
 	}).Insert()
+
+	// 017 分销资金: 确认收货 → 佣金计提事件（跨域端口; 未装配降级告警——计提幂等可补偿重放）
+	if CommissionSettle != nil {
+		CommissionSettle.OnOrderConfirmed(ctx, orderNo)
+	} else {
+		g.Log().Warningf(ctx, "[佣金计提] 端口未装配: 确认收货未投递计提事件 order_no=%s", orderNo)
+	}
 	return nil
 }
 

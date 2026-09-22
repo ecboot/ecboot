@@ -3,13 +3,15 @@ package user
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/user/v1"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
-// DistApply 申请成为推广员
+// DistApply 申请成为推广员（重复申请 60001）。
 func (c *ControllerV1) DistApply(ctx context.Context, req *v1.DistApplyReq) (res *v1.DistApplyRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = user.NewDistributionLogic().Apply(ctx, middleware.CtxUserIdFrom(ctx)); err != nil {
+		return nil, err
+	}
+	return &v1.DistApplyRes{Status: 1}, nil
 }
