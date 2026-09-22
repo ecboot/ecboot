@@ -27,7 +27,7 @@ func NewCouponLogic() *CouponLogicImpl { return &CouponLogicImpl{} }
 // 接口满足性编译断言（批次 10 评审 M7: 此前 PublicList 无实现者、CouponLogicImpl 不满足
 // 自家接口也无人发现——编译期钉住, 不再靠文字承诺）
 var (
-	_ ICouponLogic  = (*CouponLogicImpl)(nil)
+	_ ICouponLogic   = (*CouponLogicImpl)(nil)
 	_ IActivityLogic = (*ActivityLogicImpl)(nil)
 )
 
@@ -189,8 +189,7 @@ func (i *CouponLogicImpl) AdminCreate(ctx context.Context, in model.CouponInput)
 	return id, nil
 }
 
-// AdminUpdate 修改券模板（部分字段; Status 显式启停——do 结构 omitempty 语义下
-// 零值会被吞, 故 Status>0 或显式置停都以**字段白名单**写入, 沿批次 02 全量覆盖护栏先例）。
+// AdminUpdate 修改券模板（部分字段; I6 三态: Status *int nil=不修改启停, 0=停发, 1=启用）。
 func (i *CouponLogicImpl) AdminUpdate(ctx context.Context, id int64, in model.CouponInput) error {
 	cols := dao.Coupon.Columns()
 	cur, err := dao.Coupon.Ctx(ctx).Where(cols.Id, id).Where(cols.Deleted, 0).One()

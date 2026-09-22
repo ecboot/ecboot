@@ -196,11 +196,12 @@ func TestAdminCouponLifecycle(t *testing.T) {
 		// I6 回归（独立段）: 部分更新（只改名, 不传 status）不得静默停发
 		const n3 = "TF-券部分更新"
 		defer cleanupCouponFixture(ctx, n3)
+		defer cleanupCouponFixture(ctx, n3+"-改名") // Minor-1: 改名后残留行按双名清理（复审实证泄漏面）
 		cid3 := seedCoupon(ctx, t, n3, 1)
 		t.AssertNil(logic.AdminUpdate(ctx, cid3, model.CouponInput{Name: n3 + "-改名"}))
 		d3, err := logic.AdminDetail(ctx, cid3)
 		t.AssertNil(err)
-		t.Assert(d3.Status, 1)     // 启停未被触碰（原实现无条件写 status → 静默停发）
+		t.Assert(d3.Status, 1) // 启停未被触碰（原实现无条件写 status → 静默停发）
 		t.Assert(d3.Name, n3+"-改名")
 	})
 }

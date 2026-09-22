@@ -195,9 +195,9 @@ func TestAdminFlashSaleItems(t *testing.T) {
 		}))
 		keptRow, err := g.DB().GetOne(ctx, "SELECT id, sold_count, flash_price, stock_count FROM flash_sale_item WHERE activity_id=? AND sku_id=?", actId, f.SkuId)
 		t.AssertNil(err)
-		t.Assert(keptRow["id"].Int64(), oldRow["id"].Int64())   // 行 id 不变（原位更新, 引用不悬空）
+		t.Assert(keptRow["id"].Int64(), oldRow["id"].Int64())             // 行 id 不变（原位更新, 引用不悬空）
 		t.Assert(keptRow["sold_count"].Int(), oldRow["sold_count"].Int()) // sold_count 守恒
-		t.Assert(keptRow["flash_price"].String(), "6.00")       // 配置确实更新
+		t.Assert(keptRow["flash_price"].String(), "6.00")                 // 配置确实更新
 		t.Assert(keptRow["stock_count"].Int(), 20)
 
 		// I3 回归: **同值更新**不得误报"不存在"（affected=0 是无变化不是缺失）

@@ -10,7 +10,7 @@ import (
 	"ecboot/internal/service/shop"
 )
 
-// AdminCouponUpdate 修改券模板（status 显式启停: 0停发 1启用, 契约 dc 注明必传）。
+// AdminCouponUpdate 修改券模板（I6 三态: status 不传=不修改启停, 0=停发, 1=启用）。
 func (c *ControllerV1) AdminCouponUpdate(ctx context.Context, req *v1.AdminCouponUpdateReq) (res *v1.AdminCouponUpdateRes, err error) {
 	if err = middleware.RequirePerm(ctx, consts.PermPromotionCouponUpdate); err != nil {
 		return nil, err
