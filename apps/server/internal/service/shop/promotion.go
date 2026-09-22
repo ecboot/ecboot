@@ -13,6 +13,9 @@ import (
 // ICouponLogic 优惠券模板（shop 侧; 用户持有侧在 user 域 IUserCouponLogic）。
 type ICouponLogic interface {
 	AdminList(ctx context.Context, status int, page model.PageReq) (*model.PageResult[model.CouponTemplate], error)
+	// AdminDetail 券模板详情（016 契约微扩 D3-①: api 有 `GET /admin/coupons/{id}` 而接口漏定义,
+	// 批次 01/02/04/08 "按契约最小适配"同例）。
+	AdminDetail(ctx context.Context, id int64) (*model.CouponTemplate, error)
 	AdminCreate(ctx context.Context, in model.CouponInput) (int64, error)
 	AdminUpdate(ctx context.Context, id int64, in model.CouponInput) error
 	AdminDelete(ctx context.Context, id int64) error

@@ -3,12 +3,25 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/model"
+	"ecboot/internal/service/shop"
 )
 
+// AdminCouponCreate 创建券模板。
 func (c *ControllerV1) AdminCouponCreate(ctx context.Context, req *v1.AdminCouponCreateReq) (res *v1.AdminCouponCreateRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermPromotionCouponCreate); err != nil {
+		return nil, err
+	}
+	id, err := shop.NewCouponLogic().AdminCreate(ctx, model.CouponInput{
+		Name: req.Name, Type: req.Type, Threshold: req.Threshold, Discount: req.Discount,
+		TotalCount: req.TotalCount, PerLimit: req.PerLimit,
+		ValidType: req.ValidType, ValidStartAt: req.ValidStartAt, ValidEndAt: req.ValidEndAt, ValidDays: req.ValidDays,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AdminCouponCreateRes{Id: fmtID(id)}, nil
 }

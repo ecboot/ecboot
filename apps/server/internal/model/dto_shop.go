@@ -496,6 +496,7 @@ type CouponTemplate struct {
 	TotalCount int    `json:"totalCount"`
 	Received   int    `json:"receivedCount"`
 	PerLimit   int    `json:"perLimit"`
+	ValidType  int    `json:"validType" dc:"1固定区间 2领取后N天(016 契约微扩 D3-②)"`
 	ValidDesc  string `json:"validDesc"`
 	Status     int    `json:"status"`
 }
@@ -511,6 +512,7 @@ type CouponInput struct {
 	ValidStartAt string
 	ValidEndAt   string
 	ValidDays    int
+	Status       int `dc:"启停(仅 AdminUpdate 消费; 016 契约微扩 D3-③: api Update Req 有 status 而 DTO 漏)"`
 }
 
 type CouponRecordItem struct {
@@ -528,6 +530,13 @@ type PromotionActivityItem struct {
 	StartTime string `json:"startTime"`
 	EndTime   string `json:"endTime"`
 	Status    int    `json:"status"`
+	// 016 契约微扩 D3-⑧: 各玩法列表项出参要求（拼团 groupSize/perLimit; 助力 rewardType/
+	// requiredCount/perLimit/rewardDesc）——缺列的玩法类型读行为零值, 不影响既有消费
+	GroupSize     int    `json:"groupSize" dc:"拼团成团人数"`
+	PerLimit      int    `json:"perLimit" dc:"拼团限购/助力每人可发起"`
+	RewardType    int    `json:"rewardType" dc:"助力:1券 2积分"`
+	RequiredCount int    `json:"requiredCount" dc:"助力所需人数"`
+	RewardDesc    string `json:"rewardDesc" dc:"助力奖励说明"`
 }
 
 type PromotionActivityDetail struct {
@@ -568,6 +577,7 @@ type PromotionActivityInput struct {
 	Name      string
 	StartTime string
 	EndTime   string
+	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-④: api Update Req 有 status 而 DTO 漏)"`
 	Ladders   []PromotionLadder
 	Scopes    []PromotionScope
 }
@@ -579,6 +589,7 @@ type GroupBuyInput struct {
 	PerLimit  int
 	StartTime string
 	EndTime   string
+	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑤)"`
 }
 
 type ActivityTimeInput struct {
@@ -593,6 +604,7 @@ type BargainActivityInput struct {
 	SpuId     int64
 	StartTime string
 	EndTime   string
+	Status    int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑥)"`
 }
 
 type ActivitySkuInput struct {
@@ -616,6 +628,7 @@ type AssistActivityInput struct {
 	PerLimit      int
 	StartTime     string
 	EndTime       string
+	Status        int `dc:"启停(仅 Update 消费; 016 契约微扩 D3-⑦)"`
 }
 
 type ReviewCreateInput struct {
