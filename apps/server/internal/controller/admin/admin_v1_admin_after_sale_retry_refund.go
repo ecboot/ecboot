@@ -3,13 +3,20 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/shop"
 )
 
-// AdminAfterSaleRetryRefund 退款重试
+// AdminAfterSaleRetryRefund 退款重试（渠道失败后; 仅"待退款"可重试）
+// 权限: aftersale:refund
 func (c *ControllerV1) AdminAfterSaleRetryRefund(ctx context.Context, req *v1.AdminAfterSaleRetryRefundReq) (res *v1.AdminAfterSaleRetryRefundRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermAfterSaleRefund); err != nil {
+		return nil, err
+	}
+	if err = shop.NewAfterSaleLogic().RetryRefund(ctx, req.AfterSaleNo, adminOperator(ctx)); err != nil {
+		return nil, err
+	}
+	return &v1.AdminAfterSaleRetryRefundRes{Success: true}, nil
 }

@@ -56,11 +56,20 @@ type ICouponQuery interface {
 	UsableForOrder(ctx context.Context, userId int64, goodsAmountYuan string) ([]model.UsableCouponBrief, error)
 }
 
+// ICommissionReverse 佣金冲销事件出口（013 售后域）: 售后完成时投递, 避免"退了款而佣金仍计提"。
+// 归属: shop 域定义, 分销/资金域（批次 11）实现并装配; 未注入则降级跳过并告警（同下方注册变量约定）。
+// 本批只**投递事件**, 不落账（结算语义属批次 11, 与 Confirm 的"计提由分销结算推进"同源）。
+type ICommissionReverse interface {
+	// ReverseForAfterSale 订单售后完成时投递冲销意图（refundFen 为本次退款金额, 用于按额冲销）。
+	ReverseForAfterSale(ctx context.Context, orderNo, afterSaleNo string, refundFen int64)
+}
+
 // 注册变量（user 域 bootstrap 装配时注入; 未注入则相关能力降级跳过并告警）。
 var (
-	CouponTrade  ICouponTrade
-	PointTrade   IPointTrade
-	AccountTrade IAccountTrade
-	NotifyEnq    INotifyEnqueue
-	CouponQuery  ICouponQuery
+	CouponTrade       ICouponTrade
+	PointTrade        IPointTrade
+	AccountTrade      IAccountTrade
+	NotifyEnq         INotifyEnqueue
+	CouponQuery       ICouponQuery
+	CommissionReverse ICommissionReverse
 )

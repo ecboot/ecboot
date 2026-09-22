@@ -364,15 +364,28 @@ func (i *PayLogicImpl) HandleRefundNotify(ctx context.Context, channel string, r
 	// 原用 refund_no 是渠道回填列, 无人写入 → WHERE 永不命中）；② 状态 40退款中 → 50已完成
 	// （原 30→40 实为"待退款→退款中", 语义错位）；③ affected=0 不得记"已处理"。
 	acols := dao.AfterSaleOrder.Columns()
-	res, err := dao.AfterSaleOrder.Ctx(ctx).
-		Where(acols.AfterSaleNo, p.OutRefundNo).
-		Where(acols.Status, 40). // 40=退款中
-		Data(g.Map{acols.Status: 50, acols.RefundTime: gtime.Now()}).
-		Update()
+	advanced := false
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		res, e := dao.AfterSaleOrder.Ctx(ctx).
+			Where(acols.AfterSaleNo, p.OutRefundNo).
+			Where(acols.Status, 40). // 40=退款中
+			Data(g.Map{acols.Status: 50, acols.RefundTime: gtime.Now()}).
+			Update()
+		if e != nil {
+			return gerror.Wrap(e, "推进售后单失败")
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil // 未匹配/状态不符 → 事务外判定（不记"已处理"）
+		}
+		advanced = true
+		// 013（批次07）: 完成副作用与状态推进**同事务**——仅退货退款回补库存 + 重算订单退款状态 +
+		// 投递佣金冲销事件。仅在本次条件更新真正命中时执行一次, 故重复回调不会二次回补/二次投递。
+		return afterSaleFinishedSideEffects(ctx, p.OutRefundNo)
+	})
 	if err != nil {
-		return gerror.Wrap(err, "推进售后单失败")
+		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !advanced {
 		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
 		return errcode.New(errcode.CodeNotFound, "退款单未匹配或状态不符")
 	}

@@ -29,6 +29,8 @@ type AfterSaleOrder struct {
 	ReturnLogisticsNo any         // 买家寄回物流单号(type=2)
 	RefundNo          any         // 渠道退款单号(微信退款ID,回填)
 	RejectReason      any         // 拒绝原因
+	OperatorId        any         // 最后操作人标识:admin:{id}(审核/确认收货/退款重试)
+	FailReason        any         // 渠道退款失败原因(重试前保留,成功后清空)
 	AuditTime         *gtime.Time // 审核时间
 	RefundTime        *gtime.Time // 退款完成时间
 	CreatedAt         *gtime.Time // 创建时间

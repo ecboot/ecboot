@@ -38,6 +38,8 @@ type AfterSaleOrderColumns struct {
 	ReturnLogisticsNo string // 买家寄回物流单号(type=2)
 	RefundNo          string // 渠道退款单号(微信退款ID,回填)
 	RejectReason      string // 拒绝原因
+	OperatorId        string // 最后操作人标识:admin:{id}(审核/确认收货/退款重试)
+	FailReason        string // 渠道退款失败原因(重试前保留,成功后清空)
 	AuditTime         string // 审核时间
 	RefundTime        string // 退款完成时间
 	CreatedAt         string // 创建时间
@@ -63,6 +65,8 @@ var afterSaleOrderColumns = AfterSaleOrderColumns{
 	ReturnLogisticsNo: "return_logistics_no",
 	RefundNo:          "refund_no",
 	RejectReason:      "reject_reason",
+	OperatorId:        "operator_id",
+	FailReason:        "fail_reason",
 	AuditTime:         "audit_time",
 	RefundTime:        "refund_time",
 	CreatedAt:         "created_at",

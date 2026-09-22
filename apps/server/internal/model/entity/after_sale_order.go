@@ -27,6 +27,8 @@ type AfterSaleOrder struct {
 	ReturnLogisticsNo string      `json:"returnLogisticsNo" orm:"return_logistics_no" ` // 买家寄回物流单号(type=2)
 	RefundNo          string      `json:"refundNo"          orm:"refund_no"           ` // 渠道退款单号(微信退款ID,回填)
 	RejectReason      string      `json:"rejectReason"      orm:"reject_reason"       ` // 拒绝原因
+	OperatorId        string      `json:"operatorId"        orm:"operator_id"         ` // 最后操作人标识:admin:{id}(审核/确认收货/退款重试)
+	FailReason        string      `json:"failReason"        orm:"fail_reason"         ` // 渠道退款失败原因(重试前保留,成功后清空)
 	AuditTime         *gtime.Time `json:"auditTime"         orm:"audit_time"          ` // 审核时间
 	RefundTime        *gtime.Time `json:"refundTime"        orm:"refund_time"         ` // 退款完成时间
 	CreatedAt         *gtime.Time `json:"createdAt"         orm:"created_at"          ` // 创建时间

@@ -13,6 +13,7 @@ type AfterSaleApplyInput struct {
 type AfterSaleSummary struct {
 	AfterSaleNo  string `json:"afterSaleNo"`
 	OrderNo      string `json:"orderNo"`
+	UserId       int64  `json:"userId" dc:"申请人（后台展示用; C 端不映射）"`
 	Type         int    `json:"type"`
 	Quantity     int    `json:"quantity"`
 	RefundAmount string `json:"refundAmount"`
@@ -24,6 +25,7 @@ type AfterSaleDetail struct {
 	AfterSaleNo       string   `json:"afterSaleNo"`
 	OrderNo           string   `json:"orderNo"`
 	OrderItemId       int64    `json:"orderItemId"`
+	UserId            int64    `json:"userId" dc:"申请人（后台展示用; C 端不映射）"`
 	Type              int      `json:"type"`
 	Quantity          int      `json:"quantity"`
 	Reason            string   `json:"reason"`
