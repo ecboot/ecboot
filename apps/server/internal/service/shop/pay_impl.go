@@ -396,7 +396,9 @@ func (i *PayLogicImpl) HandleRefundNotify(ctx context.Context, channel string, r
 		cur, ce := dao.AfterSaleOrder.Ctx(ctx).Fields(acols.Status).
 			Where(acols.AfterSaleNo, p.OutRefundNo).Value()
 		if ce == nil && cur.Int() == 50 {
-			writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), true)
+			// 评审 M3: 留档标志按列注释口径写 **false**——`process_status` 的语义是"本次**是否真正推进**"
+			// （0=未处理或重复忽略）, 与支付回调对"真已处理"写 false 的口径一致; 幂等应答本身走 nil。
+			writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
 			return nil
 		}
 		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)

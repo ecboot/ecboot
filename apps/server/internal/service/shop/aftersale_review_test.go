@@ -6,8 +6,10 @@ package shop
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/test/gtest"
@@ -50,7 +52,11 @@ func TestAfterSaleApplyConcurrent(t *testing.T) {
 			for _, e := range errs {
 				if e == nil {
 					ok++
+					continue
 				}
+				// 评审 M-5: 失败必须是**业务码 40008**（配额拒绝）——若出现 10002（如 1205 锁等待超时）
+				// 说明锁范围/死锁出了问题, 不能与"正常拒绝"混为一谈（I-2 就是被这样掩盖的）。
+				t.Assert(errCode(e), errcode.CodeAfterSaleDenied)
 			}
 			// 行数量 1 → 每轮恰好 1 张（不让并发穿透"读额度→插入"）
 			t.Assert(ok, 1)
@@ -109,6 +115,37 @@ func TestAfterSaleRefundInFlightNotCancelable(t *testing.T) {
 
 		bc.release <- struct{}{}
 		t.AssertNil(<-done)
+	})
+}
+
+// TestAfterSaleRefundFailKeepsRefunding 渠道失败后仍不可撤（复审 C2′）:
+// 一旦调用过渠道, 失败也必须留在"退款中"（可撤销集 {10,20,30} 之外）。若回退到 30（可撤）:
+// 买家撤销 → 可退数量释放 → 以**新幂等键**重新申请并再出款一份（"钱可能已出"变成可撤状态 = 新超额退款面,
+// 复审已单线程复现）。本用例钉住"渠道失败 ⇒ 状态仍 40 ⇒ 不可撤 ⇒ 额度不释放"。
+func TestAfterSaleRefundFailKeepsRefunding(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		f := seedAfterSaleFixture(ctx, t, "AS-C2B-1", "T-AS-C2B1", 980000071, 1, "10.00")
+		defer cleanupAfterSaleFixture(ctx, t, f)
+		seedAfterSaleRow2(ctx, t, f, "AS-C2B-1", afterSalePendingRefund, afterSaleTypeRefundOnly, 1, "10.00")
+
+		spy := &refundSpy{failWith: errors.New("渠道超时")}
+		defer useRefundSpy(spy)()
+
+		// 30 → 发起（失败: 模糊失败）→ 必须留在 40
+		t.Assert(errCode(NewAfterSaleLogic().RetryRefund(ctx, "AS-C2B-1", "admin:41")), errcode.CodeRefundFailed)
+		rec := afterSaleRecord(ctx, f.OrderNo)
+		t.Assert(rec["status"].Int(), afterSaleRefunding)
+		t.Assert(rec["fail_reason"].String() != "", true)
+
+		// 关键: 此时撤销必须失败（否则额度释放 → 新键再退一份）
+		t.Assert(errCode(NewAfterSaleLogic().Cancel(ctx, f.UserId, "AS-C2B-1")), errcode.CodeStatusNotAllowed)
+
+		// 额度未被释放: 再申请同数量仍被拒（累计口径）
+		_, err := NewAfterSaleLogic().Apply(ctx, f.UserId, model.AfterSaleApplyInput{
+			OrderItemId: f.ItemId, Type: afterSaleTypeRefundOnly, Quantity: 1, Reason: "再申请",
+		})
+		t.Assert(errCode(err), errcode.CodeAfterSaleDenied)
 	})
 }
 
@@ -207,5 +244,79 @@ func TestAfterSaleRefundStatusOnlyFinished(t *testing.T) {
 		t.AssertNil(err)
 		// 只看已完成: 1/2 → 部分退款（1）; 若把在途也算进去会变成 2（全额）
 		t.Assert(st.Int(), 1)
+	})
+}
+
+// TestAfterSaleCancelLostRace 撤销**输掉**状态迁移时不得覆盖状态（复审给出的零测试缝黑盒构造）。
+// 构造: 外部事务先在**未提交**状态下把行改成终态（持该行 X 锁）→ 目标方法的前置**普通读**仍见旧状态
+// （InnoDB MVCC 看不到未提交改动）→ 其条件 UPDATE 阻塞在锁上 → 外部事务提交后条件重新求值 → 不命中
+// → affected=0 → 必须返 40006 且**不得覆盖状态**。去掉条件 WHERE 的变异会让本用例红（复审已实证）。
+func TestAfterSaleCancelLostRace(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		f := seedAfterSaleFixture(ctx, t, "AS-LOST-C", "T-AS-LOSTC", 980000081, 1, "10.00")
+		defer cleanupAfterSaleFixture(ctx, t, f)
+		seedAfterSaleRow2(ctx, t, f, "AS-LOST-C", afterSalePendingAudit, afterSaleTypeRefundOnly, 1, "10.00")
+
+		tx, err := g.DB().Begin(ctx)
+		t.AssertNil(err)
+		_, err = tx.Exec("UPDATE after_sale_order SET status=? WHERE after_sale_no=?", afterSaleCanceled, "AS-LOST-C")
+		t.AssertNil(err)
+
+		// 池预热: 确保障碍物之外的连接已就绪, 否则 goroutine 可能因取不到连接而"迟到",
+		// 其前置读会落在外部提交之后（实测会导致本构造无法区分条件 WHERE 的变异）。
+		var warm sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			warm.Add(1)
+			go func() { defer warm.Done(); _, _ = g.DB().GetValue(ctx, "SELECT 1") }()
+		}
+		warm.Wait()
+
+		done := make(chan error, 1)
+		go func() { done <- NewAfterSaleLogic().Cancel(ctx, f.UserId, "AS-LOST-C") }()
+		time.Sleep(2000 * time.Millisecond) // 让 Cancel 通过前置校验并阻塞在条件 UPDATE 上
+		t.AssertNil(tx.Commit())
+
+		t.Assert(errCode(<-done), errcode.CodeStatusNotAllowed)
+		rec := afterSaleRecord(ctx, f.OrderNo)
+		t.Assert(rec["status"].Int(), afterSaleCanceled) // 终态未被覆盖
+	})
+}
+
+// TestAfterSaleRetryRefundLostRace 重试退款**未赢得状态迁移就不得出款**（复审给出的黑盒构造）:
+// 外部事务未提交地把行改成终态 → RetryRefund 的条件推进阻塞 → 提交后不命中 → 40006 且**渠道调用 0 次**。
+func TestAfterSaleRetryRefundLostRace(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		f := seedAfterSaleFixture(ctx, t, "AS-LOST-R", "T-AS-LOSTR", 980000082, 1, "10.00")
+		defer cleanupAfterSaleFixture(ctx, t, f)
+		seedAfterSaleRow2(ctx, t, f, "AS-LOST-R", afterSalePendingRefund, afterSaleTypeRefundOnly, 1, "10.00")
+
+		spy := &refundSpy{}
+		defer useRefundSpy(spy)()
+
+		tx, err := g.DB().Begin(ctx)
+		t.AssertNil(err)
+		_, err = tx.Exec("UPDATE after_sale_order SET status=? WHERE after_sale_no=?", afterSaleCanceled, "AS-LOST-R")
+		t.AssertNil(err)
+
+		// 池预热（同 CancelLostRace 的理由）: 避免 goroutine 因取连接而迟到,
+		// 使其前置读落在外部提交之后, 那样构造就失去了区分力。
+		var warm sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			warm.Add(1)
+			go func() { defer warm.Done(); _, _ = g.DB().GetValue(ctx, "SELECT 1") }()
+		}
+		warm.Wait()
+
+		done := make(chan error, 1)
+		go func() { done <- NewAfterSaleLogic().RetryRefund(ctx, "AS-LOST-R", "admin:51") }()
+		time.Sleep(2000 * time.Millisecond)
+		t.AssertNil(tx.Commit())
+
+		t.Assert(errCode(<-done), errcode.CodeStatusNotAllowed)
+		t.Assert(spy.calls, 0) // 关键: 没赢得状态迁移, 就绝不能调用渠道
+		rec := afterSaleRecord(ctx, f.OrderNo)
+		t.Assert(rec["status"].Int(), afterSaleCanceled)
 	})
 }

@@ -77,7 +77,15 @@ func yuanFen(yuan string) (int64, error) {
 // 评审 C1（Critical）: 整个"读累计额度 → 插入"必须在**行锁事务**内完成——原先无锁无事务,
 // 并发或重复提交会在竞赛窗口内各读一次"额度未占满"而落多张超额单（评审实证: 同一行实付 10.00
 // 的订单项落 3 张各 10.00 的售后单、逐张审核后渠道被调 3 次 = 3 倍出款）。
-// 串行点取 `trade_order_item` 行锁（额度是按订单项维度的, 锁这一行即可）。
+//
+// **两处防护的分工（复审 I-1 以 SQL 级证据修正, 勿按"冗余"清理）**:
+//   - `afterSaleUsed` 的**锁定读（FOR UPDATE）是承重墙**: 普通读会被事务的 InnoDB 读视图钉住——
+//     而读视图可能在拿到行锁**之前**就已建立（GoFrame DAO 在事务内会先发 `SHOW FULL COLUMNS`
+//     刷新元数据, 实测该语句即会建立读视图: A `BEGIN; SHOW FULL COLUMNS ...` 后 B 插入并提交,
+//     A 的普通 SELECT 查不到 B 的行, 而无 SHOW 的对照组能查到）。故只有**当前读**才保证读到最新
+//     已提交的占用集合; 复审实测: 仅去掉这处锁定读 → 并发用例立刻红（一轮 4 并发落 2 张单）。
+//   - `trade_order_item` 行锁提供**按订单项串行**（同一行的并发申请在此排队）**并防止**两笔各插一行
+//     时在相邻 gap 上互相等待插入意向锁而死锁。
 func (i *AfterSaleLogicImpl) Apply(
 	ctx context.Context, userId int64, in model.AfterSaleApplyInput,
 ) (string, error) {
@@ -197,7 +205,7 @@ func afterSaleUsed(ctx context.Context, orderItemId int64) (int, int64, error) {
 		Fields(acols.Quantity, acols.RefundAmount).
 		Where(acols.OrderItemId, orderItemId).
 		WhereNotIn(acols.Status, []int{afterSaleRejected, afterSaleCanceled}).
-		LockUpdate(). // 锁定读: 并发申请下必须读到"最新已提交"的占用集合（Apply 已持有订单项行锁, 此处再兜一层）
+		LockUpdate(). // **承重墙**: 必须用当前读（普通读会被事务读视图钉住, 见 Apply 函数头的 I-1 说明）
 		All()
 	if err != nil {
 		return 0, 0, gerror.Wrap(err, "查询已申请售后失败")
@@ -352,7 +360,7 @@ func (i *AfterSaleLogicImpl) tryRefund(ctx context.Context, afterSaleNo, operato
 		return nil
 	}
 
-	// 先推进状态（30→40）; 已是 40 者允许重调渠道（渠道以 outRefundNo 幂等, 用于自愈"40 但钱未出"的崩溃窗）
+	// 先推进状态（30→40）; 已是 40 者允许重调渠道（渠道以 outRefundNo 幂等, 用于自愈崩溃窗）
 	switch rec[acols.Status].Int() {
 	case afterSalePendingRefund:
 		res, ue := dao.AfterSaleOrder.Ctx(ctx).
@@ -373,22 +381,31 @@ func (i *AfterSaleLogicImpl) tryRefund(ctx context.Context, afterSaleNo, operato
 	}
 
 	if e := afterSaleRefundChannel.Refund(afterSaleNo, amountFen); e != nil {
-		// 渠道失败 → 条件回退 40→30（affected=0 说明回调已把它推到 50, 即钱其实到了 → 不覆盖, 只告警）
-		res, re := dao.AfterSaleOrder.Ctx(ctx).
+		// 评审 C2′（复审引入的 Critical）: 一旦**调用过渠道**, 就绝不回退到 30。
+		// 30 的语义是"未出款"且**可撤**（D4: {10,20,30} 可撤, 撤销即释放可退数量）; 而渠道返回失败
+		// 未必等于钱没出去（超时/连接中断都是"模糊失败"）。回退到 30 会让"钱可能已出"的记录重新可撤,
+		// 买家撤销 → 额度释放 → 以**新的幂等键**再申请并再出款一份（复审已单线程复现: 累计 2× 行实付）。
+		// 故: 失败一律**留在 40** 并记 fail_reason —— 40 此后表示"已发起（在途或待重试）",
+		// 管理员可从 40 重试（渠道按键幂等去重, 不会二次出款）, 而"未出款 ⟺ 30"的不变量保持成立。
+		if _, re := dao.AfterSaleOrder.Ctx(ctx).
 			Where(acols.AfterSaleNo, afterSaleNo).
 			Where(acols.Status, afterSaleRefunding).
-			Data(do.AfterSaleOrder{Status: afterSalePendingRefund, FailReason: e.Error(), OperatorId: operator}).
-			Update()
-		if re != nil {
-			g.Log().Errorf(ctx, "[售后] 渠道退款失败且回退状态失败, 需人工核对: after_sale_no=%s err=%v", afterSaleNo, re)
-		} else if n, _ := res.RowsAffected(); n == 0 {
-			g.Log().Errorf(ctx,
-				"[资金异常] 渠道退款失败但售后单已被回调推进(钱可能已到), 勿重复退款: after_sale_no=%s", afterSaleNo)
+			Data(do.AfterSaleOrder{FailReason: e.Error(), OperatorId: operator}).
+			Update(); re != nil {
+			g.Log().Errorf(ctx, "[售后] 渠道退款失败且失败原因写入失败, 需人工核对: after_sale_no=%s err=%v", afterSaleNo, re)
 		}
-		g.Log().Errorf(ctx, "[售后] 渠道退款失败, 待重试: after_sale_no=%s amount_fen=%d err=%v",
+		g.Log().Errorf(ctx, "[售后] 渠道退款失败, 留在退款中待重试: after_sale_no=%s amount_fen=%d err=%v",
 			afterSaleNo, amountFen, e)
-		// 评审 M1: 不再静默返 nil——管理员须看到"未成功"（状态已回 30 且原因留痕, 可重试）
+		// 评审 M1: 不静默返 nil——管理员须看到"未成功"（状态已留 40 且原因留痕, 可重试）
 		return errcode.New(errcode.CodeRefundFailed, "退款发起失败, 可稍后重试")
+	}
+	// 渠道成功: 清掉上一次的失败原因（从 40 重试时不经过 30→40 的赋值路径, 需在此显式清理）
+	if _, ue := dao.AfterSaleOrder.Ctx(ctx).
+		Where(acols.AfterSaleNo, afterSaleNo).
+		Where(acols.Status, afterSaleRefunding).
+		Data(do.AfterSaleOrder{FailReason: "", OperatorId: operator}).
+		Update(); ue != nil {
+		g.Log().Errorf(ctx, "[售后] 清理失败原因失败: after_sale_no=%s err=%v", afterSaleNo, ue)
 	}
 	return nil
 }

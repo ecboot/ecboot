@@ -78,6 +78,9 @@ func cleanupAfterSaleByOrder(ctx context.Context, orderNo string) {
 
 func cleanupAfterSaleFixture(ctx context.Context, t *gtest.T, f *afterSaleFixture) {
 	cleanupAfterSaleByOrder(ctx, f.OrderNo)
+	// 评审 M-1: 回补流水（change_type=6）必须一并清——否则每次跑测试都往共享库累积
+	// （既有 57 行残留即此因；与批次 04 孤儿库存行同一失败模式）。
+	_, _ = g.DB().Exec(ctx, "DELETE FROM inventory_log WHERE sku_id=?", f.SkuId)
 	_, _ = g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id=?", f.SkuId)
 	cleanupPointUser(ctx, t, f.phone)
 }
@@ -498,13 +501,13 @@ func TestAfterSaleRefundChannelFail(t *testing.T) {
 		spy := &refundSpy{failWith: errors.New("渠道返回: 余额不足")}
 		defer useRefundSpy(spy)()
 
-		// 评审 C2: 先推进 30→40 再调渠道; 渠道失败 → 条件回退 40→30 + fail_reason, 且**返错**（不静默, M1）
+		// 评审 C2 + C2′: 先推进 30→40 再调渠道; 渠道失败**留在 40**（不回退到可撤的 30）+ fail_reason, 且返错（M1）
 		t.Assert(errCode(NewAfterSaleLogic().Approve(ctx, "AS-FAIL-1", "admin:12")), errcode.CodeRefundFailed)
 		rec := afterSaleRecord(ctx, f.OrderNo)
-		t.Assert(rec["status"].Int(), afterSalePendingRefund)
+		t.Assert(rec["status"].Int(), afterSaleRefunding) // 失败也留在"退款中"（可撤销集之外）
 		t.Assert(rec["fail_reason"].String(), "渠道返回: 余额不足")
 
-		// 渠道恢复 → 重试成功 → 40 且原因清空
+		// 渠道恢复 → 从 40 重试成功（幂等键自愈）→ 原因清空
 		spy.failWith = nil
 		t.AssertNil(NewAfterSaleLogic().RetryRefund(ctx, "AS-FAIL-1", "admin:12"))
 		rec = afterSaleRecord(ctx, f.OrderNo)
