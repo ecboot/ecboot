@@ -3,13 +3,22 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/system"
 )
 
-// AdminDashboardMember 会员看板
+// AdminDashboardMember 会员看板（FR-2）: 新增/活跃/休眠≥90天。
 func (c *ControllerV1) AdminDashboardMember(ctx context.Context, req *v1.AdminDashboardMemberReq) (res *v1.AdminDashboardMemberRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermDashboardRead); err != nil {
+		return nil, err
+	}
+	out, err := system.NewDashboardLogic().Member(ctx, req.StartTime, req.EndTime)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AdminDashboardMemberRes{
+		NewCount: out.NewCount, ActiveCount: out.ActiveCount, DormantCount: out.DormantCount,
+	}, nil
 }

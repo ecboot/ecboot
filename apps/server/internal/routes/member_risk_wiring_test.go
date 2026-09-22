@@ -72,3 +72,35 @@ func TestMemberRiskEndpointsReachable(t *testing.T) {
 		_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE name='TF-WIRE-RISK'")
 	})
 }
+
+// TestDashboardEndpointsReachable 批次 13: 3 看板端点可达 + dashboard:read 挂载（非超管 10005 对照）。
+func TestDashboardEndpointsReachable(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		s := startTestServer(t, 38883)
+		defer func() { _ = s.Shutdown() }()
+		base := fmt.Sprintf("http://127.0.0.1:%d", s.GetListenedPort())
+
+		adminId := seedRouteAdmin(ctx, t, "ROUTE-DB-ADM")
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM admin_user WHERE id=?", adminId) }()
+		token, _, err := security.NewSessionManager("admin", 7).Create(ctx, adminId)
+		t.AssertNil(err)
+
+		paths := []string{"/admin/dashboard/trade", "/admin/dashboard/member", "/admin/dashboard/product"}
+		for _, p := range paths {
+			body := doReq(ctx, t, base, token, "GET", p, "")
+			t.Assert(!strings.Contains(body, "\"code\":10003"), true)
+			t.Assert(!strings.Contains(body, "\"code\":10005"), true)
+		}
+
+		// 非超管对照
+		noPermId := seedRouteAdmin2(ctx, t, "ROUTE-DB-NOPERM")
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM admin_user WHERE id=?", noPermId) }()
+		noPermToken, _, err := security.NewSessionManager("admin", 7).Create(ctx, noPermId)
+		t.AssertNil(err)
+		for _, p := range paths {
+			body := doReq(ctx, t, base, noPermToken, "GET", p, "")
+			t.Assert(strings.Contains(body, "\"code\":10005"), true)
+		}
+	})
+}
