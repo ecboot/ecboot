@@ -1,6 +1,6 @@
 // dashboard_impl.go IDashboardLogic 实现（019 批次 13）——只读统计, 口径全部锚定既有权威查询。
-// 交易: 已支付订单口径（status>=20）/销售额=pay_amount 合计/退款额=售后完成实退合计/待发货=status 20。
-// 会员: 窗口新增（created_at）/活跃（last_active_at 窗口内）/休眠（last_active_at ≥90 天, 与 000029 同源）。
+// 交易: 已支付订单口径（**枚举 20/30/40, 排除 90 已取消**）/销售额=pay_amount 合计/退款额=售后完成实退合计/待发货=status 20。
+// 会员: 窗口新增（created_at）/活跃（last_active_at 窗口内, 无窗口取近 30 天）/休眠（阈值读 system_config dormant.tier1.days, 与 user/wx.go 同源; 定义在 000027）。
 // 商品: 在售 SPU/低库存（inventory available<=warn_count 既有口径）/待审核评价（audit_status=0）。
 package system
 

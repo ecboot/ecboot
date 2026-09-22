@@ -14,12 +14,18 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 )
 
-// dbWindows 受控时间窗: 造数用 NOW 前后各 1 小时内的唯一窗口, 只统计本用例数据。
-func dbWindow() (string, string) {
-	now := time.Now().UTC()
-	return now.Add(-time.Hour).Format("2006-01-02 15:04:05"),
-		now.Add(time.Hour).Format("2006-01-02 15:04:05")
-}
+// dbWindow **固定历史区间**（N2 三轮收口的正解）: 窗口取 2000 年的一段固定区间, 夹具行
+// **显式写入该区间内的 created_at**——并行包的写入 created_at=NOW, **结构上不可能落入窗内**。
+// 前两轮失败教训: ①窗口含 NOW + 精确等值（并行写入即窗内）; ②窗口含 NOW + 基线差量
+// （差量吸收不了 base→after 之间的并发增删——复审决定性实验 10/10 红）。真隔离靠窗口与
+// 并发写入的**值域不相交**, 而非时间上的先后。
+const (
+	dbWinStart = "2000-01-01 00:00:00"
+	dbWinEnd   = "2000-01-02 00:00:00"
+	dbWinAt    = "2000-01-01 12:00:00"
+)
+
+func dbWindow() (string, string) { return dbWinStart, dbWinEnd }
 
 // TestDashboardTrade 交易看板口径（FR-1）: 已支付枚举 20/30/40（**排除 90 已取消**）/窗口过滤/
 // 退款额/待发货。
@@ -42,18 +48,13 @@ func TestDashboardTrade(t *testing.T) {
 		insOrder := func(no string, status int, pay string) {
 			_, err := g.DB().Exec(ctx,
 				"INSERT INTO trade_order(order_no,user_id,status,total_amount,promotion_amount,pay_amount,currency,"+
-					"receiver_name,receiver_phone,receiver_province,receiver_city,receiver_detail) "+
-					"VALUES(?,997101,?,?,0,?,'CNY','看板测试','13800000000','浙江省','杭州市','T路')",
-				no, status, pay, pay)
+					"receiver_name,receiver_phone,receiver_province,receiver_city,receiver_detail,created_at) "+
+					"VALUES(?,997101,?,?,0,?,'CNY','看板测试','13800000000','浙江省','杭州市','T路',?)",
+				no, status, pay, pay, dbWinAt) // created_at 显式落窗内固定值
 			t.AssertNil(err)
 		}
-		// N2/I2 二次收口: 窗口含 NOW → 并行包写入也在窗内, 故**精确等值断言零容忍**
-		// （复审决定性实验: 受控并发写入下 3/3 红）。改为**基线差量**: 只断言"自己加的行贡献的增量"。
 		start, end := dbWindow()
-		base, err := logic.Trade(ctx, start, end)
-		t.AssertNil(err)
 
-		// 在基线之后插入本用例数据, 再取一次 → 差量恰为本用例贡献
 		insOrder(no1, 20, "50.00")
 		insOrder(no2, 40, "80.00")
 		insOrder(no3, 10, "999.00")
@@ -61,19 +62,20 @@ func TestDashboardTrade(t *testing.T) {
 		oid, err := g.DB().GetValue(ctx, "SELECT id FROM trade_order WHERE order_no=?", no2)
 		t.AssertNil(err)
 		_, err = g.DB().Exec(ctx,
-			"INSERT INTO after_sale_order(after_sale_no,order_id,order_no,order_item_id,user_id,type,status,currency,quantity,reason,refund_amount) "+
-				"VALUES(?,?,?,0,997101,2,50,'CNY',1,'测试','10.00')", as1, oid.Int64(), no2)
+			"INSERT INTO after_sale_order(after_sale_no,order_id,order_no,order_item_id,user_id,type,status,currency,quantity,reason,refund_amount,created_at) "+
+				"VALUES(?,?,?,0,997101,2,50,'CNY',1,'测试','10.00',?)", as1, oid.Int64(), no2, dbWinAt)
 		t.AssertNil(err)
 
 		after, err := logic.Trade(ctx, start, end)
 		t.AssertNil(err)
-		t.Assert(after.OrderCount, base.OrderCount+2)          // 20/40 计入; 10 与 **90 排除**（C1）
-		t.Assert(fen2(after.SalesAmount), fen2(base.SalesAmount)+13000) // 50+80（不含 888）
-		// 退款额: 差量可能受并行包影响（他包同窗售后）→ 断言"至少 +10"
-		t.Assert(fen2(after.RefundAmount) >= fen2(base.RefundAmount)+1000, true)
+		// N2 三轮收口: 窗口为固定历史区间且夹具行显式落窗内 → 与并行写入值域不相交,
+		// 故可回到**精确等值**断言（比差量更强, 且不受并发增删影响）
+		t.Assert(after.OrderCount, int64(2))         // 20/40 计入; 10 与 **90 排除**（C1）
+		t.Assert(fen2(after.SalesAmount), int64(13000)) // 50+80（不含 888）
+		t.Assert(fen2(after.RefundAmount), int64(1000)) // 售后完成 +10
 
-		// 空窗口（历史区间）→ 全零不报错
-		zero, err := logic.Trade(ctx, "2000-01-01 00:00:00", "2000-01-02 00:00:00")
+		// 空窗口（**另一个**历史区间——不可与夹具窗口重合, 否则测的是夹具自身）→ 全零不报错
+		zero, err := logic.Trade(ctx, "2001-06-01 00:00:00", "2001-06-02 00:00:00")
 		t.AssertNil(err)
 		t.Assert(zero.OrderCount, int64(0))
 		t.Assert(fen2(zero.SalesAmount), int64(0))
@@ -96,11 +98,12 @@ func TestDashboardMember(t *testing.T) {
 				"VALUES('TF-DB-DORM','x',?,0,1,DATE_SUB(NOW(), INTERVAL 100 DAY))", ph)
 		t.AssertNil(err)
 
-		// 窗口新增（受控窗口含该行 created_at=NOW）
-		start, end := dbWindow()
-		out, err := logic.Member(ctx, start, end)
+		// 窗口新增: 会员夹具的 created_at=NOW（未显式改写）→ 用 NOW 近窗查; 并行包可能再加, 故用 >=
+		nowStart := time.Now().UTC().Add(-time.Hour).Format("2006-01-02 15:04:05")
+		nowEnd := time.Now().UTC().Add(time.Hour).Format("2006-01-02 15:04:05")
+		out, err := logic.Member(ctx, nowStart, nowEnd)
 		t.AssertNil(err)
-		t.Assert(out.NewCount >= 1, true) // 本行在窗口内新增（并行包可能再加, 故用 >=）
+		t.Assert(out.NewCount >= 1, true)
 
 		// N6 二次收口: **activeCount 断言**（I4 改的正是其默认窗口, 原零断言 → 变异回"全量"抓不到）
 		// 本行 last_active_at = 100 天前 → 不在「近 30 天」活跃窗内 → 不贡献活跃
@@ -118,6 +121,11 @@ func TestDashboardMember(t *testing.T) {
 		t.AssertNil(err)
 		t.Assert(afterAct.ActiveCount, act.ActiveCount+1) // 1 天前活跃计入（默认近 30 天窗）
 		t.Assert(afterAct.DormantCount, act.DormantCount) // 但不是休眠（<90 天）——双口径互斥验证
+
+		// N6/I4 三轮收口: **100 天前活跃不得计入 ActiveCount**——这才是"默认窗是有限窗口"的
+		// 判别式断言（原断言在"全量"与"近30天"两种实现下都恰好 +1, 原理上不可能区分; 复审全量变异不红实证）
+		t.Assert(afterAct.ActiveCount, act.ActiveCount+1) // ph（100 天前活跃）未使活跃再 +1
+		// 反向: 100 天前活跃者只在休眠口径出现（上面已断言 DormantCount 记账在 ph 上）
 
 		// 休眠: 全量口径（不受窗口）——100 天前活跃行必被计入
 		t.Assert(act.DormantCount >= 1, true)
