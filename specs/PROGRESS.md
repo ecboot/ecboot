@@ -40,7 +40,7 @@
 | 09 | `specs/015-marketing-c` | 营销 C 端（首页聚合 + 秒杀/拼团/砍价/助力/满减列表与玩法动作） | 12 | 06 | 已实现（新建 3 接口/3 实现 + 秒杀欠账清偿 + 端点级可达性测试；**shop 渠道收官**；**独立评审 No→修复轮→复审 Yes**: C1 砍价单全库单行/C2 帮砍并发丢失更新 + I1~I6 与 M 级 20 项全部闭环, 迁移 000041/000042, 详见 §五） | ✅ | `530154e`/`d298028`/`c741ac9` |
 | 10 | `specs/016-marketing-admin` | 营销后台（券/秒杀/拼团/砍价/助力/满减管理） | 30 | 04 09 | 已实现（补实现 ICouponLogic 7 方法 + IActivityLogic 28 方法 + 连线 30 桩 + 契约微扩 D3-①~⑨ + 端点级权限探活测试; **独立评审 No→修复轮→复审 Yes**: C1 NULL日期券 panic/C2 已售保护击穿等 6+4 项全闭环, 零迁移, 详见 §五） | ✅ | `26c30c7`/`86efa69`/`adfc67a` |
 | 11 | `specs/017-distribution-fund` | 分销与资金（分销账户/申请/关系/佣金规则、提现、邀请记录、分享归因；两级红线已锁表结构） | 23 | 06 | 已实现（IDistributionLogic 16 方法 + admin 12 方法 + 连线 23 桩 + 跨域计提/冲销钩子 + **红线场景 SC-3 全测试化**; **独立评审 No→修复轮→复审 No（4 Important 低成本）→二次收口**, 迁移 000043, 详见 §五） | ✅ | `1ef5688`/`3b346b6`/`3a76790` |
-| 12 | `specs/018-member-audit-risk` | 会员管理与审计风控（admin member/登录与操作日志/风控规则与记录） | 13 | 01 11 | 已实现（新建 IMemberAdminLogic + IRiskAdminLogic + 实现 IAuditLogic + 风控评估器装配闭合批次 09/11 降级点 + 连线 13 桩 + 非超管对照 wiring; 零迁移） | ✅ | 见 §五 |
+| 12 | `specs/018-member-audit-risk` | 会员管理与审计风控（admin member/登录与操作日志/风控规则与记录） | 13 | 01 11 | 已实现（新建 IMemberAdminLogic + IRiskAdminLogic + 实现 IAuditLogic + 风控评估器装配闭合批次 09/11 降级点 + 连线 13 桩 + 非超管对照 wiring; 零迁移） | ✅ | `6ad4b33`/`ca341e7` |
 | 13 | `specs/019-dashboard-final` | 看板与收口终验（dashboard 三看板 + 全量桩清零 + 全量回归） | 3 | 全部 | 接口已有，impl 待补 | ⬜ | |
 | — | （已连线基线） | 认证纵切片 + 验证码/短信 | 8 | — | ✅ 已实现 | ✅ | `ae7acf5` 等 |
 
