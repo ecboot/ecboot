@@ -56,6 +56,11 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 		if err = ensureNotDormant(record); err != nil {
 			return nil, err
 		}
+		// I1（018 批次 13 收口终验）: 禁用态校验——SMS 通道以 status==2 拒绝登录,
+		// 微信通道原全裸发凭证（管理员禁用对小程序主通道无效, 治理语义不成立）→ 同口径拦截。
+		if record[dao.User.Columns().Status].Int() == 2 {
+			return nil, errcode.New(errcode.CodeUserDisabled, "账号已被禁用, 请联系客服")
+		}
 		userId := record["id"].Int64()
 		token, refresh, sErr := sessionManager(ctx).Create(ctx, userId)
 		if sErr != nil {
@@ -92,6 +97,9 @@ func WxLogin(ctx context.Context, wxCode, phone, smsCode string, channel int) (*
 			return nil, err
 		}
 		userId := target["id"].Int64()
+		if target[dao.User.Columns().Status].Int() == 2 { // I1: 禁用态不可经微信通道登录
+			return nil, errcode.New(errcode.CodeUserDisabled, "账号已被禁用, 请联系客服")
+		}
 		if _, err = dao.User.Ctx(ctx).Where(dao.User.Columns().Id, userId).
 			Data(g.Map{dao.User.Columns().WxOpenid: ident.Openid, dao.User.Columns().WxUnionid: ident.Unionid}).Update(); err != nil {
 			return nil, err

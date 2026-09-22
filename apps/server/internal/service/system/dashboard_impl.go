@@ -25,8 +25,10 @@ var _ IDashboardLogic = (*DashboardLogicImpl)(nil)
 // Trade 交易看板（FR-1）。
 func (i *DashboardLogicImpl) Trade(ctx context.Context, startTime, endTime string) (*model.TradeDashboard, error) {
 	out := &model.TradeDashboard{}
-	// 已支付口径（status>=20 含发货/完成; 10=待付款不计入销售额）
-	m := g.DB().Model("trade_order").Ctx(ctx).Where("status >= 20")
+	// 已支付口径（C1 评审修复: **显式枚举 20/30/40**, 原 `>= 20` 把 90=已取消计入——
+	// cancelBy 只改状态不清零 pay_amount, 取消单的应付额被计成销售额（评审探针: +888）;
+	// 10=待付款同样不计入）
+	m := g.DB().Model("trade_order").Ctx(ctx).WhereIn("status", []int{20, 30, 40})
 	if startTime != "" {
 		m = m.Where("created_at >= ?", startTime)
 	}
@@ -84,7 +86,8 @@ func (i *DashboardLogicImpl) Member(ctx context.Context, startTime, endTime stri
 	}
 	out.NewCount = int64(nc)
 
-	// 活跃: last_active_at 在窗口内（无窗口则近 30 天）
+	// 活跃（I4 评审修复——口径统一）: last_active_at 在窗口内; **无窗口默认近 30 天**
+	// （spec/api dc 已同步为"近 30 天内活跃"; 原三处表述不一: spec"全量"/api"周期内"/实现"近30天"）
 	activeFrom := startTime
 	if activeFrom == "" {
 		activeFrom = time.Now().AddDate(0, 0, -30).UTC().Format("2006-01-02 15:04:05")
@@ -100,12 +103,17 @@ func (i *DashboardLogicImpl) Member(ctx context.Context, startTime, endTime stri
 	}
 	out.ActiveCount = int64(ac)
 
-	// 休眠: 最后活跃 ≥90 天（与 000029 休眠分级同源）
+	// 休眠（I5 评审修复）: 阈值读权威配置 `dormant.tier1.days`（缺省 90——与 user/wx.go 的分级实现同源;
+	// 休眠定义在 **000027**（原注释误引 000029=bargain_assist））; 口径: 最后活跃 ≥ 阈值天 + 未删 + 正常态
+	dormantDays := g.Cfg().MustGet(ctx, "dormant.tier1.days", 90).Int()
+	if dormantDays <= 0 {
+		dormantDays = 90
+	}
 	dc, err := g.DB().Model("user").Ctx(ctx).
 		Where("deleted", 0).
 		Where("status", 1).
 		Where("last_active_at IS NOT NULL").
-		Where("last_active_at <= DATE_SUB(NOW(), INTERVAL 90 DAY)").Count()
+		Where("last_active_at <= DATE_SUB(NOW(), INTERVAL ? DAY)", dormantDays).Count()
 	if err != nil {
 		return nil, gerror.Wrap(err, "统计休眠会员失败")
 	}

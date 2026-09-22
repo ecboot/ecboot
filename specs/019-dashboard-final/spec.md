@@ -28,8 +28,8 @@
 
 ### Functional Requirements
 
-- **FR-1**: 交易看板——窗口内订单数（已支付口径）、销售额（pay_amount 合计）、退款额（售后实退合计）、当前待发货单数（status=20）。
-- **FR-2**: 会员看板——窗口新增（created_at）、活跃（last_active_at 窗口内）、休眠（≥90 天，与 000029 休眠分级同源）。
+- **FR-1**: 交易看板——窗口内订单数（**已支付枚举 20/30/40, 显式排除 90 已取消**——收口终验 C1 修正: cancelBy 只改状态不清零 pay_amount, `>=20` 会把取消单计成销售额）、销售额（pay_amount 合计）、退款额（售后完成 status=50 实退合计）、当前待发货单数（status=20）。
+- **FR-2**: 会员看板——窗口新增（created_at）、活跃（last_active_at 窗口内; **无窗口默认近 30 天**——I4 统一口径）、休眠（阈值读 `dormant.tier1.days`（缺省 90）, 与 user/wx.go 分级实现同源; 休眠定义在 **000027**）。
 - **FR-3**: 商品看板——在售 SPU 数、低库存预警数（inventory available≤warn_count 既有口径）、待审核评价数（audit_status=0）。
 - **FR-4**: 权限 `dashboard:read` 挂接三端点（RequirePerm 首行）；已就位零种子。
 
@@ -42,6 +42,6 @@
 
 ## Assumptions
 
-- 活跃口径=last_active_at 在窗口内（列既有）；若无更新入口则活跃≈新增（记账说明）。
+- 活跃口径=last_active_at 在窗口内, 无窗口取近 30 天（I4 收口终验统一三处表述）。
 - 退款额取售后单实退合计（refund_amount，status=50 已完成）；口径与售后域 status 枚举对齐。
-- 看板时间窗为空时 V1 默认全量（req 字段可选）。
+- 时间窗为空时: 交易/会员的窗口类指标取**近 30 天**（活跃）或全量（新增/订单——按各口径注释固定）; req 字段可选。
