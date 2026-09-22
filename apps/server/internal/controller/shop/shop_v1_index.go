@@ -58,7 +58,9 @@ func flashSaleItems(list []model.PublicFlashSaleItem) []v1.FlashSaleItem {
 	out := make([]v1.FlashSaleItem, 0, len(list))
 	for _, it := range list {
 		row := v1.FlashSaleItem{ActivityId: fmtID(it.ActivityId), Name: it.Name,
-			StartTime: it.StartTime, EndTime: it.EndTime, Items: make([]v1.FlashSaleSku, 0, len(it.Items))}
+			StartTime: it.StartTime, EndTime: it.EndTime,
+			Upcoming: it.Upcoming, // M7: FR-001 的"预告"标记此前无出口
+			Items:    make([]v1.FlashSaleSku, 0, len(it.Items))}
 		for _, b := range it.Items {
 			row.Items = append(row.Items, v1.FlashSaleSku{
 				SkuId: fmtID(b.SkuId), FlashPrice: b.Price, StockRemain: b.StockRemain, PerLimit: b.PerLimit,
@@ -123,6 +125,8 @@ func fullReductionItems(list []model.PublicFullReductionItem) []v1.FullReduction
 		for _, l := range fr.Ladders {
 			row.Ladders = append(row.Ladders, v1.FullReductionLadder{Threshold: l.Threshold, Discount: l.Discount})
 		}
+		row.ScopeDesc = fr.ScopeDesc // I3: FR-016 的"适用范围摘要"此前无出口
+		row.EndTime = fr.EndTime
 		out = append(out, row)
 	}
 	return out

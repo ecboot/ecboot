@@ -9,7 +9,7 @@
 补齐营销 C 端并收官 shop 渠道：新建 `IMarketingLogic`（5 公开列表 + 首页聚合）、`IBargainLogic`（发起/进度/帮砍）、
 `IAssistLogic`（发起/进度/助力）三个接口与实现；新增约 10 个 C 端 DTO；连线 12 个端点；
 **跨批清偿秒杀欠账**（秒杀价快照 + 活动/商品**双库存**锁 + 取消回补 `sold_count` + 删除批次 07 的临时拦截）；
-新增两个端口（`IRiskHit` 风控、`IAssistReward` 发奖意图）。**零迁移**（表/索引/列齐全）。
+新增两个端口（`IRiskHit` 风控、`IAssistReward` 发奖意图）。原假设"零迁移"; 实际落地 000040~000042（订单头秒杀列经评审修复轮撤销改行级归属; `bargain_record.order_no` 改可空——详见 PROGRESS §五）。
 
 ## Technical Context
 

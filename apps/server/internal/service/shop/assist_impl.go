@@ -22,6 +22,11 @@ type AssistLogicImpl struct{}
 func NewAssistLogic() *AssistLogicImpl { return &AssistLogicImpl{} }
 
 // Launch 发起助力（FR-012）: 校验活动时间窗与"每人可发起次数" → 建参与记录。
+// I1（评审修复）: per_limit 的语义已被 schema 钉死为"每人一次"——assist_record 上有
+// UNIQUE KEY uk_activity_user(activity_id,user_id)（000029）, per_limit>1 结构性不可达
+// （计数放行后第二次 INSERT 仍会撞键）。此处保留计数检查只为 per_limit=1 的友好前置拦截,
+// 真正的并发防线是唯一键兜底 + 1062 → 50006（原来裸抛会被归一成 10002 系统错误）。
+// 批次 10 营销后台配置 per_limit 时必须按此约束（>1 不生效）。
 func (i *AssistLogicImpl) Launch(
 	ctx context.Context, userId, activityId int64,
 ) (*model.AssistLaunchResult, error) {
@@ -30,7 +35,7 @@ func (i *AssistLogicImpl) Launch(
 		return nil, err
 	}
 	acols, rcols := dao.AssistActivity.Columns(), dao.AssistRecord.Columns()
-	// 每人可发起次数上限（assist_activity.per_limit）
+	// 每人可发起次数上限（assist_activity.per_limit; 见函数头 I1 说明——schema 只支持 1）
 	cnt, err := dao.AssistRecord.Ctx(ctx).
 		Where(rcols.ActivityId, activityId).
 		Where(rcols.UserId, userId).Count()
@@ -48,6 +53,9 @@ func (i *AssistLogicImpl) Launch(
 		Status:      1, // 进行中
 	}).Insert()
 	if err != nil {
+		if isDupKey(err) { // 并发双击: 唯一键兜底 → 业务码（不再裸抛 10002）
+			return nil, errcode.New(errcode.CodeAssistUsedUp, "该活动的发起次数已用完")
+		}
 		return nil, gerror.Wrap(err, "创建助力记录失败")
 	}
 	id, err := res.LastInsertId()
@@ -109,56 +117,69 @@ func (i *AssistLogicImpl) Help(
 		return nil, errcode.New(errcode.CodeActivityInvalid, "该助力活动已结束")
 	}
 
-	// 一人一助力: 先写流水（唯一键 uk_record_helper 兜底并发 → 1062 转 50007）
-	if _, e := dao.AssistHelper.Ctx(ctx).Data(do.AssistHelper{
-		RecordId:     recordId,
-		HelperUserId: userId,
-	}).Insert(); e != nil {
-		if isDupKey(e) {
-			return nil, errcode.New(errcode.CodeAlreadyAssisted, "您已经助力过了")
+	// M2（评审修复）: 助力流水、计数推进与达标置位收进**同一事务**同生共死——
+	// 原先流水先写、计数推进失败（affected=0）不回滚, 该会员会被永久记为"已助力"（不能重试）。
+	var done bool
+	if err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		// 一人一助力: 先写流水（唯一键 uk_record_helper 兜底并发 → 1062 转 50007）
+		if _, e := dao.AssistHelper.Ctx(ctx).Data(do.AssistHelper{
+			RecordId:     recordId,
+			HelperUserId: userId,
+		}).Insert(); e != nil {
+			if isDupKey(e) {
+				return errcode.New(errcode.CodeAlreadyAssisted, "您已经助力过了")
+			}
+			return gerror.Wrap(e, "记录助力失败")
 		}
-		return nil, gerror.Wrap(e, "记录助力失败")
-	}
 
-	// 条件推进助力计数（判行数）
-	res, err := dao.AssistRecord.Ctx(ctx).
-		Where(rcols.Id, recordId).
-		Where(rcols.Status, 1).
-		Data(g.Map{rcols.HelperCount: gdb.Raw("helper_count + 1")}).
-		Update()
-	if err != nil {
-		return nil, gerror.Wrap(err, "推进助力计数失败")
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return nil, errcode.New(errcode.CodeActivityInvalid, "该助力记录已结束")
-	}
+		// 条件推进助力计数（判行数）
+		res, e := dao.AssistRecord.Ctx(ctx).
+			Where(rcols.Id, recordId).
+			Where(rcols.Status, 1).
+			Data(g.Map{rcols.HelperCount: gdb.Raw("helper_count + 1")}).
+			Update()
+		if e != nil {
+			return gerror.Wrap(e, "推进助力计数失败")
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return errcode.New(errcode.CodeActivityInvalid, "该助力记录已结束")
+		}
 
-	// 达标判定: 必须用**自增后的最新计数**（重读）。
-	// 教训: 若用自增前读到的 `rec.HelperCount + 1` 判定, 并发助力时每个请求都看到旧计数,
-	// 谁都判不出"达标" → 记录永远停在"进行中"（并发用例实测 EXPECT 1 == 2 抓到）。
-	required := act[acols.RequiredCount].Int()
-	cur, err := dao.AssistRecord.Ctx(ctx).
-		Where(rcols.Id, recordId).Value(rcols.HelperCount)
-	if err != nil {
-		return nil, gerror.Wrap(err, "读取助力人数失败")
+		// 达标判定: 必须用**自增后的最新计数**（重读）。
+		// 教训: 若用自增前读到的 `rec.HelperCount + 1` 判定, 并发助力时每个请求都看到旧计数,
+		// 谁都判不出"达标" → 记录永远停在"进行中"（并发用例实测 EXPECT 1 == 2 抓到）。
+		required := act[acols.RequiredCount].Int()
+		cur, e := dao.AssistRecord.Ctx(ctx).
+			Where(rcols.Id, recordId).Value(rcols.HelperCount)
+		if e != nil {
+			return gerror.Wrap(e, "读取助力人数失败")
+		}
+		if cur.Int() < required {
+			return nil // 未达标: 提交流水与计数, Done=false
+		}
+		// 达标: **条件置位**（status 1→2 且判行数）——只有真正完成迁移的那一次才投递发奖意图,
+		// 并发下其余请求 affected=0 → 不投递（FR-014: 发奖只一次）
+		fin, e := dao.AssistRecord.Ctx(ctx).
+			Where(rcols.Id, recordId).
+			Where(rcols.Status, 1).
+			Data(g.Map{rcols.Status: 2, rcols.FinishTime: gtime.Now()}).
+			Update()
+		if e != nil {
+			return gerror.Wrap(e, "完成助力记录失败")
+		}
+		if n, _ := fin.RowsAffected(); n == 0 {
+			return nil // 已被并发者置位 → 不重复投递
+		}
+		done = true
+		return nil
+	}); err != nil {
+		return nil, err
 	}
-	if cur.Int() < required {
+	if !done {
 		return &model.AssistHelpResult{Done: false}, nil
 	}
-	// 达标: **条件置位**（status 1→2 且判行数）——只有真正完成迁移的那一次才投递发奖意图,
-	// 并发下其余请求 affected=0 → 不投递（FR-014: 发奖只一次）
-	fin, err := dao.AssistRecord.Ctx(ctx).
-		Where(rcols.Id, recordId).
-		Where(rcols.Status, 1).
-		Data(g.Map{rcols.Status: 2, rcols.FinishTime: gtime.Now()}).
-		Update()
-	if err != nil {
-		return nil, gerror.Wrap(err, "完成助力记录失败")
-	}
-	if n, _ := fin.RowsAffected(); n == 0 {
-		return &model.AssistHelpResult{Done: false}, nil // 已被并发者置位 → 不重复投递
-	}
-	// 投递发奖意图（端口; 未装配告警降级——实际发放跨 user 域, 属后续批次）
+	// 投递发奖意图（端口; 未装配告警降级——实际发放跨 user 域, 属后续批次）。
+	// 置于事务提交之后: 端口是跨域副作用, 不应被卷入本事务的回滚语义。
 	if AssistReward != nil {
 		AssistReward.GrantForAssist(ctx, rec[rcols.UserId].Int64(), rec[rcols.ActivityId].Int64(),
 			recordId, act[acols.RewardType].Int(), act[acols.RewardRef].Int64())

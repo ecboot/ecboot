@@ -20,7 +20,8 @@ type IMarketingLogic interface {
 	PublicFlashSales(ctx context.Context, page model.PageReq) (*model.PageResult[model.PublicFlashSaleItem], error)
 	PublicBargains(ctx context.Context, page model.PageReq) (*model.PageResult[model.PublicBargainItem], error)
 	PublicAssists(ctx context.Context, page model.PageReq) (*model.PageResult[model.PublicAssistItem], error)
-	PublicFullReductions(ctx context.Context, page model.PageReq) (*model.PageResult[model.PublicFullReductionItem], error)
+	// PublicFullReductions 满减公开列表: spuId>0 时按"范围命中"过滤（全场 / 商品直配 / 分类含该商品, FR-018）。
+	PublicFullReductions(ctx context.Context, spuId int64, page model.PageReq) (*model.PageResult[model.PublicFullReductionItem], error)
 	// Index 首页聚合（FR-017）: 轮播 + 楼层 + 五类活动入口（各取前 N 条）+ 可领券;
 	// **任一块为空返回空数组而非报错**（首页可用性优先）。
 	Index(ctx context.Context) (*model.IndexAggregate, error)

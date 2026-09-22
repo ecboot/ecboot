@@ -47,6 +47,7 @@ type (
 		Name       string         `json:"name"`
 		StartTime  string         `json:"startTime"`
 		EndTime    string         `json:"endTime"`
+		Upcoming   bool           `json:"upcoming" dc:"是否预告(未开始; 015 修复轮微扩)"`
 		Items      []FlashSaleSku `json:"items" dc:"场次商品"`
 	}
 	FlashSaleListRes struct {
@@ -101,6 +102,7 @@ type (
 	FullReductionListReq struct {
 		g.Meta `path:"/full-reductions" method:"GET" summary:"满减活动列表"`
 		SpuId  string `json:"spuId" dc:"按商品过滤范围命中"`
+		model.PageReq
 	}
 	FullReductionLadder struct {
 		Threshold string `json:"threshold" dc:"满X元"`
@@ -110,8 +112,11 @@ type (
 		ActivityId string                `json:"activityId"`
 		Name       string                `json:"name"`
 		Ladders    []FullReductionLadder `json:"ladders" dc:"档位"`
+		ScopeDesc  string                `json:"scopeDesc" dc:"适用范围摘要(全场/分类/指定商品; 015 修复轮微扩)"`
+		EndTime    string                `json:"endTime" dc:"015 修复轮微扩"`
 	}
 	FullReductionListRes struct {
+		model.PageRes
 		List []FullReductionItem `json:"list"`
 	}
 )

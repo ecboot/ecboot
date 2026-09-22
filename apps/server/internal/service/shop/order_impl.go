@@ -72,6 +72,15 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		}
 		flash = fc
 	}
+	// 砍价成交下单上下文（I4 / spec 006 FR-006）: 校验归属与"到底价待下单", 成交价按砍价单当前价。
+	var bargain *bargainCtx
+	if in.BargainRecordId > 0 {
+		bc, berr := loadBargainForOrder(ctx, userId, in.BargainRecordId)
+		if berr != nil {
+			return nil, berr
+		}
+		bargain = bc
+	}
 
 	// ---- 事务外预备: 收货地址快照 ----
 	addr, err := dao.UserAddress.Ctx(ctx).
@@ -107,7 +116,7 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	}
 
 	// 步骤1: 行聚合
-	lines, totalFen, err := i.collectLines(ctx, tx, userId, in, flash)
+	lines, totalFen, err := i.collectLines(ctx, tx, userId, in, flash, bargain)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +139,23 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		// 秒杀: **活动库存**条件更新（与下面的商品库存**都要锁**——批次 07 的教训: 只锁活动库存会让
 		// 支付回调的库存核销必然未命中而整单回滚, 秒杀单永远无法支付）。
 		if flash != nil {
+			// I2（评审修复）: per_limit **下单侧强制**——按订单项累计该会员在该场次的历史购买量
+			// （取消单 status=90 已回补活动库存, 不计入; 售后退款见 I5 记账口径——与 sold_count 同步不回补）。
+			// C 端列表把 per_limit 展示为"每人限购"（FR-001）, 原先只在展示层出现、下单侧零强制。
+			if flash.PerLimit > 0 {
+				bought, e := tx.GetValue(
+					"SELECT COALESCE(SUM(t.quantity),0) FROM trade_order_item t"+
+						" JOIN trade_order o ON o.id = t.order_id"+
+						" WHERE t.flash_sale_item_id = ? AND o.user_id = ? AND o.status != 90",
+					flash.ItemId, userId)
+				if e != nil {
+					return nil, e
+				}
+				if bought.Int64()+int64(ln.Quantity) > int64(flash.PerLimit) {
+					err = errcode.New(errcode.CodeSoldOut, "超过该场次每人限购数量")
+					return nil, err
+				}
+			}
 			var fsRes sql.Result
 			if fsRes, err = tx.Model("flash_sale_item").Ctx(ctx).
 				Where("id", flash.ItemId).
@@ -203,9 +229,8 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	if in.UserCouponId > 0 {
 		orderData["user_coupon_id"] = in.UserCouponId
 	}
-	if flash != nil {
-		orderData["flash_sale_item_id"] = flash.ItemId // 取消时据此回补活动库存（迁移 000040）
-	}
+	// 秒杀归属记录在**订单项**（I6: trade_order_item.flash_sale_item_id 自 000023 就存在,
+	// 迁移 000042 已撤销本表头上的同名列死列——行级归属比订单头更自然, cancelBy/售后按行回补）。
 	if in.GroupBuyTeamId > 0 {
 		orderData["group_buy_team_id"] = in.GroupBuyTeamId
 	}
@@ -219,6 +244,23 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		Where("order_no", orderNo).Value("id")
 	if err != nil {
 		return nil, err
+	}
+
+	// ---- 步骤5.5: 砍价成交置位（I4 / spec 006 FR-006）----
+	// 条件置位 status 2→3 + 回填 order_no（判行数）: 并发/重复下单只有一次成功——
+	// 其余 affected=0 → 40004; uk_order_no（未下单行全为 NULL 不参与唯一约束）作第二重兜底。
+	if bargain != nil {
+		brRes, e := tx.Model("bargain_record").Ctx(ctx).
+			Where("id", bargain.RecordId).
+			Where("status", 2).
+			Data(g.Map{"status": 3, "order_no": orderNo}).
+			Update()
+		if e != nil {
+			return nil, e
+		}
+		if n, _ := brRes.RowsAffected(); n == 0 {
+			return nil, errcode.New(errcode.CodeBargainUnpayable, "该砍价单已下单")
+		}
 	}
 
 	// ---- 步骤6: 订单项快照（行分摊, 尾差记末行） ----
@@ -235,7 +277,7 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		// 逐构成分摊后求和: 各构成的分摊和恒等于订单头对应值（AllocateProRata 保和）, 故行 promo 和 == promotionFen
 		linePromo := couponAlloc[idx] + frAlloc[idx] + pointAlloc[idx]
 		linePay := ln.LineFen - linePromo
-		if _, err = tx.Model("trade_order_item").Ctx(ctx).Data(g.Map{
+		lineData := g.Map{
 			"order_no":              orderNo,
 			"order_id":              orderId,
 			"spu_id":                ln.SpuId,
@@ -253,7 +295,13 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 			"point_amount":          money.ToYuanString(pointAlloc[idx]),
 			"promotion_amount":      money.ToYuanString(linePromo),
 			"pay_amount":            money.ToYuanString(linePay),
-		}).Insert(); err != nil {
+		}
+		// I6: 秒杀场次商品 id 落在**订单项**（000023 既有列 + idx_flash_item; 行级归属,
+		// 取消回补/售后回补/限购累计都按行定位, 不再依赖订单头）
+		if flash != nil {
+			lineData["flash_sale_item_id"] = flash.ItemId
+		}
+		if _, err = tx.Model("trade_order_item").Ctx(ctx).Data(lineData).Insert(); err != nil {
 			return nil, err
 		}
 	}
@@ -469,16 +517,18 @@ func (i *OrderLogicImpl) cancelBy(
 		qty := it["quantity"].Int()
 		_, _ = g.DB().Exec(ctx,
 			"UPDATE inventory SET locked=locked-? WHERE sku_id=? AND locked>=?", qty, skuId, qty)
-	}
-	// 秒杀单: 回补**活动库存**（批次 07 欠账清偿条件之一）。按订单快照的 `flash_sale_item_id` 定位——
-	// 若改按 sku 反查"进行中的场次", 在"活动已结束才取消"时会查不到而漏回补（活动库存永久泄漏）。
-	if fid := rec["flash_sale_item_id"].Int64(); fid > 0 {
-		for _, it := range items {
-			qty := it["quantity"].Int()
-			if _, e := g.DB().Exec(ctx,
+		// 秒杀单: 回补**活动库存**（批次 07 欠账清偿条件之一）。按**订单项**的 `flash_sale_item_id`
+		// 定位（I6: 000023 既有列, 行级归属）——若按 sku 反查"进行中的场次", 在"活动已结束才取消"
+		// 时会查不到而漏回补（活动库存永久泄漏）。
+		if fid := it["flash_sale_item_id"].Int64(); fid > 0 {
+			res, e := g.DB().Exec(ctx,
 				"UPDATE flash_sale_item SET sold_count = sold_count - ? WHERE id = ? AND sold_count >= ?",
-				qty, fid, qty); e != nil {
+				qty, fid, qty)
+			if e != nil {
 				g.Log().Errorf(ctx, "秒杀活动库存回补失败: flash_sale_item_id=%d qty=%d err=%v", fid, qty, e)
+			} else if n, _ := res.RowsAffected(); n == 0 {
+				// M3（评审修复）: 判行数——条件不命中（sold_count < qty, 账已不一致）必须可见, 不得静默
+				g.Log().Errorf(ctx, "[库存异常] 秒杀活动库存回补未命中(账实不符?): flash_sale_item_id=%d qty=%d order_no=%s", fid, qty, orderNo)
 			}
 		}
 	}
@@ -501,7 +551,7 @@ func (i *OrderLogicImpl) cancelBy(
 }
 
 // collectLines 行聚合：购物车项（普通）或直购 SKU → 下单行列表。
-func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int64, in model.OrderCreateInput, flash *flashCtx) ([]orderLine, int64, error) {
+func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int64, in model.OrderCreateInput, flash *flashCtx, bargain *bargainCtx) ([]orderLine, int64, error) {
 	var lines []orderLine
 	var totalFen int64
 
@@ -533,6 +583,16 @@ func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int
 			}
 			priceFen = flash.PriceFen
 		}
+		// 砍价成交单（I4 / FR-006）: 价格按砍价单当前价, 且所购 SKU/数量必须与场次商品一致
+		if bargain != nil {
+			if bargain.SkuId != skuId {
+				return errcode.New(errcode.CodeBargainUnpayable, "所购商品与砍价单不符")
+			}
+			if qty != 1 {
+				return errcode.New(errcode.CodeBargainUnpayable, "砍价成交单每次只能购买 1 件")
+			}
+			priceFen = bargain.PriceFen
+		}
 		lines = append(lines, orderLine{
 			SkuId: skuId, SkuNo: sku["sku_no"].String(), SpuId: sku["spu_id"].Int64(),
 			SpuName: spu["name"].String(), SkuName: sku["name"].String(),
@@ -543,6 +603,9 @@ func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int
 		return nil
 	}
 
+	if bargain != nil && len(in.CartItemIds) > 0 {
+		return nil, 0, errcode.New(errcode.CodeInvalidParam, "砍价成交单仅支持直接购买")
+	}
 	for _, itemId := range in.CartItemIds {
 		item, err := dao.CartItem.Ctx(ctx).
 			Where(dao.CartItem.Columns().Id, itemId).
@@ -627,6 +690,7 @@ type flashCtx struct {
 	ItemId   int64
 	SkuId    int64
 	PriceFen int64
+	PerLimit int // 每人限购（I2: 下单侧强制; 0=不限）
 }
 
 // loadFlashForOrder 秒杀场次商品校验（FR-002/004）: 商品存在 + 所属活动**启用未删且在时间窗内**;
@@ -657,5 +721,62 @@ func loadFlashForOrder(ctx context.Context, itemId int64) (*flashCtx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &flashCtx{ItemId: itemId, SkuId: item[icols.SkuId].Int64(), PriceFen: priceFen}, nil
+	return &flashCtx{
+		ItemId:   itemId,
+		SkuId:    item[icols.SkuId].Int64(),
+		PriceFen: priceFen,
+		PerLimit: item[icols.PerLimit].Int(),
+	}, nil
+}
+
+// bargainCtx 砍价成交下单上下文（015 评审修复 I4 / spec 006 FR-006）。
+type bargainCtx struct {
+	RecordId int64
+	SkuId    int64
+	PriceFen int64 // 砍价成交价（bargain_record.current_price, 到底价后不再变动）
+}
+
+// loadBargainForOrder 砍价成交下单前置校验（FR-006）:
+// 砍价单存在 + **归属本人** + **status=2（到底价待下单）** + 未超时。任一不满足 → 40004。
+// 成交价在 status=2 后不再变动（Cut 只对 status=1 推进）, 事务外读取安全;
+// "防重复成交"由下单事务内的条件置位（status 2→3）+ uk_order_no 双重兜底。
+func loadBargainForOrder(ctx context.Context, userId, recordId int64) (*bargainCtx, error) {
+	rcols := dao.BargainRecord.Columns()
+	rec, err := dao.BargainRecord.Ctx(ctx).Where(rcols.Id, recordId).One()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询砍价单失败")
+	}
+	if rec.IsEmpty() || rec[rcols.UserId].Int64() != userId {
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "砍价单不存在")
+	}
+	switch rec[rcols.Status].Int() {
+	case 2:
+		// 到底价待下单: 继续校验时效
+	case 1:
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "砍价未到底价, 不可下单")
+	case 3:
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "该砍价单已下单")
+	default: // 4 超时 / 5 取消 / 其他
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "砍价单已结束, 不可下单")
+	}
+	if rec[rcols.ExpireTime].GTime() != nil && !rec[rcols.ExpireTime].GTime().After(gtime.Now()) {
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "砍价单已超时, 不可下单")
+	}
+	priceFen, err := yuanFen(rec[rcols.CurrentPrice].String())
+	if err != nil {
+		return nil, err
+	}
+	item, err := dao.BargainItem.Ctx(ctx).
+		Where(dao.BargainItem.Columns().Id, rec[rcols.ItemId].Int64()).One()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询砍价场次商品失败")
+	}
+	if item.IsEmpty() {
+		return nil, errcode.New(errcode.CodeBargainUnpayable, "砍价场次商品不存在")
+	}
+	return &bargainCtx{
+		RecordId: recordId,
+		SkuId:    item[dao.BargainItem.Columns().SkuId].Int64(),
+		PriceFen: priceFen,
+	}, nil
 }

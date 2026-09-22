@@ -20,3 +20,15 @@ func parseID(s string) (int64, error) {
 func fmtID(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
+
+// spuIdOf 可选的 spuId 查询参数（空/非法 → 0 = 不过滤; 满减列表用）。
+func spuIdOf(s string) int64 {
+	if s == "" {
+		return 0
+	}
+	id, err := parseID(s)
+	if err != nil {
+		return 0
+	}
+	return id
+}

@@ -659,7 +659,7 @@ func afterSaleFinishedSideEffects(ctx context.Context, afterSaleNo, operator str
 	if rec[acols.Type].Int() == afterSaleTypeReturnGoods {
 		itemId := rec[acols.OrderItemId].Int64()
 		qty := rec[acols.Quantity].Int()
-		item, e := dao.TradeOrderItem.Ctx(ctx).Fields(icols.SkuId).Where(icols.Id, itemId).One()
+		item, e := dao.TradeOrderItem.Ctx(ctx).Fields(icols.SkuId, icols.FlashSaleItemId).Where(icols.Id, itemId).One()
 		if e != nil {
 			return gerror.Wrap(e, "查询订单项失败")
 		}
@@ -676,6 +676,19 @@ func afterSaleFinishedSideEffects(ctx context.Context, afterSaleNo, operator str
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return errcode.New(errcode.CodeInventoryAdjust, "库存行不存在, 无法回补")
+		}
+		// I5（评审修复）: 秒杀单退货须**同步回补活动库存**（sold_count）, 否则商品库存回来了、
+		// 活动侧仍计着这一件 → 双账从此永久分歧（活动永久少卖一件）。
+		// 口径与 cancelBy 一致: 条件更新 + 判行数, 未命中（账已不一致）留 [库存异常] 告警可查。
+		if fid := item[icols.FlashSaleItemId].Int64(); fid > 0 {
+			fres, fe := g.DB().Exec(ctx,
+				"UPDATE flash_sale_item SET sold_count = sold_count - ? WHERE id = ? AND sold_count >= ?",
+				qty, fid, qty)
+			if fe != nil {
+				g.Log().Errorf(ctx, "秒杀活动库存回补失败: flash_sale_item_id=%d qty=%d err=%v", fid, qty, fe)
+			} else if n, _ := fres.RowsAffected(); n == 0 {
+				g.Log().Errorf(ctx, "[库存异常] 售后回补活动库存未命中(账实不符?): flash_sale_item_id=%d qty=%d after_sale_no=%s", fid, qty, afterSaleNo)
+			}
 		}
 		inv, e2 := dao.Inventory.Ctx(ctx).
 			Fields(dao.Inventory.Columns().Total, dao.Inventory.Columns().Locked).

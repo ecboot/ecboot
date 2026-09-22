@@ -30,7 +30,7 @@ type BargainRecordColumns struct {
 	Status       string // 状态:1砍价中 2到底价待下单 3已下单 4超时失败 5已取消
 	ExpireTime   string // 砍价截止时间(超时扫描)
 	SuccessTime  string // 到底价时间
-	OrderNo      string // 成交订单号(下单后回填,防重复成交)
+	OrderNo      string // 成交订单号(下单后回填; NULL=未下单, NULL不参与唯一约束)
 	CreatedAt    string // 创建时间
 	UpdatedAt    string // 更新时间
 }

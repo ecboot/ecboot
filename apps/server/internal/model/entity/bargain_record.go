@@ -19,7 +19,7 @@ type BargainRecord struct {
 	Status       int         `json:"status"       orm:"status"        ` // 状态:1砍价中 2到底价待下单 3已下单 4超时失败 5已取消
 	ExpireTime   *gtime.Time `json:"expireTime"   orm:"expire_time"   ` // 砍价截止时间(超时扫描)
 	SuccessTime  *gtime.Time `json:"successTime"  orm:"success_time"  ` // 到底价时间
-	OrderNo      string      `json:"orderNo"      orm:"order_no"      ` // 成交订单号(下单后回填,防重复成交)
+	OrderNo      string      `json:"orderNo"      orm:"order_no"      ` // 成交订单号(下单后回填; NULL=未下单, NULL不参与唯一约束)
 	CreatedAt    *gtime.Time `json:"createdAt"    orm:"created_at"    ` // 创建时间
 	UpdatedAt    *gtime.Time `json:"updatedAt"    orm:"updated_at"    ` // 更新时间
 }

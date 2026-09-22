@@ -788,3 +788,44 @@ func TestAfterSaleZeroRefundSideEffects(t *testing.T) {
 		t.Assert(comm.calls, 1)
 	})
 }
+
+// TestAfterSaleRestoresFlashSoldCount I5 回归（015 评审）: 秒杀单退货退款完成时
+// 必须**同步回补活动库存**（flash_sale_item.sold_count）——原先只回补商品库存,
+// 双账从此永久分歧（活动永久少卖一件）。场次商品 id 按**订单项**列定位（I6 行级归属）。
+func TestAfterSaleRestoresFlashSoldCount(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		f := seedAfterSaleFixture(ctx, t, "AS-FLASH-1", "T-AS-FLASH1", 980000053, 1, "10.00")
+		defer cleanupAfterSaleFixture(ctx, t, f)
+
+		// 秒杀场次商品（挂在售后 fixture 的哨兵 SKU 上）, 已售 2
+		const flashName = "TF-售后秒杀回补"
+		defer cleanupFlashSale(ctx, flashName)
+		_, flashItemId := seedFlashSale(ctx, t, flashName, f.SkuId, "5.00", 10, -10, 60)
+		_, err := g.DB().Exec(ctx, "UPDATE flash_sale_item SET sold_count=2 WHERE id=?", flashItemId)
+		t.AssertNil(err)
+		// 该订单项来自秒杀单: 行级 flash_sale_item_id（迁移 000042 撤销订单头死列后的归属依据）
+		_, err = g.DB().Exec(ctx, "UPDATE trade_order_item SET flash_sale_item_id=? WHERE id=?", flashItemId, f.ItemId)
+		t.AssertNil(err)
+
+		seedAfterSaleRow2(ctx, t, f, "AS-FLASH-1", afterSaleFinished, afterSaleTypeReturnGoods, 1, "10.00")
+		defer cleanupAfterSaleCallbackLogs(ctx)
+
+		spy := &commissionSpy{}
+		old := CommissionReverse
+		CommissionReverse = spy
+		defer func() { CommissionReverse = old }()
+
+		t.AssertNil(afterSaleFinishedSideEffects(ctx, "AS-FLASH-1", "tester:1"))
+
+		// 活动库存回补: sold_count 2 → 1
+		sc, err := g.DB().GetValue(ctx, "SELECT sold_count FROM flash_sale_item WHERE id=?", flashItemId)
+		t.AssertNil(err)
+		t.Assert(sc.Int(), 1)
+		// 商品库存照旧回补: total 100 → 101
+		inv, err := g.DB().GetOne(ctx, "SELECT total FROM inventory WHERE sku_id=?", f.SkuId)
+		t.AssertNil(err)
+		t.Assert(inv["total"].Int(), 101)
+		t.Assert(spy.calls, 1)
+	})
+}

@@ -53,7 +53,6 @@ type TradeOrderColumns struct {
 	UserRemark          string // 买家留言
 	SellerRemark        string // 卖家备注(客服/仓库内部使用,买家不可见)
 	RequestToken        string // 下单幂等token(确认页发放,Redis抢占+唯一索引兜底;NULL不参与唯一)
-	FlashSaleItemId     string // 秒杀场次商品ID(NULL=普通单; 取消时据此回补活动库存)
 	PayTime             string // 支付完成时间
 	DeliverCompany      string // 物流公司(发货预留)
 	DeliverNo           string // 物流单号(发货预留)
@@ -100,7 +99,6 @@ var tradeOrderColumns = TradeOrderColumns{
 	UserRemark:          "user_remark",
 	SellerRemark:        "seller_remark",
 	RequestToken:        "request_token",
-	FlashSaleItemId:     "flash_sale_item_id",
 	PayTime:             "pay_time",
 	DeliverCompany:      "deliver_company",
 	DeliverNo:           "deliver_no",

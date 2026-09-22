@@ -84,8 +84,11 @@ func TestMarketingEndpointsReachable(t *testing.T) {
 			t.Assert(strings.Contains(body, "\"code\":10003"), false)
 		}
 
-		// 对照: 会员动作**不带凭证** → 必须 10003（证明这条路径确实走了鉴权）
-		body := doReq(ctx, t, base, "", "POST", "/shop/bargains/999999999/cut", "")
-		t.Assert(strings.Contains(body, "\"code\":10003"), true)
+		// 对照: 会员动作**不带凭证** → 必须 10003（证明这条路径确实走了鉴权, 而非被白名单直通）。
+		// M12（015 评审）: 原先只对照 4 个会员端点中的 1 个, 现全部覆盖。
+		for _, c := range member {
+			body := doReq(ctx, t, base, "", c.method, c.path, c.body)
+			t.Assert(strings.Contains(body, "\"code\":10003"), true)
+		}
 	})
 }

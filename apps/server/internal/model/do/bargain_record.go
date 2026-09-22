@@ -21,7 +21,7 @@ type BargainRecord struct {
 	Status       any         // 状态:1砍价中 2到底价待下单 3已下单 4超时失败 5已取消
 	ExpireTime   *gtime.Time // 砍价截止时间(超时扫描)
 	SuccessTime  *gtime.Time // 到底价时间
-	OrderNo      any         // 成交订单号(下单后回填,防重复成交)
+	OrderNo      any         // 成交订单号(下单后回填; NULL=未下单, NULL不参与唯一约束)
 	CreatedAt    *gtime.Time // 创建时间
 	UpdatedAt    *gtime.Time // 更新时间
 }

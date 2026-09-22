@@ -8,7 +8,6 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/util/gconv"
 
 	"ecboot/internal/dao"
 	"ecboot/internal/model"
@@ -137,25 +136,56 @@ func (i *MarketingLogicImpl) PublicAssists(
 	return &model.PageResult[model.PublicAssistItem]{List: list, Total: int64(total)}, nil
 }
 
-// PublicFullReductions 满减公开列表（FR-016）: 只出进行中; 含档位与适用范围摘要。
+// PublicFullReductions 满减公开列表（FR-016）: 只出进行中; 含档位与适用范围摘要;
+// spuId>0 时只出**范围命中**该商品的活动（I3/FR-018: 全场 / 商品直配 / 分类含该商品,
+// 无 scope 行视为全场——与 scopeDescOf 口径一致）。活动为管理侧配置数据量级有界,
+// 故全量取回→过滤→内存分页, 保证 total 与筛选语义一致。
 func (i *MarketingLogicImpl) PublicFullReductions(
-	ctx context.Context, page model.PageReq,
+	ctx context.Context, spuId int64, page model.PageReq,
 ) (*model.PageResult[model.PublicFullReductionItem], error) {
 	page = page.Normalized()
 	cols := dao.PromotionActivity.Columns()
-	base := func() *gdb.Model {
-		return dao.PromotionActivity.Ctx(ctx).
-			Where(cols.Status, 1).Where(cols.Deleted, 0).
-			Where(cols.StartTime + " <= NOW()").Where(cols.EndTime + " >= NOW()")
-	}
-	total, err := base().Count()
-	if err != nil {
-		return nil, gerror.Wrap(err, "统计满减活动失败")
-	}
-	acts, err := base().OrderAsc(cols.EndTime).Page(page.Page, page.PageSize).All()
+	acts, err := dao.PromotionActivity.Ctx(ctx).
+		Where(cols.Status, 1).Where(cols.Deleted, 0).
+		Where(cols.StartTime + " <= NOW()").Where(cols.EndTime + " >= NOW()").
+		OrderAsc(cols.EndTime).All()
 	if err != nil {
 		return nil, gerror.Wrap(err, "查询满减活动失败")
 	}
+
+	// SpuId 范围命中过滤（批量取 scope 行, 判定三级范围; 无 scope 行 = 全场命中）
+	if spuId > 0 {
+		scols := dao.ProductSpu.Columns()
+		cateId, err := dao.ProductSpu.Ctx(ctx).
+			Where(scols.Id, spuId).Value(scols.CategoryId)
+		if err != nil {
+			return nil, gerror.Wrap(err, "查询商品分类失败")
+		}
+		hit, err := fullReductionScopeHits(ctx, spuId, cateId.Int64())
+		if err != nil {
+			return nil, err
+		}
+		filtered := acts[:0]
+		for _, a := range acts {
+			if hit[a[cols.Id].Int64()] {
+				filtered = append(filtered, a)
+			}
+		}
+		acts = filtered
+	}
+
+	// 内存分页（total 为过滤后语义）
+	total := len(acts)
+	start := (page.Page - 1) * page.PageSize
+	if start > total {
+		start = total
+	}
+	end := start + page.PageSize
+	if end > total {
+		end = total
+	}
+	acts = acts[start:end]
+
 	lcols := dao.PromotionActivityLadder.Columns()
 	list := make([]model.PublicFullReductionItem, 0, len(acts))
 	for _, a := range acts {
@@ -172,15 +202,67 @@ func (i *MarketingLogicImpl) PublicFullReductions(
 				Discount:  r[lcols.DiscountAmount].String(),
 			})
 		}
+		scopeDesc, e := scopeDescOf(ctx, id)
+		if e != nil {
+			return nil, e // M9: 查询失败必须显式失败, 不得静默标"全场"
+		}
 		list = append(list, model.PublicFullReductionItem{
 			ActivityId: id,
 			Name:       a[cols.Name].String(),
 			Ladders:    ladders,
-			ScopeDesc:  scopeDescOf(ctx, id),
+			ScopeDesc:  scopeDesc,
 			EndTime:    a[cols.EndTime].String(),
 		})
 	}
 	return &model.PageResult[model.PublicFullReductionItem]{List: list, Total: int64(total)}, nil
+}
+
+// fullReductionScopeHits 计算满减活动的范围命中集合（批量一次 IN 查询）。
+// 命中规则: 有全场行(1) / 商品行(3) target=spuId / 分类行(2) target=该商品分类;
+// 完全没有 scope 行的活动视为全场（与 scopeDescOf 展示口径一致）。
+func fullReductionScopeHits(ctx context.Context, spuId, cateId int64) (map[int64]bool, error) {
+	ids := []int64{}
+	actIds, err := dao.PromotionActivity.Ctx(ctx).
+		Fields(dao.PromotionActivity.Columns().Id).
+		Where(dao.PromotionActivity.Columns().Status, 1).
+		Where(dao.PromotionActivity.Columns().Deleted, 0).
+		Where(dao.PromotionActivity.Columns().StartTime + " <= NOW()").
+		Where(dao.PromotionActivity.Columns().EndTime + " >= NOW()").All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询满减活动失败")
+	}
+	for _, a := range actIds {
+		ids = append(ids, a[dao.PromotionActivity.Columns().Id].Int64())
+	}
+	out := map[int64]bool{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	scols := dao.PromotionActivityScope.Columns()
+	recs, err := dao.PromotionActivityScope.Ctx(ctx).
+		WhereIn(scols.ActivityId, ids).All()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询活动范围失败")
+	}
+	// 无 scope 行的活动先全部视为全场命中, 再被有 scope 行的活动覆盖
+	hasScope := map[int64]bool{}
+	for _, r := range recs {
+		hasScope[r[scols.ActivityId].Int64()] = true
+	}
+	for _, id := range ids {
+		if !hasScope[id] {
+			out[id] = true
+		}
+	}
+	for _, r := range recs {
+		id := r[scols.ActivityId].Int64()
+		st := r[scols.ScopeType].Int()
+		target := r[scols.TargetId].Int64()
+		if st == 1 || (st == 3 && target == spuId) || (st == 2 && cateId > 0 && target == cateId) {
+			out[id] = true
+		}
+	}
+	return out, nil
 }
 
 // spuBrief 商品摘要（名称 + 主图）。
@@ -203,7 +285,8 @@ func collectIDs(recs gdb.Result, col string) []int64 {
 	return out
 }
 
-// spuBriefs 批量取商品名称与主图（一次 IN 查询, 避免 N+1; 主图取 images 数组首元素）。
+// spuBriefs 批量取商品名称与主图（一次 IN 查询, 避免 N+1; 主图口径统一走 firstImage——
+// M10: 原先 gconv.Struct 重写了一遍"取首图", 与 browse/operation 的口径是两份实现）。
 func spuBriefs(ctx context.Context, spuIds []int64) (map[int64]spuBrief, error) {
 	out := map[int64]spuBrief{}
 	if len(spuIds) == 0 {
@@ -215,13 +298,7 @@ func spuBriefs(ctx context.Context, spuIds []int64) (map[int64]spuBrief, error) 
 		return nil, gerror.Wrap(err, "查询商品摘要失败")
 	}
 	for _, r := range recs {
-		imgs := []string{}
-		_ = gconv.Struct(r[cols.Images].String(), &imgs)
-		img := ""
-		if len(imgs) > 0 {
-			img = imgs[0]
-		}
-		out[r[cols.Id].Int64()] = spuBrief{Name: r[cols.Name].String(), Image: img}
+		out[r[cols.Id].Int64()] = spuBrief{Name: r[cols.Name].String(), Image: firstImage(r[cols.Images].String())}
 	}
 	return out, nil
 }
@@ -264,12 +341,17 @@ func bargainBriefs(ctx context.Context, actId int64) ([]model.ActivitySkuBrief, 
 }
 
 // scopeDescOf 满减适用范围摘要（全场/分类/商品）。
-func scopeDescOf(ctx context.Context, actId int64) string {
+// M9（评审修复）: 查询失败必须显式返回错误——原实现把任何错误都吞成"全场",
+// 会给用户**错误的标签**（把"分类/指定商品"活动标成全场等于误导下单）。
+func scopeDescOf(ctx context.Context, actId int64) (string, error) {
 	cols := dao.PromotionActivityScope.Columns()
 	recs, err := dao.PromotionActivityScope.Ctx(ctx).
 		Where(cols.ActivityId, actId).Fields(cols.ScopeType).All()
-	if err != nil || len(recs) == 0 {
-		return "全场"
+	if err != nil {
+		return "", gerror.Wrap(err, "查询活动范围失败")
+	}
+	if len(recs) == 0 {
+		return "全场", nil
 	}
 	has := map[int]bool{}
 	for _, r := range recs {
@@ -277,13 +359,13 @@ func scopeDescOf(ctx context.Context, actId int64) string {
 	}
 	switch {
 	case has[1]:
-		return "全场"
+		return "全场", nil
 	case has[2]:
-		return "分类"
+		return "分类", nil
 	case has[3]:
-		return "指定商品"
+		return "指定商品", nil
 	}
-	return "全场"
+	return "全场", nil
 }
 
 // Index 首页聚合（FR-017, 用户裁定 D2）: 轮播 + 楼层 + 五类活动入口（各取前 N）+ 可领券。
@@ -301,27 +383,42 @@ func (i *MarketingLogicImpl) Index(ctx context.Context) (*model.IndexAggregate, 
 	}
 	entryPage := model.PageReq{Page: 1, PageSize: indexEntryLimit}
 
-	// 轮播与楼层（批次 03 装修域）: 失败不阻断首页其余分块
+	// 各分块失败不阻断首页（"空数组而非报错"针对的是**无内容**; M9: 查询**失败**必须留下告警,
+	// 否则 DB 故障时首页静默变空, 可用性掩盖了故障）
 	if banners, err := PublicBanners(ctx, 1); err == nil {
 		out.Banners = banners
+	} else {
+		g.Log().Warningf(ctx, "[首页聚合] 轮播分块失败: %v", err)
 	}
 	if floors, err := PublicFloors(ctx); err == nil {
 		out.Floors = floors
+	} else {
+		g.Log().Warningf(ctx, "[首页聚合] 楼层分块失败: %v", err)
 	}
 	if fs, err := i.PublicFlashSales(ctx, entryPage); err == nil && fs != nil {
 		out.FlashSales = fs.List
+	} else if err != nil {
+		g.Log().Warningf(ctx, "[首页聚合] 秒杀分块失败: %v", err)
 	}
 	if gb, err := i.PublicGroupBuys(ctx, entryPage); err == nil && gb != nil {
 		out.GroupBuys = gb.List
+	} else if err != nil {
+		g.Log().Warningf(ctx, "[首页聚合] 拼团分块失败: %v", err)
 	}
 	if bg, err := i.PublicBargains(ctx, entryPage); err == nil && bg != nil {
 		out.Bargains = bg.List
+	} else if err != nil {
+		g.Log().Warningf(ctx, "[首页聚合] 砍价分块失败: %v", err)
 	}
 	if as, err := i.PublicAssists(ctx, entryPage); err == nil && as != nil {
 		out.Assists = as.List
+	} else if err != nil {
+		g.Log().Warningf(ctx, "[首页聚合] 助力分块失败: %v", err)
 	}
-	if fr, err := i.PublicFullReductions(ctx, entryPage); err == nil && fr != nil {
+	if fr, err := i.PublicFullReductions(ctx, 0, entryPage); err == nil && fr != nil {
 		out.FullReductions = fr.List
+	} else if err != nil {
+		g.Log().Warningf(ctx, "[首页聚合] 满减分块失败: %v", err)
 	}
 	// 可领券: shop 域直读券表（**既有先例**: promotion_calc.go 早已直读 coupon/user_coupon 计价）。
 	// 注（记账）: 此处口径是"**有哪些券可领**"（模板级: 启用未删 + 未领完）; 而 user 域的
@@ -329,6 +426,8 @@ func (i *MarketingLogicImpl) Index(ctx context.Context) (*model.IndexAggregate, 
 	// 故不强行统一; 若后续要把会员级口径也搬上首页, 应走既有 `ICouponQuery` 端口而非在此重复实现。
 	if cp, err := publicCouponBriefs(ctx, indexEntryLimit); err == nil {
 		out.Coupons = cp
+	} else {
+		g.Log().Warningf(ctx, "[首页聚合] 可领券分块失败: %v", err)
 	}
 	return out, nil
 }
