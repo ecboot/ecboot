@@ -14,12 +14,17 @@ import (
 	"ecboot/internal/model"
 )
 
-func riskCleanupRule(ctx context.Context, t *gtest.T, name string) int64 {
+// riskCleanupRule 纯清理（I1 修复: 原"删后插"语义使 defer 留下启用规则污染共享库与他测试）。
+func riskCleanupRule(ctx context.Context, t *gtest.T, name string) {
 	_, _ = g.DB().Exec(ctx, "DELETE FROM risk_record WHERE rule_id IN (SELECT id FROM risk_rule WHERE name=?)", name)
 	_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE name=?", name)
+}
+
+// seedRiskRule 独立 seed（自足夹具——测试自身 seed 自己要用的规则, 不依赖他测试遗留）。
+func seedRiskRule(ctx context.Context, t *gtest.T, name, conditionExpr string, action, status int) int64 {
 	res, err := g.DB().Exec(ctx,
-		"INSERT INTO risk_rule(name,rule_type,condition_expr,action,status) VALUES(?,1,?,1,1)",
-		name, "user:998001")
+		"INSERT INTO risk_rule(name,rule_type,condition_expr,action,status) VALUES(?,1,?,?,?)",
+		name, conditionExpr, action, status)
 	t.AssertNil(err)
 	id, _ := res.LastInsertId()
 	return id
@@ -34,7 +39,7 @@ func TestRiskRuleCrud(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
 		const n = "TF-风控规则"
-		defer riskCleanupRule(ctx, t, n)
+		riskCleanupRule(ctx, t, n)
 		logic := NewRiskAdminLogic()
 
 		// 校验矩阵
@@ -80,7 +85,8 @@ func TestRiskAppeal(t *testing.T) {
 		ctx := context.Background()
 		const n = "TF-风控申诉"
 		defer riskCleanupRecord(ctx, t)
-		id := riskCleanupRule(ctx, t, n)
+		riskCleanupRule(ctx, t, n)
+		id := seedRiskRule(ctx, t, n, "user:998001", 1, 1)
 		logic := NewRiskAdminLogic()
 
 		_, err := g.DB().Exec(ctx,
@@ -104,9 +110,9 @@ func TestRiskAppeal(t *testing.T) {
 	})
 }
 
-// TestRiskHitEvaluator 评估器（FR-6/SC-3）: 启用黑名单命中拦截+落记录; 停用不生效; 无规则放行;
-// 重复命中不重复落事件; 评估器是 shop.IRiskHit 的真实判定实现。
-// 用户标识唯一化（998003）: 测试间共享库, 他测试遗留的同 tag 规则会污染判定（实测教训）。
+// TestRiskHitEvaluator 评估器（FR-6/SC-3, C2/C3/I3 修复后回归）:
+// 自足夹具（I1 修复: 不依赖他测试遗留）——命中拦截+落事件幂等/无关用户放行/停用不生效/
+// 无规则放行/前缀 ID 不误拦（C2）/type2 入口也吃黑名单（C3）/申诉通过后放行（I3）。
 func TestRiskHitEvaluator(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
@@ -114,43 +120,54 @@ func TestRiskHitEvaluator(t *testing.T) {
 		const tag = "user:998003"
 		defer func() {
 			_, _ = g.DB().Exec(ctx, "DELETE FROM risk_record WHERE user_id=998003")
-			_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE condition_expr=?", tag)
+			_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE condition_expr LIKE ? AND name=?", tag+"%", n)
+			_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE name=?", n)
 		}()
-		_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE condition_expr=?", tag)
-		res, err := g.DB().Exec(ctx,
-			"INSERT INTO risk_rule(name,rule_type,condition_expr,action,status) VALUES(?,1,?,1,1)", n, tag)
-		t.AssertNil(err)
-		id, _ := res.LastInsertId()
+		_, _ = g.DB().Exec(ctx, "DELETE FROM risk_record WHERE user_id=998003")
+		_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE name=?", n)
 		impl := RiskHitImpl{}
 
-		// 命中黑名单 → 拦截 + 落事件
-		blocked, err := impl.Hit(ctx, 998001, 1, "TF-CTX")
+		// C2 精确匹配: 规则 user:998003 不拦前缀 ID 99800/9980031
+		id := seedRiskRule(ctx, t, n, tag+",user:other", 1, 1)
+		blocked, err := impl.Hit(ctx, 99800, 1, "TF-CTX") // 998003 的前缀
+		t.AssertNil(err)
+		t.Assert(blocked, false)
+		// C3: **type2 入口也吃黑名单**（生产消费点传 ruleType=2——原实现按传入类型过滤致黑名单空转）
+		blocked, err = impl.Hit(ctx, 998003, 2, "bargain_cut")
 		t.AssertNil(err)
 		t.Assert(blocked, true)
-		cnt, _ := g.DB().GetValue(ctx, "SELECT COUNT(*) FROM risk_record WHERE user_id=998001")
+		cnt, _ := g.DB().GetValue(ctx, "SELECT COUNT(*) FROM risk_record WHERE user_id=998003")
 		t.Assert(cnt.Int(), 1)
 
-		// 重复命中 → 仍拦截但不重复落事件（幂等）
-		blocked, err = impl.Hit(ctx, 998003, 1, "TF-CTX")
+		// 重复命中 → 仍拦截但不重复落事件
+		blocked, err = impl.Hit(ctx, 998003, 2, "bargain_cut")
 		t.AssertNil(err)
 		t.Assert(blocked, true)
 		cnt, _ = g.DB().GetValue(ctx, "SELECT COUNT(*) FROM risk_record WHERE user_id=998003")
 		t.Assert(cnt.Int(), 1)
 
 		// 无关用户 → 放行
-		blocked, err = impl.Hit(ctx, 998002, 1, "TF-CTX")
+		blocked, err = impl.Hit(ctx, 998004, 2, "TF-CTX")
 		t.AssertNil(err)
 		t.Assert(blocked, false)
 
 		// 停用规则 → 放行
 		_, _ = g.DB().Exec(ctx, "UPDATE risk_rule SET status=0 WHERE id=?", id)
-		blocked, err = impl.Hit(ctx, 998003, 1, "TF-CTX")
+		blocked, err = impl.Hit(ctx, 998003, 2, "TF-CTX")
 		t.AssertNil(err)
 		t.Assert(blocked, false)
 
+		// I3: 重新启用 + 申诉通过 → 放行（解除拦截语义, 对齐 schema 注释）
+		_, _ = g.DB().Exec(ctx, "UPDATE risk_rule SET status=1 WHERE id=?", id)
+		rid, _ := g.DB().GetValue(ctx, "SELECT id FROM risk_record WHERE user_id=998003 LIMIT 1")
+		_, _ = g.DB().Exec(ctx, "UPDATE risk_record SET appeal_status=2, remark='申诉通过' WHERE id=?", rid.Int64())
+		blocked, err = impl.Hit(ctx, 998003, 2, "TF-CTX")
+		t.AssertNil(err)
+		t.Assert(blocked, false) // 申诉通过 → 解除拦截
+
 		// 无规则 → 放行（不阻断主流程）
 		_, _ = g.DB().Exec(ctx, "DELETE FROM risk_rule WHERE id=?", id)
-		blocked, err = impl.Hit(ctx, 998003, 1, "TF-CTX")
+		blocked, err = impl.Hit(ctx, 998003, 2, "TF-CTX")
 		t.AssertNil(err)
 		t.Assert(blocked, false)
 	})

@@ -104,6 +104,9 @@ func (i *RiskAdminLogicImpl) AdminRuleUpdate(ctx context.Context, id int64, name
 		data["action"] = action
 	}
 	if status != nil {
+		if *status != 0 && *status != 1 { // M1（评审修复）: 值域校验
+			return errcode.New(errcode.CodeInvalidParam, "状态值非法")
+		}
 		data["status"] = *status
 	}
 	if len(data) == 0 {
@@ -180,6 +183,10 @@ func (i *RiskAdminLogicImpl) AdminAppeal(ctx context.Context, id int64, pass boo
 	if pass {
 		to = 2 // 通过
 	}
+	// M2（评审修复）: 结论必填（服务侧兜底, 契约 dc 同步说明）
+	if strings.TrimSpace(remark) == "" {
+		remark = "无补充说明"
+	}
 	conclusion := "申诉驳回: " + remark
 	if pass {
 		conclusion = "申诉通过: " + remark
@@ -193,7 +200,7 @@ func (i *RiskAdminLogicImpl) AdminAppeal(ctx context.Context, id int64, pass boo
 		return errcode.New(errcode.CodeNotFound, "风控事件不存在")
 	}
 	res, err := g.DB().Model("risk_record").Ctx(ctx).
-		Where("id", id).Where("appeal_status", 0). // 无结论才可处理
+		Where("id", id).WhereIn("appeal_status", []int{0, 1}). // I2（评审修复）: 申诉中(1)也可 adjudicate——原只放行 0 使申诉中记录死锁
 		Data(g.Map{"appeal_status": to, "remark": conclusion}).Update()
 	if err != nil {
 		return gerror.Wrap(err, "处理申诉失败")
@@ -219,35 +226,68 @@ type RiskEvaluator interface {
 	Hit(ctx context.Context, userId int64, ruleType int, payload string) (blocked bool, err error)
 }
 
-// Hit 评估: 启用的 rule_type 规则逐条判定。
-//   - 黑名单(1): condition_expr 含用户标识（"user:<id>"）→ 命中;
-//   - 其余类型（2~5 实时统计类）: V1 记录面完整、实时统计判定挂账增强 → 不命中。
-//
-// 命中: 按规则 action 落 risk_record（1拦截/2标记）并返回 blocked; 重复命中幂等（同用户同规则
-// 已有未申诉拦截记录 → 不重复落, 但仍返回拦截）。
+// Hit 评估（C2/C3/I3 评审修复后形态）:
+//  1. **任意入口先并查 type1 黑名单**（C3: 生产入口传各自 ruleType=2, 原实现按传入类型过滤
+//     导致黑名单在任何生产路径都不生效——名义闭合）——黑名单 condition_expr 为**逗号分隔的
+//     user:<id> 列表**, 精确解析比对（C2: 原 strings.Contains 使前缀 ID 无辜用户被误拦, 探针实证）;
+//  2. 申诉通过放行（I3）: 该用户对该规则存在 appeal_status=2 的记录 → 跳过该规则（解除拦截语义,
+//     对齐 schema 注释与 spec SC-3）;
+//  3. 其余类型（2~5 实时统计类）: V1 记录面完整、实时统计判定挂账增强 → 不命中。
+// 命中: 按规则 action 落 risk_record（重复命中幂等——已有未申诉事件不重复落）并返回 blocked。
+// 评估失败不阻断主流程（降级放行 + 告警）。
 func (impl RiskHitImpl) Hit(ctx context.Context, userId int64, ruleType int, payload string) (bool, error) {
 	rules, err := g.DB().Model("risk_rule").Ctx(ctx).
-		Where("rule_type", ruleType).Where("status", 1).Where("deleted", 0).All()
+		Where("status", 1).Where("deleted", 0).
+		Where("rule_type = ? OR rule_type = 1", ruleType). // C3: 本类规则 + 黑名单并查
+		All()
 	if err != nil {
 		g.Log().Warningf(ctx, "[风控] 规则查询失败, 降级放行: user_id=%d err=%v", userId, err)
 		return false, nil // 评估失败不阻断主流程（D2）
 	}
 	tag := fmt.Sprintf("user:%d", userId)
 	for _, r := range rules {
-		if r["rule_type"].Int() == 1 && // 黑名单: 精确标识命中
-			strings.Contains(r["condition_expr"].String(), tag) {
-			return impl.record(ctx, userId, r, payload)
+		if r["rule_type"].Int() != 1 {
+			continue // 类型 2~5: 实时统计判定挂账增强（V1 不命中）
 		}
-		// 类型 2~5: 实时统计判定挂账增强（V1 不命中——记录面完整, 判定后续增强）
+		// I3（评审修复）: 该用户对该规则已有"申诉通过"记录 → 解除拦截（白名单语义,
+		// 对齐 000021 列注释"2申诉通过(解除拦截)"与 spec SC-3）
+		passed, e := g.DB().Model("risk_record").Ctx(ctx).
+			Where("user_id", userId).Where("rule_id", r["id"].Int64()).
+			Where("appeal_status", 2).Count()
+		if e != nil {
+			g.Log().Warningf(ctx, "[风控] 申诉查询失败, 降级放行: user_id=%d err=%v", userId, e)
+			return false, nil
+		}
+		if passed > 0 {
+			continue
+		}
+		// C2（评审修复）: 精确解析 condition_expr（逗号分隔 user:<id> 列表）——
+		// 原 strings.Contains 使前缀 ID 无辜用户被误拦（评审探针: user:914000123 拦 9140001）
+		hit := false
+		for _, tok := range strings.Split(r["condition_expr"].String(), ",") {
+			if strings.TrimSpace(tok) == tag {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		blocked, e := impl.record(ctx, userId, r, payload)
+		if e != nil {
+			g.Log().Errorf(ctx, "[风控] 事件落库失败(不阻断): user_id=%d rule_id=%d err=%v", userId, r["id"].Int64(), e)
+		}
+		return blocked, nil
 	}
 	return false, nil
 }
 
-// record 落风控事件（幂等: 同用户同规则已有未申诉拦截记录不重复落）。
+// record 落风控事件（幂等: 同用户同规则已有未申诉事件不重复落; 查重失败降级放行）。
 func (impl RiskHitImpl) record(ctx context.Context, userId int64, rule gdb.Record, payload string) (bool, error) {
 	dup, e := g.DB().Model("risk_record").Ctx(ctx).
 		Where("user_id", userId).Where("rule_id", rule["id"].Int64()).
-		Where("appeal_status", 0).Count()
+		WhereIn("appeal_status", []int{0, 1}). // 未结论的事件视为在途
+		Count()
 	if e != nil {
 		g.Log().Warningf(ctx, "[风控] 事件查重失败, 降级放行: user_id=%d err=%v", userId, e)
 		return false, nil

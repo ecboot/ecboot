@@ -23,14 +23,9 @@ func NewMemberAdminLogic() *MemberAdminLogicImpl { return &MemberAdminLogicImpl{
 
 var _ IMemberAdminLogic = (*MemberAdminLogicImpl)(nil)
 
-// memberStatusOf user.status 业务语义转换（表: 1正常 0禁用 → api: 1正常 2禁用）。
-// 注: 000001 的 user.status 枚举为 1正常 0禁用（勘察口径）, api 层映射在此收口。
-func memberStatusOf(raw int) int {
-	if raw == 1 {
-		return 1
-	}
-	return 2
-}
+// memberStatusOf user.status 直通——C1（评审修复）: 真实枚举是 **1正常 2禁用**（000001 列注释
+// + auth.go 消费点 status==2 拒绝登录实证）, 原注释"0=禁用"系未查列注释的事实性错误,
+// 导致禁用写 0 而登录查 2 → 治理语义为空。api 枚举与库一致, 无需转换。
 
 func memberRowOf(r gdb.Record, phone string) AdminMemberItem {
 	cols := dao.User.Columns()
@@ -41,7 +36,7 @@ func memberRowOf(r gdb.Record, phone string) AdminMemberItem {
 		Gender:      r[cols.Gender].Int(),
 		Level:       r[cols.Level].Int64(),
 		GrowthValue: r[cols.GrowthValue].Int(),
-		Status:      memberStatusOf(r[cols.Status].Int()),
+		Status:      r[cols.Status].Int(),
 		CreatedAt:   r[cols.CreatedAt].String(),
 	}
 }
@@ -69,7 +64,7 @@ func (i *MemberAdminLogicImpl) AdminList(ctx context.Context, phone string, stat
 	}
 	switch status {
 	case 2:
-		m = m.Where(cols.Status, 0) // api 禁用(2) → 库 0
+		m = m.Where(cols.Status, 2) // C1: 库枚举 2=禁用（直通, 无 0 值转换）
 	case 1:
 		m = m.Where(cols.Status, 1)
 	}
@@ -93,7 +88,10 @@ func (i *MemberAdminLogicImpl) AdminList(ctx context.Context, phone string, stat
 
 // AdminDetail 会员详情（资产概要 + 订单统计）。
 func (i *MemberAdminLogicImpl) AdminDetail(ctx context.Context, userId int64) (*AdminMemberItem, error) {
-	r, err := dao.User.Ctx(ctx).Where(dao.User.Columns().Id, userId).One()
+	// M5（评审修复）: 补 deleted=0（与列表/memberMustExist 口径一致, 软删会员详情不可达）
+	r, err := dao.User.Ctx(ctx).
+		Where(dao.User.Columns().Id, userId).
+		Where(dao.User.Columns().Deleted, 0).One()
 	if err != nil {
 		return nil, gerror.Wrap(err, "查询会员失败")
 	}
@@ -129,11 +127,12 @@ func (i *MemberAdminLogicImpl) AdminDetail(ctx context.Context, userId int64) (*
 	return &out, nil
 }
 
-// Disable 禁用/启用（条件更新; 同值幂等——批次 10 I3; 审计 reason 由操作日志面承载）。
+// Disable 禁用/启用（C1 修复: 库枚举 **2=禁用**（000001 列注释）, auth.go 以 status==2 拒绝登录
+// ——治理语义即"禁用后无法登录"; 同值幂等; 审计 reason 由操作日志面承载）。
 func (i *MemberAdminLogicImpl) Disable(ctx context.Context, userId int64, disable bool, reason string) error {
 	target := 1 // 启用
 	if disable {
-		target = 0 // 库枚举 0=禁用
+		target = 2 // 禁用（登录侧 status==2 拒绝, 语义闭环）
 	}
 	if err := memberMustExist(ctx, userId); err != nil {
 		return err
