@@ -103,12 +103,12 @@ func (i *DashboardLogicImpl) Member(ctx context.Context, startTime, endTime stri
 	}
 	out.ActiveCount = int64(ac)
 
-	// 休眠（I5 评审修复）: 阈值读权威配置 `dormant.tier1.days`（缺省 90——与 user/wx.go 的分级实现同源;
-	// 休眠定义在 **000027**（原注释误引 000029=bargain_assist））; 口径: 最后活跃 ≥ 阈值天 + 未删 + 正常态
-	dormantDays := g.Cfg().MustGet(ctx, "dormant.tier1.days", 90).Int()
-	if dormantDays <= 0 {
-		dormantDays = 90
-	}
+	// 休眠（I5 二次收口——**读法与权威实现同源**）: 阈值取 `system_config` 表（dormant.tier1.days,
+	// 000033 种子）, 与 user/wx.go 的 ensureNotDormant→cfgInt 完全同源——原修复误用 `g.Cfg()`
+	// （配置文件/环境变量），而该键**只存在于 system_config 表**, 故恒取兜底 90 = 与原硬编码等价,
+	// 且运营改阈值后登录门禁与看板统计会分叉（复审决定性探针: 表值改 2 后 g.Cfg 仍 90）。
+	// 休眠定义在 **000027**（原注释误引 000029=bargain_assist）; 口径: 最后活跃 ≥ 阈值天 + 未删 + 正常态
+	dormantDays := cfgIntSystem(ctx, "dormant.tier1.days", 90)
 	dc, err := g.DB().Model("user").Ctx(ctx).
 		Where("deleted", 0).
 		Where("status", 1).
@@ -147,6 +147,20 @@ func (i *DashboardLogicImpl) Product(ctx context.Context) (*model.ProductDashboa
 	}
 	out.PendingReview = int64(pr)
 	return out, nil
+}
+
+// cfgIntSystem 读 system_config 整型配置（停用/缺失回退默认; 与 user 域的 cfgInt 同源同表——
+// 两域各自持有一份读法以免兄弟域互引, 但**数据源唯一**=system_config）。
+func cfgIntSystem(ctx context.Context, code string, fallback int) int {
+	v, err := g.DB().GetOne(ctx,
+		"SELECT value FROM system_config WHERE code=? AND status=1 AND deleted=0", code)
+	if err != nil || v.IsEmpty() {
+		return fallback
+	}
+	if n := v["value"].Int(); n > 0 {
+		return n
+	}
+	return fallback
 }
 
 // mustFen 元字符串 → 分（解析失败归 0——统计面不因单值异常中断）。

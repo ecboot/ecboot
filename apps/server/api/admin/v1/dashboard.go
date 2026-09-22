@@ -24,7 +24,7 @@ type (
 	}
 	AdminDashboardMemberRes struct {
 		NewCount     int64 `json:"newCount" dc:"新增会员"`
-		ActiveCount  int64 `json:"activeCount" dc:"活跃会员(口径:周期内有活动)"`
+		ActiveCount  int64 `json:"activeCount" dc:"活跃会员(口径:周期内 last_active_at 有活动; 无窗口取近 30 天)"`
 		DormantCount int64 `json:"dormantCount" dc:"休眠会员(≥90天)"`
 	}
 

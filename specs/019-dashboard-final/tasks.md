@@ -23,7 +23,7 @@ description: "任务清单：看板与收口终验（批次 13）"
 ## 完成记录（2026-09-22）
 
 - **3 端点全清 → 210 桩全部清零**: `check-stub` 四渠道 **0/0/0/0**; controller 文件 218 = api 端点定义 218（admin 129/common 8/shop 42/user 39）与 §二 基线快照一致
-- **实现**: `dashboard_impl.go`（Trade/Member/Product 三方法, 口径全部锚定既有域查询: 已支付 status>=20 销售额 pay_amount 合计/退款额售后完成 status=50 实退/休眠 last_active_at≥90天 与 000029 同源/低库存 available<=warn_count 复用 inventory 预警口径/待审核评价 audit_status=0）; 连线 3 桩
+- **实现**: `dashboard_impl.go`（Trade/Member/Product 三方法, 口径全部锚定既有域查询: 已支付 status>=20 销售额 pay_amount 合计/退款额售后完成 status=50 实退/休眠 last_active_at≥**配置阈值**（读 system_config `dormant.tier1.days`, 与 user/wx.go 同源; 休眠定义在 **000027**）/低库存 available<=warn_count 复用 inventory 预警口径/待审核评价 audit_status=0）; 连线 3 桩
 - **实现期新发现**: `Sum()` 返回 float64 违反"禁 float 存算金额"铁律 → 改 `Value("COALESCE(SUM(...),0)")` + money 规范化到分
 - **收口终验**: 迁移账本一致（schema_migrations=43 = migrations/**.up.sql 43 个, dirty=0）; 全量两连跑全绿; lint 0; 13 批全部 ✅
 - **端点级测试**: 3 看板超管可达 + 非超管 10005 对照（dashboard:read 挂载守卫）

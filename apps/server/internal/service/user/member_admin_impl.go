@@ -185,3 +185,17 @@ func memberMustExist(ctx context.Context, userId int64) error {
 	}
 	return nil
 }
+
+// ActiveUser 会员账号存在且**未禁用未软删**（N3 收口: 与 system.ActiveAdmin 同型——
+// 中间件对 user 渠道每请求校验, 禁用后既有会话立即不可用; token refresh 前亦校验）。
+func ActiveUser(ctx context.Context, userId int64) (bool, error) {
+	cnt, err := dao.User.Ctx(ctx).
+		Where(dao.User.Columns().Id, userId).
+		Where(dao.User.Columns().Status, 1). // 1正常 2禁用（000001 列注释）
+		Where(dao.User.Columns().Deleted, 0).
+		Count()
+	if err != nil {
+		return false, gerror.Wrap(err, "查询会员失败")
+	}
+	return cnt > 0, nil
+}

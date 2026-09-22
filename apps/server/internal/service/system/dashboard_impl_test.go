@@ -47,12 +47,17 @@ func TestDashboardTrade(t *testing.T) {
 				no, status, pay, pay)
 			t.AssertNil(err)
 		}
-		insOrder(no1, 20, "50.00")  // 待发货（计入）
-		insOrder(no2, 40, "80.00")  // 已完成（计入）
-		insOrder(no3, 10, "999.00") // 待付款（不计入）
-		insOrder(no4, 90, "888.00") // **已取消（C1: 原 >=20 口径误计入）**
+		// N2/I2 二次收口: 窗口含 NOW → 并行包写入也在窗内, 故**精确等值断言零容忍**
+		// （复审决定性实验: 受控并发写入下 3/3 红）。改为**基线差量**: 只断言"自己加的行贡献的增量"。
+		start, end := dbWindow()
+		base, err := logic.Trade(ctx, start, end)
+		t.AssertNil(err)
 
-		// 售后完成单: 退款 +10
+		// 在基线之后插入本用例数据, 再取一次 → 差量恰为本用例贡献
+		insOrder(no1, 20, "50.00")
+		insOrder(no2, 40, "80.00")
+		insOrder(no3, 10, "999.00")
+		insOrder(no4, 90, "888.00") // **已取消: 必须零贡献（C1）**
 		oid, err := g.DB().GetValue(ctx, "SELECT id FROM trade_order WHERE order_no=?", no2)
 		t.AssertNil(err)
 		_, err = g.DB().Exec(ctx,
@@ -60,14 +65,12 @@ func TestDashboardTrade(t *testing.T) {
 				"VALUES(?,?,?,0,997101,2,50,'CNY',1,'测试','10.00')", as1, oid.Int64(), no2)
 		t.AssertNil(err)
 
-		// 受控窗口: 只统计本用例 4 单 + 1 售后单（并行包写入不在窗口内）
-		start, end := dbWindow()
-		out, err := logic.Trade(ctx, start, end)
+		after, err := logic.Trade(ctx, start, end)
 		t.AssertNil(err)
-		t.Assert(out.OrderCount, int64(2))        // 20/40 计入; 10 与 **90 排除**（C1）
-		t.Assert(fen2(out.SalesAmount), int64(13000)) // 50 + 80（不含 888 取消单——C1 断言）
-		t.Assert(fen2(out.RefundAmount), int64(1000)) // 售后完成 +10
-		t.Assert(out.PendingDeliver >= 0, true)       // 实时口径（含并行包可能造的单, 不断言精确值）
+		t.Assert(after.OrderCount, base.OrderCount+2)          // 20/40 计入; 10 与 **90 排除**（C1）
+		t.Assert(fen2(after.SalesAmount), fen2(base.SalesAmount)+13000) // 50+80（不含 888）
+		// 退款额: 差量可能受并行包影响（他包同窗售后）→ 断言"至少 +10"
+		t.Assert(fen2(after.RefundAmount) >= fen2(base.RefundAmount)+1000, true)
 
 		// 空窗口（历史区间）→ 全零不报错
 		zero, err := logic.Trade(ctx, "2000-01-01 00:00:00", "2000-01-02 00:00:00")
@@ -98,10 +101,26 @@ func TestDashboardMember(t *testing.T) {
 		out, err := logic.Member(ctx, start, end)
 		t.AssertNil(err)
 		t.Assert(out.NewCount >= 1, true) // 本行在窗口内新增（并行包可能再加, 故用 >=）
-		// 休眠: 全量口径（不受窗口）——本行必被计入
-		all, err := logic.Member(ctx, "", "")
+
+		// N6 二次收口: **activeCount 断言**（I4 改的正是其默认窗口, 原零断言 → 变异回"全量"抓不到）
+		// 本行 last_active_at = 100 天前 → 不在「近 30 天」活跃窗内 → 不贡献活跃
+		act, err := logic.Member(ctx, "", "")
 		t.AssertNil(err)
-		t.Assert(all.DormantCount >= 1, true) // 100 天前活跃 + 正常态 + 未删 → 休眠口径命中
+		// 差量法: 再插一个"1 天前活跃"的用户 → activeCount 必须 +1（证明默认窗是有限窗口而非全量）
+		const ph2 = "TF-DB-ACT-PH"
+		_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph2)
+		_, err = g.DB().Exec(ctx,
+			"INSERT INTO `user`(nickname,phone,phone_hash,growth_value,status,last_active_at) "+
+				"VALUES('TF-DB-ACT','x',?,0,1,DATE_SUB(NOW(), INTERVAL 1 DAY))", ph2)
+		t.AssertNil(err)
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph2) }()
+		afterAct, err := logic.Member(ctx, "", "")
+		t.AssertNil(err)
+		t.Assert(afterAct.ActiveCount, act.ActiveCount+1) // 1 天前活跃计入（默认近 30 天窗）
+		t.Assert(afterAct.DormantCount, act.DormantCount) // 但不是休眠（<90 天）——双口径互斥验证
+
+		// 休眠: 全量口径（不受窗口）——100 天前活跃行必被计入
+		t.Assert(act.DormantCount >= 1, true)
 	})
 }
 
@@ -176,4 +195,44 @@ func fen2(yuan string) int64 {
 		}
 	}
 	return yuanPart*100 + fenPart
+}
+
+// TestDashboardDormantThresholdFromConfig N1 收口守卫: 休眠阈值读 `system_config` 表
+// （与 user/wx.go 的 cfgInt 同源）——原修复误用 g.Cfg()（该键只存在于表内）→ 恒取兜底 90,
+// 运营改阈值后登录门禁与看板统计会分叉（复审决定性探针: 表值改 2 后 g.Cfg 仍 90）。
+func TestDashboardDormantThresholdFromConfig(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		logic := NewDashboardLogic()
+		const ph = "TF-DB-CFG-PH"
+		_, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph)
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE phone_hash=?", ph) }()
+
+		// 5 天前活跃（若阈值为 2 天则应计入休眠; 阈值为 90 则不计）
+		_, err := g.DB().Exec(ctx,
+			"INSERT INTO `user`(nickname,phone,phone_hash,growth_value,status,last_active_at) "+
+				"VALUES('TF-DB-CFG','x',?,0,1,DATE_SUB(NOW(), INTERVAL 5 DAY))", ph)
+		t.AssertNil(err)
+
+		// 读原阈值并改为 2（模拟运营在后台改配置）
+		orig, err := g.DB().GetValue(ctx,
+			"SELECT value FROM system_config WHERE code='dormant.tier1.days'")
+		t.AssertNil(err)
+		_, err = g.DB().Exec(ctx,
+			"UPDATE system_config SET value='2' WHERE code='dormant.tier1.days'")
+		t.AssertNil(err)
+		defer func() {
+			_, _ = g.DB().Exec(ctx,
+				"UPDATE system_config SET value=? WHERE code='dormant.tier1.days'", orig.String())
+		}()
+
+		out, err := logic.Member(ctx, "", "")
+		t.AssertNil(err)
+		// 阈值=2 → 5 天前活跃者计入休眠（N1: 若读 g.Cfg 恒 90 则此处为 0 → 红）
+		cnt, err := g.DB().GetValue(ctx,
+			"SELECT COUNT(*) FROM `user` WHERE phone_hash=? AND last_active_at <= DATE_SUB(NOW(), INTERVAL 2 DAY)", ph)
+		t.AssertNil(err)
+		t.Assert(cnt.Int(), 1) // 夹具自身符合新阈值
+		t.Assert(out.DormantCount >= 1, true) // 看板必须跟随配置阈值（同源读生效）
+	})
 }

@@ -98,6 +98,23 @@ func (m *SessionManager) Validate(ctx context.Context, token string) (int64, boo
 	return userId, true, nil
 }
 
+// PeekUserId 非消费式解析刷新凭证对应的 userId（**不移除**该 refresh token）。
+// 用途（N3 收口）: 刷新前校验账号态——禁用/软删会员不得续期。
+// 原刷新路径不校验账号态, 且 refresh 每次轮换长寿 4×TTL → 禁用可被近乎无限绕过。
+func (m *SessionManager) PeekUserId(ctx context.Context, refreshToken string) (int64, error) {
+	if refreshToken == "" {
+		return 0, fmt.Errorf("刷新凭证为空")
+	}
+	v, err := g.Redis().Do(ctx, "GET", m.refreshKey(refreshToken))
+	if err != nil {
+		return 0, err
+	}
+	if v == nil || v.String() == "" {
+		return 0, fmt.Errorf("刷新凭证失效")
+	}
+	return v.Int64(), nil
+}
+
 // Refresh 以刷新凭证换发双凭证（旧凭证全部失效, 防重放）。
 func (m *SessionManager) Refresh(ctx context.Context, refreshToken string) (token, newRefreshToken string, userId int64, err error) {
 	if refreshToken == "" {

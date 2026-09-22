@@ -104,3 +104,37 @@ func TestDashboardEndpointsReachable(t *testing.T) {
 		}
 	})
 }
+
+// TestDisabledMemberSessionRejected N3 收口守卫: 会员禁用后——
+// ① 既有 access token 不可再调用业务接口（中间件 user 渠道加验账号态）;
+// ② refresh 不得换发新凭证（原实现可无限续期, 禁用被完全绕过）。
+func TestDisabledMemberSessionRejected(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		s := startTestServer(t, 38885)
+		defer func() { _ = s.Shutdown() }()
+		base := fmt.Sprintf("http://127.0.0.1:%d", s.GetListenedPort())
+
+		uid := seedRouteUser(ctx, t, "ROUTE-DIS-1")
+		defer func() { _, _ = g.DB().Exec(ctx, "DELETE FROM `user` WHERE id=?", uid) }()
+		token, refresh, err := security.NewSessionManager("user", 7).Create(ctx, uid)
+		t.AssertNil(err)
+
+		// 禁用前: 凭证可用（基线）
+		body := doReq(ctx, t, base, token, "GET", "/user/distribution/account", "")
+		t.Assert(!strings.Contains(body, "\"code\":10003"), true)
+
+		// 禁用
+		_, err = g.DB().Exec(ctx, "UPDATE `user` SET status=2 WHERE id=?", uid)
+		t.AssertNil(err)
+
+		// ① 既有 access token 必须被拒（N3: 原实现仍可调用业务接口）
+		body = doReq(ctx, t, base, token, "GET", "/user/distribution/account", "")
+		t.Assert(strings.Contains(body, "\"code\":10003"), true)
+
+		// ② refresh 必须被拒（N3: 原实现可换发新双凭证 → 近乎无限续期）
+		body = doReq(ctx, t, base, "", "POST", "/user/token/refresh",
+			fmt.Sprintf(`{"refreshToken":%q}`, refresh))
+		t.Assert(strings.Contains(body, "\"code\":10003"), true)
+	})
+}

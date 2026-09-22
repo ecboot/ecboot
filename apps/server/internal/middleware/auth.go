@@ -11,6 +11,7 @@ import (
 	"ecboot/internal/consts"
 	"ecboot/internal/library/security"
 	"ecboot/internal/service/system"
+	"ecboot/internal/service/user"
 )
 
 // CtxUserId/CtxToken ctx 键已下沉 consts（service 层可无环读取），此处别名保持既有引用。
@@ -101,10 +102,18 @@ func Auth(r *ghttp.Request) {
 		unauthorized(r)
 		return
 	}
-	// 管理渠道加验账号态（禁用/软删即拒）
+	// 账号态加验（禁用/软删即拒）。
+	// admin 渠道: system.ActiveAdmin; user 渠道: user.ActiveUser（N3 收口——原**只验 admin**,
+	// 会员禁用后既有 access token 仍可调用业务接口、且 refresh 可无限续期, 治理语义不成立）。
 	if aud == "admin" {
 		active, aErr := system.ActiveAdmin(r.Context(), userId)
 		if aErr != nil || !active {
+			unauthorized(r)
+			return
+		}
+	} else {
+		active, uErr := user.ActiveUser(r.Context(), userId)
+		if uErr != nil || !active {
 			unauthorized(r)
 			return
 		}
