@@ -93,6 +93,14 @@ func seedAfterSaleRow(
 	t.AssertNil(err)
 }
 
+// cleanupAfterSaleCallbackLogs 清理本文件用例写的回调留档。
+// 评审 I6: 售后用例的回调载荷带 pay_no=PAY-AS*（非匿名行）, 用 cleanupCallbackLogsAfter（只删 pay_no=”）
+// 永远清不掉 → 92 行残留累积（与批次 04 的库存孤儿行同一失败模式: 共享库残留 → 分页/计数假失败）。
+// 本仓前缀规划: 支付用例 PAY-T-*, 售后用例 PAY-AS* —— 故按前缀精确清理, 不误伤他包。
+func cleanupAfterSaleCallbackLogs(ctx context.Context) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM pay_callback_log WHERE pay_no LIKE 'PAY-AS%'")
+}
+
 // afterSaleRecord 取该订单下唯一的售后单（未找到返回 nil）。
 func afterSaleRecord(ctx context.Context, orderNo string) gdb.Record {
 	rec, err := g.DB().GetOne(ctx,
@@ -468,14 +476,14 @@ func TestAfterSaleRetryRefund(t *testing.T) {
 		t.Assert(rec["operator_id"].String(), "admin:11")
 		t.Assert(spy.calls, 1)
 
-		// 退款中（40）不可重试（避免重复出款）
-		t.Assert(errCode(NewAfterSaleLogic().RetryRefund(ctx, "AS-RTY-1", "admin:11")), errcode.CodeStatusNotAllowed)
-		t.Assert(spy.calls, 1)
+		// 退款中（40）允许重试（评审 C2 自愈口: 渠道以 outRefundNo 幂等去重, 用于修复"40 但钱未出"的崩溃窗）
+		t.AssertNil(NewAfterSaleLogic().RetryRefund(ctx, "AS-RTY-1", "admin:11"))
+		t.Assert(spy.calls, 2)
 
-		// 已完成后（50）不可重试
+		// 已完成后（50）不可重试（避免重复出款）
 		_, _ = g.DB().Exec(ctx, "UPDATE after_sale_order SET status=? WHERE after_sale_no='AS-RTY-1'", afterSaleFinished)
 		t.Assert(errCode(NewAfterSaleLogic().RetryRefund(ctx, "AS-RTY-1", "admin:11")), errcode.CodeStatusNotAllowed)
-		t.Assert(spy.calls, 1)
+		t.Assert(spy.calls, 2)
 	})
 }
 
@@ -490,7 +498,8 @@ func TestAfterSaleRefundChannelFail(t *testing.T) {
 		spy := &refundSpy{failWith: errors.New("渠道返回: 余额不足")}
 		defer useRefundSpy(spy)()
 
-		t.AssertNil(NewAfterSaleLogic().Approve(ctx, "AS-FAIL-1", "admin:12"))
+		// 评审 C2: 先推进 30→40 再调渠道; 渠道失败 → 条件回退 40→30 + fail_reason, 且**返错**（不静默, M1）
+		t.Assert(errCode(NewAfterSaleLogic().Approve(ctx, "AS-FAIL-1", "admin:12")), errcode.CodeRefundFailed)
 		rec := afterSaleRecord(ctx, f.OrderNo)
 		t.Assert(rec["status"].Int(), afterSalePendingRefund)
 		t.Assert(rec["fail_reason"].String(), "渠道返回: 余额不足")
@@ -512,7 +521,7 @@ func TestAfterSaleRefundCallback(t *testing.T) {
 		f := seedAfterSaleFixture(ctx, t, "AS-CB-1", "T-AS-CB1", 980000033, 1, "10.00")
 		defer cleanupAfterSaleFixture(ctx, t, f)
 		seedAfterSaleRow2(ctx, t, f, "AS-CB-1", afterSaleRefunding, afterSaleTypeRefundOnly, 1, "10.00")
-		defer cleanupCallbackLogsAfter(ctx, maxCallbackLogId(ctx))
+		defer cleanupAfterSaleCallbackLogs(ctx)
 
 		body, _ := json.Marshal(map[string]any{
 			"payNo": "PAY-AS-1", "outRefundNo": "AS-CB-1", "success": true,
@@ -522,8 +531,8 @@ func TestAfterSaleRefundCallback(t *testing.T) {
 		t.Assert(rec["status"].Int(), afterSaleFinished)
 		t.Assert(rec["refund_time"].String() != "", true)
 
-		// 重复回调: 状态不为 40 → 不匹配 → 报错且状态不变（幂等语义: 不二次推进）
-		t.AssertNE(NewPayLogic().HandleRefundNotify(ctx, "mock", body), nil)
+		// 重复回调: 状态已 50 → **幂等应答成功**（评审 M2: 渠道不该为本该忽略的回调无限重试）, 状态不变
+		t.AssertNil(NewPayLogic().HandleRefundNotify(ctx, "mock", body))
 		rec = afterSaleRecord(ctx, f.OrderNo)
 		t.Assert(rec["status"].Int(), afterSaleFinished)
 
@@ -662,7 +671,7 @@ func TestAfterSaleFinishedSideEffects(t *testing.T) {
 		defer cleanupAfterSaleFixture(ctx, t, f)
 		// 单行订单 + 退货退款 2 件（整行） → 完成后应"全额退款"且库存 +2
 		seedAfterSaleRow2(ctx, t, f, "AS-SFX-1", afterSalePendingRefund, afterSaleTypeReturnGoods, 2, "20.00")
-		defer cleanupCallbackLogsAfter(ctx, maxCallbackLogId(ctx))
+		defer cleanupAfterSaleCallbackLogs(ctx)
 
 		spy := &commissionSpy{}
 		old := CommissionReverse
@@ -684,6 +693,16 @@ func TestAfterSaleFinishedSideEffects(t *testing.T) {
 		t.Assert(spy.lastOrder, f.OrderNo)
 		t.Assert(spy.lastSaleNo, "AS-SFX-1")
 		t.Assert(spy.lastRefund, int64(2000))
+		// 评审 I1: 回补必须写 inventory_log（change_type=6=售后回补）——流水才是对账依据
+		lg, err := g.DB().GetOne(ctx,
+			"SELECT change_type, quantity, total_after, locked_after, order_no FROM inventory_log "+
+				"WHERE sku_id=? AND change_type=6 ORDER BY id DESC LIMIT 1", f.SkuId)
+		t.AssertNil(err)
+		t.Assert(lg["change_type"].Int(), 6)
+		t.Assert(lg["quantity"].Int(), 2)
+		t.Assert(lg["total_after"].Int(), 102)
+		t.Assert(lg["locked_after"].Int(), 0)
+		t.Assert(lg["order_no"].String(), f.OrderNo)
 	})
 }
 
@@ -694,7 +713,7 @@ func TestAfterSaleFinishedSideEffectsRefundOnly(t *testing.T) {
 		f := seedAfterSaleFixture(ctx, t, "AS-SFX-2", "T-AS-SFX2", 980000052, 2, "10.00")
 		defer cleanupAfterSaleFixture(ctx, t, f)
 		seedAfterSaleRow2(ctx, t, f, "AS-SFX-2", afterSalePendingRefund, afterSaleTypeRefundOnly, 1, "10.00")
-		defer cleanupCallbackLogsAfter(ctx, maxCallbackLogId(ctx))
+		defer cleanupAfterSaleCallbackLogs(ctx)
 
 		spy := &commissionSpy{}
 		old := CommissionReverse
@@ -719,7 +738,7 @@ func TestAfterSaleCallbackIdempotentSideEffect(t *testing.T) {
 		f := seedAfterSaleFixture(ctx, t, "AS-SFX-3", "T-AS-SFX3", 980000053, 1, "10.00")
 		defer cleanupAfterSaleFixture(ctx, t, f)
 		seedAfterSaleRow2(ctx, t, f, "AS-SFX-3", afterSaleRefunding, afterSaleTypeReturnGoods, 1, "10.00")
-		defer cleanupCallbackLogsAfter(ctx, maxCallbackLogId(ctx))
+		defer cleanupAfterSaleCallbackLogs(ctx)
 
 		spy := &commissionSpy{}
 		old := CommissionReverse
@@ -733,8 +752,8 @@ func TestAfterSaleCallbackIdempotentSideEffect(t *testing.T) {
 		inv, _ := g.DB().GetOne(ctx, "SELECT total FROM inventory WHERE sku_id=?", f.SkuId)
 		t.Assert(inv["total"].Int(), 101)
 
-		// 重复回调: 状态已 50 → 不匹配 → 报错; 副作用不重复
-		t.AssertNE(NewPayLogic().HandleRefundNotify(ctx, "mock", body), nil)
+		// 重复回调: 状态已 50 → 幂等应答成功; 副作用不重复
+		t.AssertNil(NewPayLogic().HandleRefundNotify(ctx, "mock", body))
 		inv, _ = g.DB().GetOne(ctx, "SELECT total FROM inventory WHERE sku_id=?", f.SkuId)
 		t.Assert(inv["total"].Int(), 101)
 		t.Assert(spy.calls, 1)

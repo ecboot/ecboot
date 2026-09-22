@@ -12,20 +12,20 @@
 | 4 | `POST /shop/after-sales/{afterSaleNo}/cancel` | `shop_v1_after_sale_cancel.go` | `.Cancel` | 会员（仅本人） | {10,20,30} → 91 已撤销 |
 | 5 | `POST /shop/after-sales/{afterSaleNo}/logistics` | `shop_v1_after_sale_logistics.go` | `.SubmitReturn` | 会员（仅本人） | 20 填寄回单号（状态不变） |
 
-**注**：`shop_v1_refund_notify.go` 已于批次 06 连线（渠道退款回调），**不在本批**改动范围内；本批的 40→50 推进依赖它。
+**注**：`shop_v1_refund_notify.go` 的控制器已于批次 06 连线（**本批未改它**）；但本批**改了它调用的 service** —— `pay_impl.HandleRefundNotify` 改为事务包裹并在 40→50 命中时触发完成副作用（评审 I2 后补：事务失败也留档 + `[资金异常]` 告警；重复回调按状态 50 判幂等应答成功）。
 
 ## 二、后台（admin，6 个）
 
 | # | 端点 | controller 桩文件 | service 方法 | 权限点 | 状态影响 |
 |---|---|---|---|---|---|
-| 6 | `GET /admin/after-sales` | `admin_v1_admin_after_sale_list.go` | `.AdminList` | `aftersale:list` | 读（状态 + 类型筛选） |
-| 7 | `GET /admin/after-sales/{afterSaleNo}` | `admin_v1_admin_after_sale_detail.go` | `.AdminDetail` | `aftersale:list` | 读（含 userId / 凭证） |
+| 6 | `GET /admin/after-sales` | `admin_v1_admin_after_sale_list.go` | `.AdminList` | `aftersale:read` | 读（状态 + 类型筛选） |
+| 7 | `GET /admin/after-sales/{afterSaleNo}` | `admin_v1_admin_after_sale_detail.go` | `.AdminDetail` | `aftersale:read` | 读（含 userId / 凭证） |
 | 8 | `POST /admin/after-sales/{afterSaleNo}/approve` | `admin_v1_admin_after_sale_approve.go` | `.Approve` | `aftersale:audit` | 10→20（退货退款）或 10→30→40（仅退款，发起退款） |
 | 9 | `POST /admin/after-sales/{afterSaleNo}/reject` | `admin_v1_admin_after_sale_reject.go` | `.Reject` | `aftersale:audit` | 10→90（原因必填） |
 | 10 | `POST /admin/after-sales/{afterSaleNo}/confirm-receipt` | `admin_v1_admin_after_sale_confirm_receipt.go` | `.ConfirmReceipt` | `aftersale:audit` | 20→30→40（须已填寄回单号） |
 | 11 | `POST /admin/after-sales/{afterSaleNo}/retry-refund` | `admin_v1_admin_after_sale_retry_refund.go` | `.RetryRefund` | `aftersale:refund` | 30→40（重试） |
 
-权限点取自 `api/admin/v1/aftersale.go` 的注释（`aftersale:audit` / `aftersale:refund`；列表/详情沿用 `aftersale:list`，与既有后台列表惯例一致）。**注意**：`aftersale:*` 是否需要登记到 RBAC 权限种子表，取决于批次 01 的权限装载方式——实现时须核对（若权限表按前缀校验，缺失会直接 10005）。
+权限点取自 `api/admin/v1/aftersale.go` 的注释（`aftersale:audit` / `aftersale:refund`）；列表/详情用 **`aftersale:read`**（与 000032 RBAC 种子及 `consts/permission.go` 一致——实现前已核对，无需新权限迁移）。
 
 ## 三、需求 → 端点覆盖
 

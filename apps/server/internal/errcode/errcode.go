@@ -52,6 +52,7 @@ const (
 	CodeAlreadyReviewed    = 40010 // 已评价
 	CodeExtraReviewDenied  = 40011 // 追评违规（已追评/超期）
 	CodeLogisticsCodeTaken = 40012 // 物流公司编码已存在（009-logistics-ops）
+	CodeRefundFailed       = 40013 // 退款发起失败（渠道拒绝/超时; 状态已回"待退款", 可重试——013 售后域）
 )
 
 // 促销域（5xxxx）

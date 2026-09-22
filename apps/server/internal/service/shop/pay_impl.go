@@ -234,10 +234,10 @@ func (i *PayLogicImpl) HandlePayNotify(ctx context.Context, channel string, rawB
 
 	// ①③④ 条件更新 + 同事务推进
 	// 评审 I2: **留档一律移出事务**——写在事务内则回滚即丢（原实现两处在事务内、一处在事务外, 语义不一）。
-	processed := false  // 是否真正推进（process_status=1）
-	dirtyOrderNo := ""  // 资金已入账但订单不可推进的脏态订单号（评审 C3b）
+	processed := false // 是否真正推进（process_status=1）
+	dirtyOrderNo := "" // 资金已入账但订单不可推进的脏态订单号（评审 C3b）
 	var dirtyOrderId int64
-	closedPayNo := ""   // 命中已关闭/已失败支付单的支付号（评审 Critical）
+	closedPayNo := "" // 命中已关闭/已失败支付单的支付号（评审 Critical）
 	err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		res, e := dao.PayOrder.Ctx(ctx).
 			Where(pcols.PayNo, payload.PayNo).
@@ -380,12 +380,25 @@ func (i *PayLogicImpl) HandleRefundNotify(ctx context.Context, channel string, r
 		advanced = true
 		// 013（批次07）: 完成副作用与状态推进**同事务**——仅退货退款回补库存 + 重算订单退款状态 +
 		// 投递佣金冲销事件。仅在本次条件更新真正命中时执行一次, 故重复回调不会二次回补/二次投递。
-		return afterSaleFinishedSideEffects(ctx, p.OutRefundNo)
+		return afterSaleFinishedSideEffects(ctx, p.OutRefundNo, "system:refund")
 	})
 	if err != nil {
+		// 评审 I2: 事务失败（含完成副作用失败）也必须留档 + 告警——"回调来过但没处理成"正对对账口径,
+		// 且此刻钱已出（状态 40 意味着渠道退款成功）, 不告警则长期无人知道。
+		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
+		g.Log().Errorf(ctx, "[资金异常] 退款回调处理失败, 售后单未推进, 需人工核对: out_refund_no=%s err=%v",
+			p.OutRefundNo, err)
 		return err
 	}
 	if !advanced {
+		// 评审 M2: 区分"真幂等"与"不匹配"——状态已是 50（已完成）说明这是重复回调, 应静默应答成功,
+		// 否则渠道会为一个本该忽略的回调无限重试; 其余情况（未匹配/已撤销/状态不符）仍返错并要求留档。
+		cur, ce := dao.AfterSaleOrder.Ctx(ctx).Fields(acols.Status).
+			Where(acols.AfterSaleNo, p.OutRefundNo).Value()
+		if ce == nil && cur.Int() == 50 {
+			writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), true)
+			return nil
+		}
 		writeCallbackLog(ctx, channel, p.PayNo, 2, string(rawBody), false)
 		return errcode.New(errcode.CodeNotFound, "退款单未匹配或状态不符")
 	}

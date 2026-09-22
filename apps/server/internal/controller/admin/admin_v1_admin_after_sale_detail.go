@@ -33,5 +33,9 @@ func (c *ControllerV1) AdminAfterSaleDetail(ctx context.Context, req *v1.AdminAf
 		RejectReason:      d.RejectReason,
 		RefundNo:          d.RefundNo,
 		Status:            d.Status,
+		AuditTime:         d.AuditTime,
+		RefundTime:        d.RefundTime,
+		OperatorId:        d.OperatorId,
+		FailReason:        d.FailReason,
 	}, nil
 }

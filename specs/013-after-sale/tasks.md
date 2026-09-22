@@ -73,7 +73,7 @@ description: "任务清单：售后域（批次 07）"
 
 - [x] T024 `golangci-lint run` 保持 **0 issues**；`make test` 全绿
 - [x] T025 `make check-stub` 对账：**shop 21→16、admin 64→58**（本批 11 端点全清）；按 [quickstart.md](./quickstart.md) 冒烟 7 项
-- [ ] T026 更新 `specs/PROGRESS.md` 批次 07 状态 ✅ 与本批完成 commit（同 commit）并提交
+- [x] T026 更新 `specs/PROGRESS.md` 批次 07 状态 ✅ 与本批完成 commit（同 commit）并提交
 
 ## Dependencies & Execution Order
 

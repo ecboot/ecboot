@@ -47,6 +47,10 @@ type (
 		RejectReason      string   `json:"rejectReason"`
 		RefundNo          string   `json:"refundNo" dc:"渠道退款单号"`
 		Status            int      `json:"status"`
+		AuditTime         string   `json:"auditTime" dc:"审核时间"`
+		RefundTime        string   `json:"refundTime" dc:"退款完成时间"`
+		OperatorId        string   `json:"operatorId" dc:"最后操作人（审核/确认收货/退款重试）"`
+		FailReason        string   `json:"failReason" dc:"渠道退款失败原因（可重试的排障依据）"`
 	}
 
 	// 同意（仅退款→待退款; 退货退款→待寄回）

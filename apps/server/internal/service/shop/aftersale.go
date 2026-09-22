@@ -29,7 +29,7 @@ type IAfterSaleLogic interface {
 	AdminDetail(ctx context.Context, afterSaleNo string) (*model.AfterSaleDetail, error)
 	Approve(ctx context.Context, afterSaleNo, operator string) error
 	Reject(ctx context.Context, afterSaleNo, reason, operator string) error
-	// ConfirmReceipt 退货确认收货（→30 待退款）。
+	// ConfirmReceipt 退货确认收货（20→30 待退款→**随即发起渠道退款**→40 退款中; 见 research D1）。
 	ConfirmReceipt(ctx context.Context, afterSaleNo, operator string) error
 	// RetryRefund 退款重试（渠道失败后）。
 	RetryRefund(ctx context.Context, afterSaleNo, operator string) error

@@ -57,10 +57,12 @@
 ```
 行数量 = N, 行实付 = P（trade_order_item.pay_amount，含行优惠分摊）
 本次申请数量 = q
-本行已完成的退款数量 = q_done（仅统计状态=50 的单）
-若 q_done + q == N  →  refund_amount = P - Σ(已完成的 refund_amount)   // 末笔取剩余全额，消尾差
-否则                →  refund_amount = floor(P * q / N)                // 向下取整到分
+本行**占用中**数量 = q_used、占用中退款额 = P_used（占用 = 状态**不属于** {90已拒绝, 91已撤销} 的单）
+若 q_used + q == N  →  refund_amount = P - P_used        // 末笔取剩余全额，消尾差
+否则                →  refund_amount = floor(P * q / N)  // 向下取整到分
 约束: refund_amount ≤ P（超额即拒绝 40008）
+口径说明（评审 M3）: 实现用"非 90/91"作为占用口径（同时服务于额度校验与"剩余全额"计算），
+保证任意"拒绝/撤销 → 再次申请"的组合下 Σ(all non-released refund_amount) 恒等于 P；图纸原写"仅统计 50"与实现不符，此处已按实现订正。
 边界: refund_amount == 0 → 不调用渠道，直接以已完成收口（记 refund_time，refund_no 留空）
 ```
 

@@ -37,6 +37,8 @@ type AfterSaleDetail struct {
 	RejectReason      string   `json:"rejectReason"`
 	AuditTime         string   `json:"auditTime"`
 	RefundTime        string   `json:"refundTime"`
+	OperatorId        string   `json:"operatorId" dc:"最后操作人（后台可见; C 端不映射）"`
+	FailReason        string   `json:"failReason" dc:"渠道退款失败原因（后台可见; 可重试时的排障依据）"`
 	Status            int      `json:"status"`
 }
 

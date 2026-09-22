@@ -73,6 +73,11 @@ func yuanFen(yuan string) (int64, error) {
 }
 
 // Apply 申请售后（FR-001~004）: 校验归属与可售后状态 → 累计额度 → 计算退款金额 → 落单（10 待审核）。
+//
+// 评审 C1（Critical）: 整个"读累计额度 → 插入"必须在**行锁事务**内完成——原先无锁无事务,
+// 并发或重复提交会在竞赛窗口内各读一次"额度未占满"而落多张超额单（评审实证: 同一行实付 10.00
+// 的订单项落 3 张各 10.00 的售后单、逐张审核后渠道被调 3 次 = 3 倍出款）。
+// 串行点取 `trade_order_item` 行锁（额度是按订单项维度的, 锁这一行即可）。
 func (i *AfterSaleLogicImpl) Apply(
 	ctx context.Context, userId int64, in model.AfterSaleApplyInput,
 ) (string, error) {
@@ -83,80 +88,92 @@ func (i *AfterSaleLogicImpl) Apply(
 		return "", errcode.New(errcode.CodeInvalidParam, "退货数量需大于 0")
 	}
 
-	item, order, err := afterSaleItemAndOrder(ctx, in.OrderItemId, userId)
+	var no string
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		item, order, e := afterSaleItemAndOrder(ctx, in.OrderItemId, userId, true)
+		if e != nil {
+			return e
+		}
+		ocols := dao.TradeOrder.Columns()
+		if order[ocols.Status].Int() != orderStatusCompleted {
+			// 契约: 仅**已完成**订单可申请（已发货未收货是否开放属产品决策, 本批不开放）
+			return errcode.New(errcode.CodeAfterSaleDenied, "当前订单状态不可申请售后")
+		}
+
+		icols := dao.TradeOrderItem.Columns()
+		lineQty := item[icols.Quantity].Int()
+		if lineQty <= 0 {
+			return errcode.New(errcode.CodeAfterSaleDenied, "订单项数量异常")
+		}
+		payFen, e := yuanFen(item[icols.PayAmount].String())
+		if e != nil {
+			return e
+		}
+
+		// 累计额度: 占用 = 非「已拒绝/已撤销」的申请数量（D5）; 锁定读, 见函数头 C1 说明
+		usedQty, usedRefundFen, e := afterSaleUsed(ctx, in.OrderItemId)
+		if e != nil {
+			return e
+		}
+		if usedQty+in.Quantity > lineQty {
+			return errcode.New(errcode.CodeAfterSaleDenied, "已达可退数量上限")
+		}
+
+		// 退款金额（D6）: 常规按行实付比例向下取整; **本次退完剩余数量时取剩余全额**, 保多笔之和恒等于行实付
+		var refundFen int64
+		if usedQty+in.Quantity == lineQty {
+			refundFen = payFen - usedRefundFen
+		} else {
+			refundFen = payFen * int64(in.Quantity) / int64(lineQty)
+		}
+		if refundFen < 0 {
+			refundFen = 0
+		}
+		if refundFen > payFen { // 不超行实付（000008 契约）
+			refundFen = payFen
+		}
+
+		gen, e := nextAfterSaleNo()
+		if e != nil {
+			return e
+		}
+		if _, e = dao.AfterSaleOrder.Ctx(ctx).Data(do.AfterSaleOrder{
+			AfterSaleNo:   gen,
+			OrderId:       order[ocols.Id].Int64(),
+			OrderNo:       order[ocols.OrderNo].String(),
+			OrderItemId:   in.OrderItemId,
+			UserId:        userId,
+			Type:          in.Type,
+			Status:        afterSalePendingAudit,
+			Currency:      order[ocols.Currency].String(),
+			Quantity:      in.Quantity,
+			Reason:        in.Reason,
+			Description:   in.Description,
+			VoucherImages: mustJSON(voucherMap(in.VoucherImages)),
+			RefundAmount:  money.ToYuanString(refundFen),
+		}).Insert(); e != nil {
+			return gerror.Wrap(e, "创建售后单失败")
+		}
+		no = gen
+		return nil
+	})
 	if err != nil {
 		return "", err
-	}
-	ocols := dao.TradeOrder.Columns()
-	if order[ocols.Status].Int() != orderStatusCompleted {
-		// 契约: 仅**已完成**订单可申请（已发货未收货是否开放属产品决策, 本批不开放）
-		return "", errcode.New(errcode.CodeAfterSaleDenied, "当前订单状态不可申请售后")
-	}
-
-	icols := dao.TradeOrderItem.Columns()
-	lineQty := item[icols.Quantity].Int()
-	if lineQty <= 0 {
-		return "", errcode.New(errcode.CodeAfterSaleDenied, "订单项数量异常")
-	}
-	payFen, err := yuanFen(item[icols.PayAmount].String())
-	if err != nil {
-		return "", err
-	}
-
-	// 累计额度: 占用 = 非「已拒绝/已撤销」的申请数量（D5）
-	usedQty, usedRefundFen, err := afterSaleUsed(ctx, in.OrderItemId)
-	if err != nil {
-		return "", err
-	}
-	if usedQty+in.Quantity > lineQty {
-		return "", errcode.New(errcode.CodeAfterSaleDenied, "已达可退数量上限")
-	}
-
-	// 退款金额（D6）: 常规按行实付比例向下取整; **本次退完剩余数量时取剩余全额**, 保多笔之和恒等于行实付
-	var refundFen int64
-	if usedQty+in.Quantity == lineQty {
-		refundFen = payFen - usedRefundFen
-	} else {
-		refundFen = payFen * int64(in.Quantity) / int64(lineQty)
-	}
-	if refundFen < 0 {
-		refundFen = 0
-	}
-	if refundFen > payFen { // 不超行实付（000008 契约）
-		refundFen = payFen
-	}
-
-	no, err := nextAfterSaleNo()
-	if err != nil {
-		return "", err
-	}
-	_, err = dao.AfterSaleOrder.Ctx(ctx).Data(do.AfterSaleOrder{
-		AfterSaleNo:   no,
-		OrderId:       order[ocols.Id].Int64(),
-		OrderNo:       order[ocols.OrderNo].String(),
-		OrderItemId:   in.OrderItemId,
-		UserId:        userId,
-		Type:          in.Type,
-		Status:        afterSalePendingAudit,
-		Currency:      order[ocols.Currency].String(),
-		Quantity:      in.Quantity,
-		Reason:        in.Reason,
-		Description:   in.Description,
-		VoucherImages: mustJSON(voucherMap(in.VoucherImages)),
-		RefundAmount:  money.ToYuanString(refundFen),
-	}).Insert()
-	if err != nil {
-		return "", gerror.Wrap(err, "创建售后单失败")
 	}
 	return no, nil
 }
 
 // afterSaleItemAndOrder 取订单项与其订单, 并校验归属（他人资源一律按"不存在"处理, 不泄露存在性）。
+// forUpdate=true 时对订单项行取行锁（申请侧串行化, 见 Apply 的 C1 说明）。
 func afterSaleItemAndOrder(
-	ctx context.Context, orderItemId, userId int64,
+	ctx context.Context, orderItemId, userId int64, forUpdate bool,
 ) (gdb.Record, gdb.Record, error) {
 	icols, ocols := dao.TradeOrderItem.Columns(), dao.TradeOrder.Columns()
-	item, err := dao.TradeOrderItem.Ctx(ctx).Where(icols.Id, orderItemId).One()
+	m := dao.TradeOrderItem.Ctx(ctx).Where(icols.Id, orderItemId)
+	if forUpdate {
+		m = m.LockUpdate()
+	}
+	item, err := m.One()
 	if err != nil {
 		return nil, nil, gerror.Wrap(err, "查询订单项失败")
 	}
@@ -180,6 +197,7 @@ func afterSaleUsed(ctx context.Context, orderItemId int64) (int, int64, error) {
 		Fields(acols.Quantity, acols.RefundAmount).
 		Where(acols.OrderItemId, orderItemId).
 		WhereNotIn(acols.Status, []int{afterSaleRejected, afterSaleCanceled}).
+		LockUpdate(). // 锁定读: 并发申请下必须读到"最新已提交"的占用集合（Apply 已持有订单项行锁, 此处再兜一层）
 		All()
 	if err != nil {
 		return 0, 0, gerror.Wrap(err, "查询已申请售后失败")
@@ -285,8 +303,14 @@ func (i *AfterSaleLogicImpl) Reject(ctx context.Context, afterSaleNo, reason, op
 	return nil
 }
 
-// tryRefund 发起渠道退款（FR-011/012）: 成功 → 40 退款中; 渠道失败 → **停 30** 并写 fail_reason（可由后台重试）;
-// 退款额为 0（全优惠行）→ 不调渠道, 直接 50 完成（D6）。
+// tryRefund 发起渠道退款（FR-011/012）: 成功 → 停留 40 退款中（等回调推进到 50）;
+// 渠道失败 → **条件回退** 40→30 并写 fail_reason（可由后台重试）; 退款额为 0（全优惠行）→ 不调渠道, 直接 50（D6）。
+//
+// 评审 C2（Critical）: 顺序必须是**先条件推进状态、再调用渠道**——原实现先调渠道再改状态,
+// 于是"钱已出"的判定标准实际是"渠道调用是否返回"而非状态=40, 买家可在那个窗口里撤销（{10,20,30} 可撤）,
+// 形成"钱已出、单已撤销、额度释放、可再退一次"（评审实证: 终态 91 且渠道已被调 1 次, 撤销后可再拿一份全额）。
+// 且渠道调用成功与 UPDATE 之间任一次崩溃/DB 错误都会把"钱已出"永久留在 30（可撤状态）。
+// 改序后: "未出款" ⟺ 状态 30; 崩溃只会留下"40 但钱未出"（方向安全, 且可由重试自愈, 见 RetryRefund）。
 func (i *AfterSaleLogicImpl) tryRefund(ctx context.Context, afterSaleNo, operator string) error {
 	rec, err := loadAfterSale(ctx, afterSaleNo)
 	if err != nil {
@@ -317,7 +341,7 @@ func (i *AfterSaleLogicImpl) tryRefund(ctx context.Context, afterSaleNo, operato
 				return nil
 			}
 			advanced = true
-			return afterSaleFinishedSideEffects(ctx, afterSaleNo) // 与状态推进同事务
+			return afterSaleFinishedSideEffects(ctx, afterSaleNo, operator) // 与状态推进同事务
 		})
 		if e != nil {
 			return e
@@ -328,26 +352,43 @@ func (i *AfterSaleLogicImpl) tryRefund(ctx context.Context, afterSaleNo, operato
 		return nil
 	}
 
-	if e := afterSaleRefundChannel.Refund(afterSaleNo, amountFen); e != nil {
-		// 渠道失败: 停在待退款并把原因留痕（可重试）; 不回滚状态机（30 是失败后的正确落点）
-		_, _ = dao.AfterSaleOrder.Ctx(ctx).
+	// 先推进状态（30→40）; 已是 40 者允许重调渠道（渠道以 outRefundNo 幂等, 用于自愈"40 但钱未出"的崩溃窗）
+	switch rec[acols.Status].Int() {
+	case afterSalePendingRefund:
+		res, ue := dao.AfterSaleOrder.Ctx(ctx).
 			Where(acols.AfterSaleNo, afterSaleNo).
 			Where(acols.Status, afterSalePendingRefund).
-			Data(do.AfterSaleOrder{FailReason: e.Error(), OperatorId: operator}).Update()
+			Data(do.AfterSaleOrder{Status: afterSaleRefunding, FailReason: "", OperatorId: operator}).
+			Update()
+		if ue != nil {
+			return gerror.Wrap(ue, "推进退款中失败")
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可发起退款")
+		}
+	case afterSaleRefunding:
+		// 允许: 崩溃窗/回调未到的重试
+	default:
+		return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可发起退款")
+	}
+
+	if e := afterSaleRefundChannel.Refund(afterSaleNo, amountFen); e != nil {
+		// 渠道失败 → 条件回退 40→30（affected=0 说明回调已把它推到 50, 即钱其实到了 → 不覆盖, 只告警）
+		res, re := dao.AfterSaleOrder.Ctx(ctx).
+			Where(acols.AfterSaleNo, afterSaleNo).
+			Where(acols.Status, afterSaleRefunding).
+			Data(do.AfterSaleOrder{Status: afterSalePendingRefund, FailReason: e.Error(), OperatorId: operator}).
+			Update()
+		if re != nil {
+			g.Log().Errorf(ctx, "[售后] 渠道退款失败且回退状态失败, 需人工核对: after_sale_no=%s err=%v", afterSaleNo, re)
+		} else if n, _ := res.RowsAffected(); n == 0 {
+			g.Log().Errorf(ctx,
+				"[资金异常] 渠道退款失败但售后单已被回调推进(钱可能已到), 勿重复退款: after_sale_no=%s", afterSaleNo)
+		}
 		g.Log().Errorf(ctx, "[售后] 渠道退款失败, 待重试: after_sale_no=%s amount_fen=%d err=%v",
 			afterSaleNo, amountFen, e)
-		return nil
-	}
-	res, err := dao.AfterSaleOrder.Ctx(ctx).
-		Where(acols.AfterSaleNo, afterSaleNo).
-		Where(acols.Status, afterSalePendingRefund).
-		Data(do.AfterSaleOrder{Status: afterSaleRefunding, FailReason: "", OperatorId: operator}).
-		Update()
-	if err != nil {
-		return gerror.Wrap(err, "推进退款中失败")
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可发起退款")
+		// 评审 M1: 不再静默返 nil——管理员须看到"未成功"（状态已回 30 且原因留痕, 可重试）
+		return errcode.New(errcode.CodeRefundFailed, "退款发起失败, 可稍后重试")
 	}
 	return nil
 }
@@ -432,6 +473,8 @@ func afterSaleDetail(rec gdb.Record) *model.AfterSaleDetail {
 		RejectReason:      rec[acols.RejectReason].String(),
 		AuditTime:         rec[acols.AuditTime].String(),
 		RefundTime:        rec[acols.RefundTime].String(),
+		OperatorId:        rec[acols.OperatorId].String(),
+		FailReason:        rec[acols.FailReason].String(),
 		Status:            rec[acols.Status].Int(),
 	}
 }
@@ -503,8 +546,14 @@ func (i *AfterSaleLogicImpl) RetryRefund(ctx context.Context, afterSaleNo, opera
 		return err
 	}
 	acols := dao.AfterSaleOrder.Columns()
-	if rec[acols.Status].Int() != afterSalePendingRefund {
-		return errcode.New(errcode.CodeStatusNotAllowed, "仅待退款可重试退款")
+	switch rec[acols.Status].Int() {
+	case afterSalePendingRefund:
+		// 正常重试: 30 → 发起
+	case afterSaleRefunding:
+		// 评审 C2 的自愈口: "已推进到 40 但渠道调用前崩溃/回调未到" → 允许重调渠道
+		// （渠道以 outRefundNo 幂等去重, 重复调用不会二次出款）; 已完成(50)仍一律拒绝。
+	default:
+		return errcode.New(errcode.CodeStatusNotAllowed, "仅待退款/退款中可重试退款")
 	}
 	return i.tryRefund(ctx, afterSaleNo, operator)
 }
@@ -583,7 +632,7 @@ func (i *AfterSaleLogicImpl) Cancel(ctx context.Context, userId int64, afterSale
 //  3. 投递佣金冲销事件（结算属批次 11; 未装配则告警跳过）。
 //
 // 调用方须保证"仅在 40→50 条件更新成功时调用一次", 以维持幂等（重复回调不会二次回补/二次投递）。
-func afterSaleFinishedSideEffects(ctx context.Context, afterSaleNo string) error {
+func afterSaleFinishedSideEffects(ctx context.Context, afterSaleNo, operator string) error {
 	rec, err := loadAfterSale(ctx, afterSaleNo)
 	if err != nil {
 		return err
@@ -601,9 +650,33 @@ func afterSaleFinishedSideEffects(ctx context.Context, afterSaleNo string) error
 			return errcode.New(errcode.CodeAfterSaleNotFound, "订单项不存在")
 		}
 		skuId := item[icols.SkuId].Int64()
-		if _, e = g.DB().Exec(ctx,
-			"UPDATE inventory SET total = total + ? WHERE sku_id = ?", qty, skuId); e != nil {
-			return gerror.Wrap(e, "回补库存失败")
+		// 评审 I1: ① 必须判行数（库存行缺失时静默无操作会造成账实不符, 批次06 I1 同型）;
+		// ② 必须写 inventory_log（000003 为"6=售后回补"专门留了枚举, 而全仓此前只有后台调整在写流水;
+		//    inventory_impl 的注释亦写明"全部库存变更 = 单行原子条件 UPDATE + 同事务流水, 流水是对账唯一依据"）。
+		res, ue := g.DB().Exec(ctx, "UPDATE inventory SET total = total + ? WHERE sku_id = ?", qty, skuId)
+		if ue != nil {
+			return gerror.Wrap(ue, "回补库存失败")
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return errcode.New(errcode.CodeInventoryAdjust, "库存行不存在, 无法回补")
+		}
+		inv, e2 := dao.Inventory.Ctx(ctx).
+			Fields(dao.Inventory.Columns().Total, dao.Inventory.Columns().Locked).
+			Where(dao.Inventory.Columns().SkuId, skuId).One()
+		if e2 != nil {
+			return gerror.Wrap(e2, "读取库存失败")
+		}
+		if _, e2 = dao.InventoryLog.Ctx(ctx).Data(do.InventoryLog{
+			SkuId:       skuId,
+			OrderNo:     rec[acols.OrderNo].String(),
+			ChangeType:  6, // 6=售后退货回补（000003 枚举）
+			Quantity:    qty,
+			TotalAfter:  inv[dao.Inventory.Columns().Total].Int(),
+			LockedAfter: inv[dao.Inventory.Columns().Locked].Int(),
+			Operator:    operator,
+			Remark:      "售后退货回补(" + afterSaleNo + ")",
+		}).Insert(); e2 != nil {
+			return gerror.Wrap(e2, "写入库存流水失败")
 		}
 	}
 
