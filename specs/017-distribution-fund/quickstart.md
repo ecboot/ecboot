@@ -1,6 +1,6 @@
 # Quickstart: 分销与资金（017-distribution-fund）冒烟验证
 
-**Prerequisites**: 应用库 `ecboot` 迁移版本 42（本批零迁移）。命令在 `apps/server/` 下。
+**Prerequisites**: 应用库 `ecboot` 迁移版本 43（000043 佣金记录唯一键——评审修复 C3/C4, 详见 PROGRESS §五）。命令在 `apps/server/` 下。
 
 ## 冒烟（TDD 全绿后手工抽查 5 组）
 

@@ -164,14 +164,28 @@ func (i *DistributionLogicImpl) BindRelation(ctx context.Context, userId, invite
 	if n > 0 {
 		return errcode.New(errcode.CodeInvalidParam, "已绑定上级, 一人一链不可更改")
 	}
-	// I1（评审修复）: 互环拒绝——若 inviter 的上级正是 user（A←B 再绑 B→A）即成环。
-	// 链仅两级, 查一层即闭环（结构上不存在更深路径）。
-	inv, err := dao.UserRelation.Ctx(ctx).Where(dao.UserRelation.Columns().UserId, inviterId).One()
-	if err != nil {
-		return gerror.Wrap(err, "查询上级关系失败")
+	// I1（复审 N1 修正）: 互环拒绝——沿 inviter 链**向上回溯**判环。
+	// 复审实证: 一层检查只堵二环, 3 阶环可成（user_relation 是无界深度的父指针结构——
+	// 只有"计佣"封顶两级, "关系图"不封顶, 原注释的完备性论证为假）。
+	// 回溯带步数上限: uk_user 保证每人至多一个上级, 无环链必到顶; 上限兜底历史脏数据成环的情形。
+	cursor := inviterId
+	cycle := false
+	for step := 0; step < 64; step++ {
+		if cursor == userId {
+			cycle = true
+			break
+		}
+		up, e := dao.UserRelation.Ctx(ctx).Where(dao.UserRelation.Columns().UserId, cursor).One()
+		if e != nil {
+			return gerror.Wrap(e, "查询上级关系失败")
+		}
+		if up.IsEmpty() {
+			break // 到顶, 无环
+		}
+		cursor = up["inviter_id"].Int64()
 	}
-	if !inv.IsEmpty() && inv["inviter_id"].Int64() == userId {
-		return errcode.New(errcode.CodeInvalidParam, "不能绑定自己的下级为上级（互环）")
+	if cycle {
+		return errcode.New(errcode.CodeInvalidParam, "不能绑定自己的下级为上级（关系环）")
 	}
 	if _, err = dao.UserRelation.Ctx(ctx).Data(g.Map{
 		"user_id": userId, "inviter_id": inviterId, "bind_channel": channel,

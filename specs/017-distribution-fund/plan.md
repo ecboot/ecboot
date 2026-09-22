@@ -5,7 +5,7 @@
 ## Technical Context
 
 - Go + GoFrame v2.10.3；user 侧接口 `internal/service/user/distribution.go`（13 方法，含表/红线/归因详注）；admin 侧方法**契约缺口**需微扩（D3）。
-- 表 9 张全既有（000016/000028），**零迁移**；权限点 7 个全就位（000032），**零权限种子**。
+- 表 9 张全既有（000016/000028）；权限点 7 个全就位（000032），零权限种子。评审修复 C3/C4 增**迁移 000043**（佣金记录唯一键, 原假设"零迁移"破除并记账）。
 - 跨域：shop（订单/售后）→ user（分销结算/冲销）经 ports 投递——既有 `ICommissionReverse`（shop 投递侧已接）补 user 消费实现；新增正向 `ICommissionSettle` 投递端口（确认收货→SettleOrder）。
 
 ## Constitution Check

@@ -6,7 +6,7 @@ description: "任务清单：分销与资金（批次 11）"
 
 **Feature**: `specs/017-distribution-fund` | **Plan**: [plan.md](./plan.md) | **Spec**: [spec.md](./spec.md) | **Contract**: [contracts/distribution-endpoint-mapping.md](./contracts/distribution-endpoint-mapping.md)
 
-**Input**: 23 端点（user 11 + admin 12）、`IDistributionLogic` 13 方法 + admin 微扩 ~11 方法、跨域钩子 2 个（正向结算端口新增/反向冲销消费落地）、**零迁移零权限种子**。
+**Input**: 23 端点（user 11 + admin 12）、`IDistributionLogic` 13 方法 + admin 微扩 ~11 方法、跨域钩子 2 个（正向结算端口新增/反向冲销消费落地）、零权限种子 + 迁移 000043（评审修复轮破除"零迁移"原假设, 记账）。
 
 **Tests**: TDD 红→绿；**红线场景 SC-3 全测试化**（两级封顶/自邀/幂等/状态机/并发提现）。
 
@@ -54,7 +54,7 @@ description: "任务清单：分销与资金（批次 11）"
 
 - **23 端点全清**: `check-stub` 对账 **user 10→0、admin 28→16**, 四渠道合计 **39→16**
 - **实现**: 新写 `distribution_impl.go`（IDistributionLogic 16 方法 + IDistributionAdminLogic 12 方法, **编译期接口断言**）; 连线 23 桩; 契约微扩 D3（admin 接口 + user 侧 Records/RuleQuery/ShareCode, 记账）
-- **跨域钩子**: shop ports 新增 `ICommissionSettle`（Confirm 确认收货投递, 未装配告警降级——计提幂等可补偿重放）; bootstrap 装配正向 SettleOrder + 反向 ICommissionReverse 消费适配器（afterSaleNo→订单项集合逐项冲销）
+- **跨域钩子**: shop ports 新增 `ICommissionSettle`（Confirm 确认收货投递, 未装配告警降级——计提幂等可补偿重放）; bootstrap 装配正向 SettleOrder + 反向 ICommissionReverse 消费适配器（after_sale_order.order_item_id 按项精确冲销（评审 I3 修正））
 - **红线场景 SC-3 全测试化**: 两级封顶（两次单列查询到顶即止）/自邀拒绝+一人一链唯一键兜底/**计提幂等**（事件重放）/保护期结算入账（余额+双快照流水）/**退款冲销**（负额+可负扣回+冲销幂等）/**提现并发双申请只成一笔**（余额条件冻结）/**渠道单号幂等防重复打款**/**状态机不可逆**
 - **实现期新发现（测试当场抓到）**: ①user fixture 的 phone_hash 撞 uk_phone_hash（每用户唯一值修复）; ②share_code 列宽 varchar(16) UNIQUE → sonyflake base36 编码（≤14 字符全局唯一）
-- **验证**: `go test ./...` 两连跑全绿; `golangci-lint` **0 issues**; 零迁移零权限种子（000032 七权限点就位）; wiring 测试含**非超管 10005 对照**（批次 10 I4 内化）
+- **验证**: `go test ./...` 两连跑全绿; `golangci-lint` **0 issues**; 迁移 000043（评审修复轮新增）+零权限种子（000032 七权限点就位）; wiring 测试含**非超管 10005 对照**（批次 10 I4 内化）

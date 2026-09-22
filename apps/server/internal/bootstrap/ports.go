@@ -9,6 +9,7 @@ package bootstrap
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 
 	"ecboot/internal/model"
@@ -84,6 +85,11 @@ func (commissionReverseAdapter) ReverseForAfterSale(ctx context.Context, orderNo
 		return
 	}
 	if err = user.NewDistributionLogic().ReverseOnRefund(ctx, itemId.Int64()); err != nil {
+		// N5（复审）: 并发输家的良性竞态（"已被并发冲销"）降为幂等跳过, 不再"需人工核对"噪音
+		if ec := gerror.Code(err); ec.Code() == 40006 {
+			g.Log().Infof(ctx, "[佣金冲销] 并发冲销已被他方完成, 幂等跳过: after_sale_no=%s", afterSaleNo)
+			return
+		}
 		g.Log().Errorf(ctx, "[佣金冲销] 冲销失败(需人工核对): order_no=%s order_item_id=%d after_sale_no=%s err=%v",
 			orderNo, itemId.Int64(), afterSaleNo, err)
 	}

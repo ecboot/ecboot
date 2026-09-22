@@ -41,19 +41,12 @@ func TestDistCommissionConcurrentGuards(t *testing.T) {
 		start := make(chan struct{})
 		for i := 0; i < 2; i++ {
 			wg.Add(1)
-			go func() {
+			go func(idx int) {
 				defer wg.Done()
 				<-start
-				errs[0] = logic.SettleOrder(ctx, no)
-			}()
+				errs[idx] = logic.SettleOrder(ctx, no)
+			}(i)
 		}
-		// 同订单两个 goroutine 调同一方法 → 用两个调用
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-start
-			errs[1] = logic.SettleOrder(ctx, no)
-		}()
 		close(start)
 		wg.Wait()
 		for _, e := range errs {
@@ -111,11 +104,23 @@ func TestDistReverseUnsettledConcurrent(t *testing.T) {
 		defer distCleanupAll(ctx, a, b)
 		const no = "TF-DIST-UU-1"
 		defer cleanupDistOrder(ctx, no)
+		f := newDistFixture(t)
+		defer f.teardown(ctx)
 		logic := NewDistributionLogic()
 		seedRelation(ctx, t, a, b)
 		seedDistributor(ctx, t, a, 2)
-		itemId := seedDistOrder(ctx, t, no, b, "100.00")
+		_, _ = g.DB().Exec(ctx, "DELETE FROM commission_rule WHERE scope_type=1 AND scope_id=?", f.catId)
+		_, err := g.DB().Exec(ctx,
+			"INSERT INTO commission_rule(scope_type,scope_id,level1_rate,level2_rate,status) VALUES(1,?,10.00,0.00,1)",
+			f.catId)
+		t.AssertNil(err)
+		itemId := seedDistOrderSku(ctx, t, no, b, "100.00", f.skuId, f.spuId)
 		t.AssertNil(logic.SettleOrder(ctx, no))
+		// 确认佣金行真实存在（复审 N2: 原夹具 spu_id=1 不存在 → 0 行佣金 → 守卫空转）
+		pre, err := g.DB().GetValue(ctx,
+			"SELECT COUNT(*) FROM commission_record WHERE order_item_id=? AND status=1", itemId)
+		t.AssertNil(err)
+		t.Assert(pre.Int(), 1)
 		seedAccount(ctx, t, a, "100.00", "0.00") // 独立预置余额（佣金未入账）
 
 		var wg sync.WaitGroup
@@ -131,23 +136,31 @@ func TestDistReverseUnsettledConcurrent(t *testing.T) {
 		close(start)
 		wg.Wait()
 
-		// 佣金从未入账 → 不得被扣（评审探针 P5b: 余额 100→90）
+		// 恰一条置失效（输家不进负额路径）; 佣金从未入账 → 不得被扣（评审探针 P5b: 100→90）
+		invalid, err := g.DB().GetValue(ctx,
+			"SELECT COUNT(*) FROM commission_record WHERE order_item_id=? AND status=3", itemId)
+		t.AssertNil(err)
+		t.Assert(invalid.Int(), 1)
 		acc, _ := g.DB().GetOne(ctx, "SELECT balance FROM user_account WHERE user_id=?", a)
 		t.Assert(acc["balance"].String(), "100.00")
 	})
 }
 
-// TestDistBindCycle I1 守卫: 互环绑定拒绝（A←B 已建立, 再绑 B→A → 拒绝）。
+// TestDistBindCycle I1/N1 守卫: 二环与三阶环均拒绝（复审 N1: 一层检查只堵二环, 3 阶环可成）。
 func TestDistBindCycle(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		ctx := context.Background()
 		a := distCleanupUser(ctx, t, "TF-DX-A")
 		b := distCleanupUser(ctx, t, "TF-DX-B")
-		defer distCleanupAll(ctx, a, b)
+		c := distCleanupUser(ctx, t, "TF-DX-C")
+		defer distCleanupAll(ctx, a, b, c)
 		logic := NewDistributionLogic()
 		t.AssertNil(logic.BindRelation(ctx, b, a, 1)) // B 的上级 = A
-		// 互环: 给 A 绑上级 B（B 是 A 的下级）→ 拒绝
+		// 二环: 给 A 绑上级 B（B 是 A 的直接下级）→ 拒绝
 		t.Assert(errCode(logic.BindRelation(ctx, a, b, 1)), errcode.CodeInvalidParam)
+		// 三阶环: C 的上级 = B（B 的上级 = A）→ 给 A 绑上级 C（C 在 A 的下级子树里）→ 拒绝
+		t.AssertNil(logic.BindRelation(ctx, c, b, 1))
+		t.Assert(errCode(logic.BindRelation(ctx, a, c, 1)), errcode.CodeInvalidParam)
 	})
 }
 
