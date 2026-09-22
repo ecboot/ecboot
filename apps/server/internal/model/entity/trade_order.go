@@ -42,6 +42,7 @@ type TradeOrder struct {
 	UserRemark          string      `json:"userRemark"          orm:"user_remark"           ` // 买家留言
 	SellerRemark        string      `json:"sellerRemark"        orm:"seller_remark"         ` // 卖家备注(客服/仓库内部使用,买家不可见)
 	RequestToken        string      `json:"requestToken"        orm:"request_token"         ` // 下单幂等token(确认页发放,Redis抢占+唯一索引兜底;NULL不参与唯一)
+	FlashSaleItemId     uint64      `json:"flashSaleItemId"     orm:"flash_sale_item_id"    ` // 秒杀场次商品ID(NULL=普通单; 取消时据此回补活动库存)
 	PayTime             *gtime.Time `json:"payTime"             orm:"pay_time"              ` // 支付完成时间
 	DeliverCompany      string      `json:"deliverCompany"      orm:"deliver_company"       ` // 物流公司(发货预留)
 	DeliverNo           string      `json:"deliverNo"           orm:"deliver_no"            ` // 物流单号(发货预留)

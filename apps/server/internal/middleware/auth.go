@@ -33,9 +33,13 @@ var publicPrefixes = []string{
 	"/common/",
 	"/user/login", "/user/token/refresh",
 	"/admin/login", "/admin/token/refresh",
+	"/shop/index", // 首页聚合对游客开放（015 批次 09; 由端点级可达性测试发现漏配）
 	"/shop/categories", "/shop/brands", "/shop/products", "/shop/search",
 	"/shop/activities/", "/shop/full-reductions", "/shop/banners", "/shop/floors",
-	"/shop/bargains/", "/shop/assists/",
+	// 注（015 批次 09 全端点扫描）: `/shop/bargains/` 与 `/shop/assists/` **不再**列在此处——
+	// 这两个前缀下既有公开的 GET（进度查询）, 又有**会员的 POST**（帮砍 /{id}/cut、助力 /{id}/helpers）;
+	// 前缀放行会把会员动作一并直通（Auth 不注入 ctx userId）→ 控制器 requireMember 恒判未登录。
+	// 它们改列 publicGetOnlyPrefixes（只放行 GET）。
 	"/shop/pay/notify", "/shop/refund/notify",
 	// 注（014 评审 C1）: 此处**不得**加 `/shop/reviews`——它是前缀匹配, 会把同一前缀下的
 	// `/shop/reviews/mine`（我的评价）与 `/shop/reviews/{id}/extra`（追评）一并放行,
@@ -44,8 +48,20 @@ var publicPrefixes = []string{
 	// （该行原先在此, 并配有一处 `POST /shop/reviews` 的精确例外; 端点未连线时不可观测, 连线后即成故障。）
 }
 
+// publicGetOnlyPrefixes 只放行 **GET** 的公开前缀。
+// 场景（015 批次 09 全端点扫描得出）: 同一前缀下既有公开读（如砍价/助力进度查询）, 又有会员写
+// （帮砍、助力）——前缀级放行会把"写"也当公开路径直通, 控制器拿不到 userId（批次 08 的 C1 同型）。
+var publicGetOnlyPrefixes = []string{"/shop/bargains/", "/shop/assists/"}
+
 func isPublicPath(r *ghttp.Request) bool {
 	path := r.URL.Path
+	if r.Method == "GET" {
+		for _, p := range publicGetOnlyPrefixes {
+			if path == p || strings.HasPrefix(path, p+"/") || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {
+				return true
+			}
+		}
+	}
 	for _, p := range publicPrefixes {
 		// 段边界匹配: path==p 或 path 以 p+"/" 开头（防 /user/login* 误匹配）
 		if path == p || strings.HasPrefix(path, p+"/") || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {

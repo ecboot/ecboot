@@ -42,17 +42,18 @@ func nextOrderNo() (string, error) {
 
 // orderLine 下单行（聚合 SKU/SPU/库存信息）。
 type orderLine struct {
-	SkuId          int64
-	SkuNo          string // trade_order_item.sku_no 非空列（快照）
-	SpuId          int64
-	SpuName        string
-	SkuName        string
-	SkuImage       string
-	Specs          map[string]string
-	PriceFen       int64
-	LineFen        int64
-	Quantity       int
-	SaleRestricted bool
+	SkuId            int64
+	SkuNo            string // trade_order_item.sku_no 非空列（快照）
+	SpuId            int64
+	SpuName          string
+	SkuName          string
+	SkuImage         string
+	Specs            map[string]string
+	PriceFen         int64 // 成交价（秒杀单为秒杀价, 见 D1）
+	OriginalPriceFen int64 // 原价（下单时页面价快照; 与成交价分离, FR-002）
+	LineFen          int64
+	Quantity         int
+	SaleRestricted   bool
 }
 
 // Create 下单九步事务编排（幂等/四玩法/优惠分摊/库存锁定）。
@@ -61,13 +62,15 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 		return nil, errcode.New(errcode.CodeInvalidParam, "缺少幂等凭证")
 	}
 
-	// 评审 Important: 秒杀玩法（批次 09/10 营销域）尚未接线——原分支只锁活动库存、**不锁 inventory**,
-	// 且 collectLines 恒用 product_sku.price（从不读 flash_sale_item.flash_price, 而 000018 的契约是
-	// "秒杀价经 trade_order_item.price 快照承载"）。这样的单 ① 按原价计费 ② 支付回调的库存核销必然
-	// 未命中（I1 判定为账实不符）→ 整单回滚, 即**永远无法支付**。与其产出无法履约的单, 不如明确拒绝。
-	// 待批次 09 接通「秒杀价快照 + inventory 锁 + 取消时回补 sold_count」后删除本闸（PROGRESS §五 已记账）。
+	// 秒杀下单上下文（015 批次 09 清偿批次 07 欠账）: 原"未上线"临时拦截已按 ledger 约定的删除条件移除
+	// ——条件即「秒杀价快照 + 商品库存同时锁 + 取消回补 sold_count」三者均落地（见下方各步与 cancelBy）。
+	var flash *flashCtx
 	if in.FlashSaleItemId > 0 {
-		return nil, errcode.New(errcode.CodeActivityInvalid, "秒杀玩法未上线")
+		fc, ferr := loadFlashForOrder(ctx, in.FlashSaleItemId)
+		if ferr != nil {
+			return nil, ferr
+		}
+		flash = fc
 	}
 
 	// ---- 事务外预备: 收货地址快照 ----
@@ -104,7 +107,7 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	}
 
 	// 步骤1: 行聚合
-	lines, totalFen, err := i.collectLines(ctx, tx, userId, in)
+	lines, totalFen, err := i.collectLines(ctx, tx, userId, in, flash)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +127,23 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	// 原实现只看 error（条件不命中时 error 为 nil, 行数为 0）, 于是库存 1 也能下 2 件的单（静默超卖）。
 	// 回滚由函数头的 `committed` 标志兜底（见事务开头的注释）, 此处无需关心 err 赋值约定。
 	for _, ln := range lines {
-		// 普通/拼团/砍价: inventory 锁定（条件更新防超卖）
+		// 秒杀: **活动库存**条件更新（与下面的商品库存**都要锁**——批次 07 的教训: 只锁活动库存会让
+		// 支付回调的库存核销必然未命中而整单回滚, 秒杀单永远无法支付）。
+		if flash != nil {
+			var fsRes sql.Result
+			if fsRes, err = tx.Model("flash_sale_item").Ctx(ctx).
+				Where("id", flash.ItemId).
+				Where("stock_count - sold_count >= ?", ln.Quantity).
+				Data(g.Map{"sold_count": gdb.Raw("sold_count + " + fmt.Sprint(ln.Quantity))}).
+				Update(); err != nil {
+				return nil, err
+			}
+			if n, _ := fsRes.RowsAffected(); n == 0 {
+				err = errcode.New(errcode.CodeSoldOut, "秒杀活动库存不足")
+				return nil, err
+			}
+		}
+		// 普通/拼团/砍价/秒杀: inventory 锁定（条件更新防超卖）
 		var invRes sql.Result
 		if invRes, err = tx.Model("inventory").Ctx(ctx).
 			Where("sku_id", ln.SkuId).
@@ -184,6 +203,9 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 	if in.UserCouponId > 0 {
 		orderData["user_coupon_id"] = in.UserCouponId
 	}
+	if flash != nil {
+		orderData["flash_sale_item_id"] = flash.ItemId // 取消时据此回补活动库存（迁移 000040）
+	}
 	if in.GroupBuyTeamId > 0 {
 		orderData["group_buy_team_id"] = in.GroupBuyTeamId
 	}
@@ -224,7 +246,7 @@ func (i *OrderLogicImpl) Create(ctx context.Context, userId int64, in model.Orde
 			"sku_image":             ln.SkuImage,
 			"quantity":              ln.Quantity,
 			"sku_specs":             mustJSON(ln.Specs),
-			"original_price":        money.ToYuanString(ln.PriceFen),
+			"original_price":        money.ToYuanString(ln.OriginalPriceFen),
 			"price":                 money.ToYuanString(ln.PriceFen),
 			"coupon_amount":         money.ToYuanString(couponAlloc[idx]),
 			"full_reduction_amount": money.ToYuanString(frAlloc[idx]),
@@ -448,6 +470,19 @@ func (i *OrderLogicImpl) cancelBy(
 		_, _ = g.DB().Exec(ctx,
 			"UPDATE inventory SET locked=locked-? WHERE sku_id=? AND locked>=?", qty, skuId, qty)
 	}
+	// 秒杀单: 回补**活动库存**（批次 07 欠账清偿条件之一）。按订单快照的 `flash_sale_item_id` 定位——
+	// 若改按 sku 反查"进行中的场次", 在"活动已结束才取消"时会查不到而漏回补（活动库存永久泄漏）。
+	if fid := rec["flash_sale_item_id"].Int64(); fid > 0 {
+		for _, it := range items {
+			qty := it["quantity"].Int()
+			if _, e := g.DB().Exec(ctx,
+				"UPDATE flash_sale_item SET sold_count = sold_count - ? WHERE id = ? AND sold_count >= ?",
+				qty, fid, qty); e != nil {
+				g.Log().Errorf(ctx, "秒杀活动库存回补失败: flash_sale_item_id=%d qty=%d err=%v", fid, qty, e)
+			}
+		}
+	}
+
 	// 评审 I6 修正: trade_order_log **无 operator 列**（只有 operator_type/operator_id）——
 	// 原写法报 1054 且被吞, 致每次取消都没有状态流水。
 	if _, e := dao.TradeOrderLog.Ctx(ctx).Data(do.TradeOrderLog{
@@ -466,7 +501,7 @@ func (i *OrderLogicImpl) cancelBy(
 }
 
 // collectLines 行聚合：购物车项（普通）或直购 SKU → 下单行列表。
-func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int64, in model.OrderCreateInput) ([]orderLine, int64, error) {
+func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int64, in model.OrderCreateInput, flash *flashCtx) ([]orderLine, int64, error) {
 	var lines []orderLine
 	var totalFen int64
 
@@ -486,16 +521,24 @@ func (i *OrderLogicImpl) collectLines(ctx context.Context, tx gdb.TX, userId int
 		if err != nil {
 			return err
 		}
-		priceFen, err := money.FromYuanString(sku["price"].String())
+		origFen, err := money.FromYuanString(sku["price"].String())
 		if err != nil {
 			return err
+		}
+		// 秒杀单: 成交价取场次商品秒杀价, 且**所购 SKU 必须属于该场次商品**（防篡改, FR-002）
+		priceFen := origFen
+		if flash != nil {
+			if flash.SkuId != skuId {
+				return errcode.New(errcode.CodeActivityInvalid, "该商品不在所选秒杀场次中")
+			}
+			priceFen = flash.PriceFen
 		}
 		lines = append(lines, orderLine{
 			SkuId: skuId, SkuNo: sku["sku_no"].String(), SpuId: sku["spu_id"].Int64(),
 			SpuName: spu["name"].String(), SkuName: sku["name"].String(),
 			SkuImage: sku["image"].String(),
 			Specs:    specsMap(sku["specs"].String()),
-			PriceFen: priceFen, LineFen: priceFen * int64(qty), Quantity: qty,
+			PriceFen: priceFen, OriginalPriceFen: origFen, LineFen: priceFen * int64(qty), Quantity: qty,
 		})
 		return nil
 	}
@@ -577,4 +620,42 @@ func (i *OrderLogicImpl) Confirm(ctx context.Context, userId int64, orderNo stri
 		OperatorId:   fmt.Sprintf("user:%d", userId),
 	}).Insert()
 	return nil
+}
+
+// flashCtx 秒杀下单上下文（成交价与场次商品定位; 015 批次 09）。
+type flashCtx struct {
+	ItemId   int64
+	SkuId    int64
+	PriceFen int64
+}
+
+// loadFlashForOrder 秒杀场次商品校验（FR-002/004）: 商品存在 + 所属活动**启用未删且在时间窗内**;
+// 返回成交价（分）。任一不满足 → 50002 活动无效。
+func loadFlashForOrder(ctx context.Context, itemId int64) (*flashCtx, error) {
+	icols := dao.FlashSaleItem.Columns()
+	item, err := dao.FlashSaleItem.Ctx(ctx).Where(icols.Id, itemId).One()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询秒杀场次商品失败")
+	}
+	if item.IsEmpty() {
+		return nil, errcode.New(errcode.CodeActivityInvalid, "秒杀场次商品不存在")
+	}
+	acols := dao.FlashSaleActivity.Columns()
+	act, err := dao.FlashSaleActivity.Ctx(ctx).
+		Where(acols.Id, item[icols.ActivityId].Int64()).
+		Where(acols.Status, 1).
+		Where(acols.Deleted, 0).
+		Where(acols.StartTime + " <= NOW()").
+		Where(acols.EndTime + " >= NOW()").One()
+	if err != nil {
+		return nil, gerror.Wrap(err, "查询秒杀场次失败")
+	}
+	if act.IsEmpty() {
+		return nil, errcode.New(errcode.CodeActivityInvalid, "秒杀场次不在进行中")
+	}
+	priceFen, err := yuanFen(item[icols.FlashPrice].String())
+	if err != nil {
+		return nil, err
+	}
+	return &flashCtx{ItemId: itemId, SkuId: item[icols.SkuId].Int64(), PriceFen: priceFen}, nil
 }

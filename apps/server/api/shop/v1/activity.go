@@ -60,9 +60,11 @@ type (
 		model.PageReq
 	}
 	BargainSku struct {
+		ItemId        string `json:"itemId" dc:"场次商品ID(发起砍价必传; 015 微扩)"`
 		SkuId         string `json:"skuId"`
 		OriginalPrice string `json:"originalPrice" dc:"起始价"`
 		FloorPrice    string `json:"floorPrice" dc:"底价"`
+		MaxCutCount   int    `json:"maxCutCount" dc:"最大刀数(015 微扩; 展示用)"`
 	}
 	BargainActivityItem struct {
 		ActivityId string       `json:"activityId"`

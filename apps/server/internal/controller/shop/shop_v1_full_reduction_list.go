@@ -3,13 +3,17 @@ package shop
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/shop/v1"
+	"ecboot/internal/model"
+	"ecboot/internal/service/shop"
 )
 
-// FullReductionList 当前满减活动（可按商品过滤范围命中）
+// FullReductionList 满减活动列表（公开; 只出进行中）
 func (c *ControllerV1) FullReductionList(ctx context.Context, req *v1.FullReductionListReq) (res *v1.FullReductionListRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	out, err := shop.NewMarketingLogic().PublicFullReductions(ctx, model.PageReq{Page: 1, PageSize: 100})
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.FullReductionListRes{List: fullReductionItems(out.List)}
+	return res, nil
 }

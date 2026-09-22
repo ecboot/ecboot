@@ -761,3 +761,145 @@ type PublicFloorItem struct {
 	Config    map[string]any        `json:"config"`
 	Products  []FloorProductSummary `json:"products" dc:"仅商品楼层有值"`
 }
+
+// ---------- 营销 C 端 DTO（015-marketing-c 批次 09 新建） ----------
+// 说明: C 端营销在批次 09 之前**无任何接口与 DTO**（IActivityLogic 全为管理面）,
+// 故按批次 03（IOperationLogic）先例在本批新建; 管理面 DTO 一律不动。
+
+// ActivitySkuBrief 场次商品摘要（五类玩法共用: 秒杀价/成团价/起始价等）。
+type ActivitySkuBrief struct {
+	ItemId        int64  `json:"itemId" dc:"场次商品ID(砍价发起必传; 其余玩法为 0)"`
+	SkuId         int64  `json:"skuId"`
+	Price         string `json:"price" dc:"活动价(元; 秒杀价/成团价/砍价起始价)"`
+	OriginalPrice string `json:"originalPrice" dc:"原价(元; 砍价用)"`
+	FloorPrice    string `json:"floorPrice" dc:"底价(元; 砍价用)"`
+	MaxCutCount   int    `json:"maxCutCount" dc:"最大刀数(砍价用)"`
+	StockRemain   int    `json:"stockRemain" dc:"活动剩余量(秒杀用)"`
+	PerLimit      int    `json:"perLimit" dc:"每人限购(秒杀用)"`
+}
+
+// PublicGroupBuyItem 拼团活动（公开列表项）。
+type PublicGroupBuyItem struct {
+	ActivityId int64              `json:"activityId"`
+	Name       string             `json:"name"`
+	SpuId      int64              `json:"spuId"`
+	SpuName    string             `json:"spuName"`
+	Image      string             `json:"image"`
+	GroupSize  int                `json:"groupSize" dc:"成团人数"`
+	Items      []ActivitySkuBrief `json:"items"`
+	EndTime    string             `json:"endTime"`
+}
+
+// PublicFlashSaleItem 秒杀场次（公开列表项；含预告）。
+type PublicFlashSaleItem struct {
+	ActivityId int64              `json:"activityId"`
+	Name       string             `json:"name"`
+	StartTime  string             `json:"startTime"`
+	EndTime    string             `json:"endTime"`
+	Upcoming   bool               `json:"upcoming" dc:"是否预告(未开始)"`
+	Items      []ActivitySkuBrief `json:"items"`
+}
+
+// PublicBargainItem 砍价活动（公开列表项）。
+type PublicBargainItem struct {
+	ActivityId int64              `json:"activityId"`
+	Name       string             `json:"name"`
+	SpuId      int64              `json:"spuId"`
+	SpuName    string             `json:"spuName"`
+	Image      string             `json:"image"`
+	Items      []ActivitySkuBrief `json:"items"`
+	EndTime    string             `json:"endTime"`
+}
+
+// PublicAssistItem 助力活动（公开列表项）。
+type PublicAssistItem struct {
+	ActivityId    int64  `json:"activityId"`
+	Name          string `json:"name"`
+	RequiredCount int    `json:"requiredCount" dc:"所需助力人数"`
+	PerLimit      int    `json:"perLimit" dc:"每人可发起次数"`
+	RewardType    int    `json:"rewardType" dc:"奖励类型:1优惠券 2积分"`
+	EndTime       string `json:"endTime"`
+}
+
+// LadderBrief 满减档位摘要。
+type LadderBrief struct {
+	Threshold string `json:"threshold" dc:"满(元)"`
+	Discount  string `json:"discount" dc:"减(元)"`
+}
+
+// PublicFullReductionItem 满减活动（公开列表项）。
+type PublicFullReductionItem struct {
+	ActivityId int64         `json:"activityId"`
+	Name       string        `json:"name"`
+	Ladders    []LadderBrief `json:"ladders"`
+	ScopeDesc  string        `json:"scopeDesc" dc:"适用范围摘要(全场/分类/商品)"`
+	EndTime    string        `json:"endTime"`
+}
+
+// PlayHelperItem 帮砍/助力条目（昵称脱敏）。
+type PlayHelperItem struct {
+	UserId    int64  `json:"userId"`
+	Nickname  string `json:"nickname" dc:"脱敏"`
+	Amount    string `json:"amount" dc:"本刀金额(砍价用,元)"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// BargainLaunchResult 发起砍价出参。
+type BargainLaunchResult struct {
+	RecordId     int64  `json:"recordId"`
+	CurrentPrice string `json:"currentPrice" dc:"发起即首刀后的当前价(元)"`
+}
+
+// BargainProgressView 砍价进度。
+type BargainProgressView struct {
+	RecordId      int64            `json:"recordId"`
+	SkuId         int64            `json:"skuId"`
+	OriginalPrice string           `json:"originalPrice" dc:"起始价(元)"`
+	CurrentPrice  string           `json:"currentPrice" dc:"当前价(元)"`
+	FloorPrice    string           `json:"floorPrice" dc:"底价(元)"`
+	CutCount      int              `json:"cutCount" dc:"已砍刀数"`
+	Status        int              `json:"status" dc:"1砍价中 2到底价 3已下单 4超时 5取消"`
+	ExpireTime    string           `json:"expireTime"`
+	OrderNo       string           `json:"orderNo"`
+	Helpers       []PlayHelperItem `json:"helpers"`
+}
+
+// BargainCutResult 帮砍出参。
+type BargainCutResult struct {
+	CutAmount    string `json:"cutAmount"`
+	CurrentPrice string `json:"currentPrice"`
+	FloorReached bool   `json:"floorReached" dc:"是否已到底价(可下单)"`
+}
+
+// AssistLaunchResult 发起助力出参。
+type AssistLaunchResult struct {
+	RecordId int64 `json:"recordId"`
+}
+
+// AssistProgressView 助力进度。
+type AssistProgressView struct {
+	RecordId      int64            `json:"recordId"`
+	ActivityId    int64            `json:"activityId"`
+	HelperCount   int              `json:"helperCount"`
+	RequiredCount int              `json:"requiredCount"`
+	Status        int              `json:"status" dc:"1进行中 2已完成发奖 3已过期"`
+	FinishTime    string           `json:"finishTime"`
+	Helpers       []PlayHelperItem `json:"helpers"`
+}
+
+// AssistHelpResult 助力出参。
+type AssistHelpResult struct {
+	Done bool `json:"done" dc:"本次助力后是否达成发奖"`
+}
+
+// IndexAggregate 首页聚合（轮播 + 楼层 + 五类活动入口 + 可领券; 任一块可为空数组）。
+type IndexAggregate struct {
+	Banners        []PublicBannerItem        `json:"banners"`
+	Floors         []PublicFloorItem         `json:"floors"`
+	FlashSales     []PublicFlashSaleItem     `json:"flashSales"`
+	GroupBuys      []PublicGroupBuyItem      `json:"groupBuys"`
+	Bargains       []PublicBargainItem       `json:"bargains"`
+	Assists        []PublicAssistItem        `json:"assists"`
+	FullReductions []PublicFullReductionItem `json:"fullReductions"`
+	Coupons        []CouponTemplate          `json:"coupons" dc:"可领券"`
+}

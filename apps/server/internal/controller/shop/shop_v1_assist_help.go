@@ -3,13 +3,23 @@ package shop
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/shop/v1"
+	"ecboot/internal/service/shop"
 )
 
-// AssistHelp 助力（会员; 一人一助力; 风控挂载位: risk_rule 2/3/4）
+// AssistHelp 助力（会员; 一人一助力）
 func (c *ControllerV1) AssistHelp(ctx context.Context, req *v1.AssistHelpReq) (res *v1.AssistHelpRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	userId, err := requireMember(ctx)
+	if err != nil {
+		return nil, err
+	}
+	recordId, err := parseID(req.RecordId)
+	if err != nil {
+		return nil, err
+	}
+	out, err := shop.NewAssistLogic().Help(ctx, userId, recordId)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AssistHelpRes{Success: true, Done: out.Done}, nil
 }

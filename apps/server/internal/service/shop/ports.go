@@ -64,6 +64,22 @@ type ICommissionReverse interface {
 	ReverseForAfterSale(ctx context.Context, orderNo, afterSaleNo string, refundFen int64)
 }
 
+// IRiskHit 风控命中判定（015 营销 C 端）: 帮砍/助力入口调用。
+// 归属: shop 域定义; 实现属**批次 12**（风控规则引擎）→ 未装配时**放行 + 告警**（不阻塞玩法可用）。
+// 依据: 迁移 000029 两处注释明写"砍价/助力是被刷重灾区——帮砍/助力入口须挂风控"（schema 级要求）。
+type IRiskHit interface {
+	// Hit 判定是否拦截（返回 true 表示拦截; ruleType 沿用 risk_rule.rule_type 口径）。
+	Hit(ctx context.Context, userId int64, ruleType int, payload string) (blocked bool, err error)
+}
+
+// IAssistReward 助力发奖意图（015 营销 C 端）: 达标时投递。
+// 归属: shop 域定义; 实际发放（发券/发积分）跨 user 域, 属后续批次 → 未装配时告警降级。
+// 与 ICommissionReverse 同型: 只**投递意图**, 不落账（结算/发放后置）。
+type IAssistReward interface {
+	// GrantForAssist 投递发奖意图（rewardType 1 券 / 2 积分; rewardRef 为券 id 或积分点数载体）。
+	GrantForAssist(ctx context.Context, userId, activityId, recordId int64, rewardType int, rewardRef int64)
+}
+
 // 注册变量（user 域 bootstrap 装配时注入; 未注入则相关能力降级跳过并告警）。
 var (
 	CouponTrade       ICouponTrade
@@ -72,4 +88,6 @@ var (
 	NotifyEnq         INotifyEnqueue
 	CouponQuery       ICouponQuery
 	CommissionReverse ICommissionReverse
+	RiskHit           IRiskHit
+	AssistReward      IAssistReward
 )

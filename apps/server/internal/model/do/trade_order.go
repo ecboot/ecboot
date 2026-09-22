@@ -44,6 +44,7 @@ type TradeOrder struct {
 	UserRemark          any         // 买家留言
 	SellerRemark        any         // 卖家备注(客服/仓库内部使用,买家不可见)
 	RequestToken        any         // 下单幂等token(确认页发放,Redis抢占+唯一索引兜底;NULL不参与唯一)
+	FlashSaleItemId     any         // 秒杀场次商品ID(NULL=普通单; 取消时据此回补活动库存)
 	PayTime             *gtime.Time // 支付完成时间
 	DeliverCompany      any         // 物流公司(发货预留)
 	DeliverNo           any         // 物流单号(发货预留)
