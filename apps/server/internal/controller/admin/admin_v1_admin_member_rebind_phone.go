@@ -3,13 +3,23 @@ package admin
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/errors/gcode"
-	"github.com/gogf/gf/v2/errors/gerror"
-
 	"ecboot/api/admin/v1"
+	"ecboot/internal/consts"
+	"ecboot/internal/middleware"
+	"ecboot/internal/service/user"
 )
 
-// AdminMemberRebindPhone 改绑手机号（旧号解占; 审计留痕）
+// AdminMemberRebindPhone 改绑手机号（唯一键兜底并发）。
 func (c *ControllerV1) AdminMemberRebindPhone(ctx context.Context, req *v1.AdminMemberRebindPhoneReq) (res *v1.AdminMemberRebindPhoneRes, err error) {
-	return nil, gerror.NewCode(gcode.CodeNotImplemented)
+	if err = middleware.RequirePerm(ctx, consts.PermMemberUpdate); err != nil {
+		return nil, err
+	}
+	uid, err := parseID(req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	if err = user.NewMemberAdminLogic().RebindPhone(ctx, uid, req.NewPhone); err != nil {
+		return nil, err
+	}
+	return &v1.AdminMemberRebindPhoneRes{Success: true}, nil
 }

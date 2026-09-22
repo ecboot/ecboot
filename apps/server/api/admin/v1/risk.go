@@ -45,7 +45,7 @@ type (
 		Name          string `json:"name" dc:"名称"`
 		ConditionExpr string `json:"conditionExpr" dc:"条件描述"`
 		Action        int    `json:"action" dc:"处置"`
-		Status        int    `json:"status" dc:"状态"`
+		Status        *int   `json:"status" dc:"启停(nil=不修改; 批次10 I6 同款三态)"`
 	}
 	AdminRiskRuleUpdateRes struct {
 		Success bool `json:"success"`

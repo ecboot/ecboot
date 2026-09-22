@@ -20,7 +20,7 @@
 | 9 | `GET /admin/risk-rules/{id}`(详情) | admin_v1_admin_risk_rule_detail.go | .RuleDetail | risk:rule:read |
 | 10 | `GET /admin/risk-records` | admin_v1_admin_risk_record_list.go | .RecordList | risk:record:read |
 | 11 | `POST /admin/risk-records/{id}/appeal` | admin_v1_admin_risk_appeal.go | .Appeal | risk:record:appeal |
-| 12 | `GET /admin/login-logs` | admin_v1_admin_login_log_list.go | Audit.LoginLogs | system:audit:read |
+| 12 | `GET /admin/admin-login-logs` | admin_v1_admin_login_log_list.go | Audit.LoginLogs | system:audit:read |
 | 13 | `GET /admin/operation-logs` | admin_v1_admin_operation_log_list.go | Audit.OperationLogs | system:audit:read |
 
 ## 校验矩阵

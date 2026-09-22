@@ -14,6 +14,7 @@ import (
 
 	"ecboot/internal/model"
 	"ecboot/internal/service/shop"
+	"ecboot/internal/service/system"
 	"ecboot/internal/service/user"
 )
 
@@ -44,8 +45,17 @@ func (couponQueryAdapter) UsableForOrder(
 func init() {
 	// 正向: 订单确认收货 → 佣金计提（SettleOrder, 归因+规则命中在 user 域）
 	shop.CommissionSettle = commissionSettleAdapter{}
-	// 反向: 售后完成 → 佣金冲销（批次 07 投递侧的消费端落地; 适配器把 afterSaleNo 还原为订单项集合）
+	// 反向: 售后完成 → 佣金冲销（批次 07 投递侧的消费端落地; 适配器按售后单订单项精确冲销）
 	shop.CommissionReverse = commissionReverseAdapter{}
+	// 风控: 批次 09/11 预留端口的真实判定落地（018 评估器; 失败降级放行）
+	shop.RiskHit = riskHitAdapter{}
+}
+
+// riskHitAdapter 风控评估适配: shop 端口 → system 评估器。
+type riskHitAdapter struct{}
+
+func (riskHitAdapter) Hit(ctx context.Context, userId int64, ruleType int, payload string) (bool, error) {
+	return system.RiskHitImpl{}.Hit(ctx, userId, ruleType, payload)
 }
 
 // commissionSettleAdapter 正向计提适配。
