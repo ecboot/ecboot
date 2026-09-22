@@ -5,6 +5,7 @@ package shop
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -218,6 +219,13 @@ func TestReviewProductList(t *testing.T) {
 		t.Assert(summary.Distribution["3"], 1)
 		t.Assert(summary.Distribution["4"], 0)
 
+		// 空集合口径与商品详情页一致（占位 "—"）
+		s0, p0, err := NewReviewLogic().ProductList(ctx, 979999999, 0, model.PageReq{Page: 1, PageSize: 10})
+		t.AssertNil(err)
+		t.Assert(p0.Total, 0)
+		t.Assert(s0.Avg, "—")
+		t.Assert(s0.Total, 0)
+
 		// 星级筛选
 		s5, p5, err := NewReviewLogic().ProductList(ctx, spuId, 5, model.PageReq{Page: 1, PageSize: 10})
 		t.AssertNil(err)
@@ -354,7 +362,7 @@ func TestReviewExtraExpired(t *testing.T) {
 		t.Assert(errCode(NewReviewLogic().Extra(ctx, f.UserId, rid, "超期追评", nil)), errcode.CodeExtraReviewDenied)
 
 		// 89 天前仍可追评（边界）
-		rid2 := seedReviewRow(ctx, t, f, "T-RV-EXT2B", spuId, 4, reviewAuditPassed, 0, "边界评价")
+		rid2 := seedReviewRow(ctx, t, f, f.OrderNo, spuId, 4, reviewAuditPassed, 0, "边界评价") // 评审 I1: 必须用 f.OrderNo, 否则 cleanup 按 order_no 删不到 → 每次跑测试留 1 行
 		_, _ = g.DB().Exec(ctx, "UPDATE product_review SET created_at=DATE_SUB(NOW(), INTERVAL 89 DAY) WHERE id=?", rid2)
 		t.AssertNil(NewReviewLogic().Extra(ctx, f.UserId, rid2, "89天追评", nil))
 	})
@@ -391,5 +399,84 @@ func TestReviewExtraConcurrent(t *testing.T) {
 			}
 		}
 		t.Assert(success, 1) // 条件更新: 只有一次能把 '' 写成内容
+	})
+}
+
+// TestReviewEdgeCoverage 评审 Minor 的覆盖补齐: 90 天边界/软删不可见/空昵称占位/图片往返/排序/追评文案。
+func TestReviewEdgeCoverage(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const spuId = 970000041
+		f := seedReviewFixture(ctx, t, "RV-EDGE-1", "T-RV-EDGE1", spuId, 970000141)
+		defer cleanupReviewFixture(ctx, t, f)
+
+		// ① 恰好 90 天: 允许追评（`>=` 边界; 改成 `>` 会被这条抓住）
+		rid := seedReviewRow(ctx, t, f, f.OrderNo, spuId, 5, reviewAuditPassed, 0, "边界90天")
+		_, _ = g.DB().Exec(ctx, "UPDATE product_review SET created_at=DATE_SUB(NOW(), INTERVAL 90 DAY) WHERE id=?", rid)
+		t.AssertNil(NewReviewLogic().Extra(ctx, f.UserId, rid, "恰好90天可追评", nil))
+
+		// ② 软删评价不可见（对外列表与我的评价都要过滤 deleted=0）
+		rid2 := seedReviewRow(ctx, t, f, f.OrderNo, spuId, 1, reviewAuditPassed, 0, "待软删")
+		_, _ = g.DB().Exec(ctx, "UPDATE product_review SET deleted=1 WHERE id=?", rid2)
+		_, page, err := NewReviewLogic().ProductList(ctx, spuId, 0, model.PageReq{Page: 1, PageSize: 50})
+		t.AssertNil(err)
+		for _, it := range page.List {
+			t.Assert(it.ReviewId != rid2, true)
+		}
+		mine, err := NewReviewLogic().MyList(ctx, f.UserId, model.PageReq{Page: 1, PageSize: 50})
+		t.AssertNil(err)
+		for _, it := range mine.List {
+			t.Assert(it.ReviewId != rid2, true)
+		}
+
+		// ③ 空昵称占位（脱敏 helper 的空值分支）
+		_, _ = g.DB().Exec(ctx, "UPDATE `user` SET nickname='' WHERE id=?", f.UserId)
+		_, page2, err := NewReviewLogic().ProductList(ctx, spuId, 5, model.PageReq{Page: 1, PageSize: 50})
+		t.AssertNil(err)
+		t.Assert(page2.List[0].User, "用户****")
+		_, _ = g.DB().Exec(ctx, "UPDATE `user` SET nickname='积分测试' WHERE id=?", f.UserId)
+
+		// ④ 图片往返: 提交时写非空数组 → 列表读回同内容（写入侧与解析侧各钉一条）
+		id3, err := NewReviewLogic().Create(ctx, f.UserId, model.ReviewCreateInput{
+			OrderItemId: f.ItemId, Score: 4, Content: "带图", Images: []string{"http://img/x.jpg", "http://img/y.jpg"},
+		})
+		t.AssertNil(err)
+		raw, err := g.DB().GetValue(ctx, "SELECT images FROM product_review WHERE id=?", id3)
+		t.AssertNil(err)
+		t.Assert(strings.Contains(raw.String(), "x.jpg"), true) // 写入侧
+		_, page3, err := NewReviewLogic().ProductList(ctx, spuId, 4, model.PageReq{Page: 1, PageSize: 50})
+		t.AssertNil(err)
+		t.Assert(len(page3.List), 1)
+		t.Assert(len(page3.List[0].Images), 2) // 解析侧
+		t.Assert(page3.List[0].Images[0], "http://img/x.jpg")
+
+		// ⑤ 我的评价按 id 倒序（最新在前）: 断言首页第一条是刚创建的
+		mine2, err := NewReviewLogic().MyList(ctx, f.UserId, model.PageReq{Page: 1, PageSize: 1})
+		t.AssertNil(err)
+		t.Assert(mine2.List[0].ReviewId, id3)
+	})
+}
+
+// TestReviewExtraMessages 追评 affected=0 的两条文案可区分（评审 M8: 交换两条消息的变异须被抓住）。
+func TestReviewExtraMessages(t *testing.T) {
+	gtest.C(t, func(t *gtest.T) {
+		ctx := context.Background()
+		const spuId = 970000042
+		f := seedReviewFixture(ctx, t, "RV-MSG-1", "T-RV-MSG1", spuId, 970000142)
+		defer cleanupReviewFixture(ctx, t, f)
+
+		rid := seedReviewRow(ctx, t, f, f.OrderNo, spuId, 5, reviewAuditPassed, 0, "文案用")
+		// 已追评 → 文案含"已追评"
+		_, _ = g.DB().Exec(ctx, "UPDATE product_review SET extra_content='已追评过' WHERE id=?", rid)
+		err := NewReviewLogic().Extra(ctx, f.UserId, rid, "再来", nil)
+		t.Assert(errCode(err), errcode.CodeExtraReviewDenied)
+		t.Assert(strings.Contains(err.Error(), "已追评"), true)
+
+		// 超期 → 文案含"90 天"
+		rid2 := seedReviewRow(ctx, t, f, f.OrderNo, spuId, 4, reviewAuditPassed, 0, "超期用")
+		_, _ = g.DB().Exec(ctx, "UPDATE product_review SET created_at=DATE_SUB(NOW(), INTERVAL 200 DAY) WHERE id=?", rid2)
+		err = NewReviewLogic().Extra(ctx, f.UserId, rid2, "再来", nil)
+		t.Assert(errCode(err), errcode.CodeExtraReviewDenied)
+		t.Assert(strings.Contains(err.Error(), "90 天"), true)
 	})
 }

@@ -281,15 +281,17 @@ func (i *ReviewLogicImpl) ProductList(
 	if err != nil {
 		return nil, nil, gerror.Wrap(err, "统计商品评价失败")
 	}
-	// 汇总: 总数为 0 时不给平均分（避免 0/0）
-	avg := "0.0"
+	// 汇总: **口径与商品详情页（browse_impl）逐字对齐**（评审 I2）——同一 SPU 在两处显示的均分必须一致:
+	// 用 SQL 侧 `COALESCE(ROUND(AVG(score),1),0)`（半进位）而非 Go 侧 FormatFloat（半进位规则不同，
+	// 实测 4 条评分和 13 时 Go=3.2 而 SQL=3.3 → 同一页两处数字打架）；无评价时占位同为 "—"。
+	avg := "—"
 	dist := map[string]int{}
 	if total > 0 {
-		sum, se := base().Sum(cols.Score)
+		av, se := base().Fields("COALESCE(ROUND(AVG(" + cols.Score + "),1),0) AS avg_score").Value()
 		if se != nil {
 			return nil, nil, gerror.Wrap(se, "统计评分失败")
 		}
-		avg = strconv.FormatFloat(sum/float64(total), 'f', 1, 64)
+		avg = av.String()
 		distRecs, de := base().Fields(cols.Score + ", COUNT(*) AS c").Group(cols.Score).All()
 		if de != nil {
 			return nil, nil, gerror.Wrap(de, "统计评分分布失败")
@@ -305,14 +307,19 @@ func (i *ReviewLogicImpl) ProductList(
 	}
 
 	// 评价人昵称批量取（一次 IN 查询, 避免 N+1）; 读 user 表**跟随既有先例**（order_mgmt_impl 已如此）
+	// 评审 Minor: **匿名评价不参与昵称查询**（最小化原则——取回来也只被丢弃）; 软删用户不展示昵称。
 	uids := make([]int64, 0, len(recs))
 	for _, r := range recs {
+		if r[cols.IsAnonymous].Int() == 1 {
+			continue
+		}
 		uids = append(uids, r[cols.UserId].Int64())
 	}
 	nick := map[int64]string{}
 	if len(uids) > 0 {
 		ucols := dao.User.Columns()
-		urecs, ue := dao.User.Ctx(ctx).Fields(ucols.Id, ucols.Nickname).WhereIn(ucols.Id, uids).All()
+		urecs, ue := dao.User.Ctx(ctx).Fields(ucols.Id, ucols.Nickname).
+			WhereIn(ucols.Id, uids).Where(ucols.Deleted, 0).All()
 		if ue != nil {
 			return nil, nil, gerror.Wrap(ue, "查询评价人失败")
 		}

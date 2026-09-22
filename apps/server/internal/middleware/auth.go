@@ -37,7 +37,11 @@ var publicPrefixes = []string{
 	"/shop/activities/", "/shop/full-reductions", "/shop/banners", "/shop/floors",
 	"/shop/bargains/", "/shop/assists/",
 	"/shop/pay/notify", "/shop/refund/notify",
-	"/shop/reviews",
+	// 注（014 评审 C1）: 此处**不得**加 `/shop/reviews`——它是前缀匹配, 会把同一前缀下的
+	// `/shop/reviews/mine`（我的评价）与 `/shop/reviews/{id}/extra`（追评）一并放行,
+	// 而 Auth 对白名单路径**直通不注入 ctx userId** → 控制器 requireMember 恒判未登录(10003)。
+	// 公开的"商品评价列表"是 `/shop/products/{spuId}/reviews`, 已由上面的 `/shop/products` 覆盖。
+	// （该行原先在此, 并配有一处 `POST /shop/reviews` 的精确例外; 端点未连线时不可观测, 连线后即成故障。）
 }
 
 func isPublicPath(r *ghttp.Request) bool {
@@ -45,9 +49,6 @@ func isPublicPath(r *ghttp.Request) bool {
 	for _, p := range publicPrefixes {
 		// 段边界匹配: path==p 或 path 以 p+"/" 开头（防 /user/login* 误匹配）
 		if path == p || strings.HasPrefix(path, p+"/") || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {
-			if path == "/shop/reviews" && r.Method == "POST" {
-				return false // POST 提交评价是会员行为
-			}
 			return true
 		}
 	}

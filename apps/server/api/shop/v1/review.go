@@ -12,7 +12,7 @@ type (
 		g.Meta      `path:"/reviews" method:"POST" summary:"提交评价"`
 		OrderItemId string   `json:"orderItemId" v:"required" dc:"订单项ID"`
 		Score       int      `json:"score" v:"required|between:1,5" dc:"评分1-5"`
-		Content     string   `json:"content" dc:"评价内容"`
+		Content     string   `json:"content" v:"max-length:1024" dc:"评价内容(≤1024, 与列宽一致)"`
 		Images      []string `json:"images" dc:"评价图片"`
 		IsAnonymous bool     `json:"isAnonymous" dc:"匿名"`
 	}
@@ -24,7 +24,7 @@ type (
 	ReviewExtraReq struct {
 		g.Meta   `path:"/reviews/{reviewId}/extra" method:"POST" summary:"追加评价"`
 		ReviewId string   `json:"reviewId" v:"required" dc:"评价ID"`
-		Content  string   `json:"content" v:"required" dc:"追评内容"`
+		Content  string   `json:"content" v:"required|max-length:1024" dc:"追评内容(≤1024, 与列宽一致)"`
 		Images   []string `json:"images" dc:"追评图片"`
 	}
 	ReviewExtraRes struct {
