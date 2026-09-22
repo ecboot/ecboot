@@ -87,7 +87,7 @@ type (
 		Id         string `json:"id" v:"required" dc:"规则ID"`
 		Level1Rate string `json:"level1Rate" dc:"一级比例%"`
 		Level2Rate string `json:"level2Rate" dc:"二级比例%"`
-		Status     int    `json:"status" dc:"状态"`
+		Status     *int   `json:"status" dc:"启停(nil=不修改; 016 评审 I6 同款三态)"`
 	}
 	AdminDistRuleUpdateRes struct {
 		Success bool `json:"success"`

@@ -164,6 +164,15 @@ func (i *DistributionLogicImpl) BindRelation(ctx context.Context, userId, invite
 	if n > 0 {
 		return errcode.New(errcode.CodeInvalidParam, "已绑定上级, 一人一链不可更改")
 	}
+	// I1（评审修复）: 互环拒绝——若 inviter 的上级正是 user（A←B 再绑 B→A）即成环。
+	// 链仅两级, 查一层即闭环（结构上不存在更深路径）。
+	inv, err := dao.UserRelation.Ctx(ctx).Where(dao.UserRelation.Columns().UserId, inviterId).One()
+	if err != nil {
+		return gerror.Wrap(err, "查询上级关系失败")
+	}
+	if !inv.IsEmpty() && inv["inviter_id"].Int64() == userId {
+		return errcode.New(errcode.CodeInvalidParam, "不能绑定自己的下级为上级（互环）")
+	}
 	if _, err = dao.UserRelation.Ctx(ctx).Data(g.Map{
 		"user_id": userId, "inviter_id": inviterId, "bind_channel": channel,
 	}).Insert(); err != nil {
@@ -290,7 +299,11 @@ func (i *DistributionLogicImpl) ShareCode(ctx context.Context, userId int64) (st
 // ---------- US2 佣金（计提/结算/冲销——事件入口, 由 shop 域端口投递） ----------
 
 // SettleOrder 订单佣金计提（确认收货事件; 订单项粒度幂等）。
-// 归因: 分享窗口内归因人 > 关系链两级 > 不计佣。冻结/待审/软删推广员不计提。
+// 归因（C2 修复, 对齐 V28 设计）: 订单归因人 attributed_user_id（下单带码判定, 列就绪、
+// 入口接线挂账 I5）> 关系链两级 > 不计佣。冻结/待审/软删推广员不计提。
+// C3（评审修复）: 计提幂等靠**唯一键 uk_item_bene_level_rev**（迁移 000043）兜底并发——
+// 原 check-then-insert 无事务无唯一键, 两并发 SettleOrder 双计提（评审探针 rows=2）;
+// INSERT 撞 1062 → 幂等跳过; 保留前置查重作快速路径。
 func (i *DistributionLogicImpl) SettleOrder(ctx context.Context, orderNo string) error {
 	items, err := g.DB().Model("trade_order_item").Ctx(ctx).
 		Where("order_no", orderNo).All()
@@ -311,18 +324,24 @@ func (i *DistributionLogicImpl) SettleOrder(ctx context.Context, orderNo string)
 			continue
 		}
 		spuId := it["spu_id"].Int64()
-		bene, level, rate := i.attribute(ctx, buyer, spuId) // (受益人, 层级, 比例%)
-		if bene == 0 || rate <= 0 {
+		bene, level, rateStr := i.attribute(ctx, buyer, spuId, order) // (受益人, 层级, 比例字符串)
+		if bene == 0 || rateStr == "" {
 			continue
 		}
-		amountFen := base * rate / 100 // 四舍五入见下方修正
-		if rem := (base * rate) % 100; rem >= 50 {
-			amountFen++ // base*rate/100 的小数部分 ≥0.5 分则进位（整数域四舍五入到分）
+		// I2（评审修复）: 比例支持两位小数（如 2.50%）——整数域精算:
+		// rateNum = 比例×100（2.50→250）, amountFen = base × rateNum / 10000, 余数 ≥5000 进位
+		rateNum, e := money.FromYuanString(rateStr) // 复用两位小数解析（2.50 → 250）
+		if e != nil || rateNum <= 0 {
+			continue
+		}
+		amountFen := base * rateNum / 10000
+		if rem := (base * rateNum) % 10000; rem >= 5000 {
+			amountFen++
 		}
 		if amountFen <= 0 {
 			continue
 		}
-		// 计提幂等: (order_item_id, beneficiary, level) 业务键同事务查重（事件重放不重复落账）
+		// 快速路径查重（并发正解是唯一键, 见函数头 C3）
 		dup, e := g.DB().Model("commission_record").Ctx(ctx).
 			Where("order_item_id", it["id"].Int64()).
 			Where("beneficiary_user_id", bene).
@@ -339,32 +358,35 @@ func (i *DistributionLogicImpl) SettleOrder(ctx context.Context, orderNo string)
 			"beneficiary_user_id": bene,
 			"level":               level,
 			"base_amount":         it["pay_amount"].String(),
-			"rate":                rate,
+			"rate":                rateStr,
 			"amount":              money.ToYuanString(amountFen),
 			"status":              1, // 待结算（保护期满由 ConfirmSettle 入账）
 		}).Insert(); e != nil {
+			if isDupKeyUser(e) { // C3: 唯一键兜底并发双计提 → 幂等跳过
+				continue
+			}
 			return gerror.Wrap(e, "写入佣金记录失败")
 		}
 	}
 	return nil
 }
 
-// attribute 归因: 分享窗口内最近分享人 > 关系链一级 > 二级（0/0/0=不计佣）。
-// 冻结(3)/待审(1)/软删推广员不计提; 红线: 二级=上级的上级, 两次单列查询到顶即止。
-func (i *DistributionLogicImpl) attribute(ctx context.Context, buyer, spuId int64) (int64, int, int64) {
-	// ① 分享窗口归因（V1: share_record 中该买家对该 SPU 窗口内最近一次分享人）
-	share, err := g.DB().Model("share_record").Ctx(ctx).
-		Where("spu_id", spuId).Where("buyer_user_id", buyer).
-		OrderDesc("id").Limit(1).One()
-	if err == nil && !share.IsEmpty() {
-		if uid := i.activeDistributor(ctx, share["user_id"].Int64()); uid > 0 {
-			return uid, 1, i.rateOf(ctx, spuId, 1)
+// attribute 归因（C2 修复, 对齐 V28 设计）:
+// ① 订单归因人 attributed_user_id（下单带码判定——列就绪, 入口接线挂账 I5, 恒 NULL 时自然落到②）;
+// ② 关系链: 一级=直接上级; 二级=上级的上级（两次单列查询, 到顶即止——红线）。
+// 返回 (受益人, 层级, 比例字符串); 0/"" = 不计佣。冻结(3)/待审(1)/软删推广员不计提。
+func (i *DistributionLogicImpl) attribute(ctx context.Context, buyer, spuId int64, order gdb.Record) (int64, int, string) {
+	// ① 订单归因人（下单时按 share_code 判定; 分享点击→下单带码的入口接线挂账 I5）
+	attr := order["attributed_user_id"].Int64()
+	if attr > 0 {
+		if uid := i.activeDistributor(ctx, attr); uid > 0 {
+			return attr, 1, i.rateOf(ctx, spuId, 1)
 		}
 	}
 	// ② 关系链: 一级=直接上级; 二级=上级的上级（两次单列查询, 到顶即止——红线）
 	my, err := dao.UserRelation.Ctx(ctx).Where(dao.UserRelation.Columns().UserId, buyer).One()
 	if err != nil || my.IsEmpty() {
-		return 0, 0, 0
+		return 0, 0, ""
 	}
 	l1 := my["inviter_id"].Int64()
 	if uid := i.activeDistributor(ctx, l1); uid > 0 {
@@ -372,13 +394,13 @@ func (i *DistributionLogicImpl) attribute(ctx context.Context, buyer, spuId int6
 	}
 	grand, err := dao.UserRelation.Ctx(ctx).Where(dao.UserRelation.Columns().UserId, l1).One()
 	if err != nil || grand.IsEmpty() {
-		return 0, 0, 0
+		return 0, 0, ""
 	}
 	l2 := grand["inviter_id"].Int64()
 	if uid := i.activeDistributor(ctx, l2); uid > 0 {
 		return l2, 2, i.rateOf(ctx, spuId, 2)
 	}
-	return 0, 0, 0
+	return 0, 0, ""
 }
 
 // activeDistributor 用户是否"通过且未冻结未删"的推广员。
@@ -396,13 +418,14 @@ func (i *DistributionLogicImpl) activeDistributor(ctx context.Context, userId in
 	return userId
 }
 
-// rateOf 规则命中（商品覆盖 > 分类默认; 未命中 0）。
-func (i *DistributionLogicImpl) rateOf(ctx context.Context, spuId int64, level int) int64 {
+// rateOf 规则命中（商品覆盖 > 分类默认; 未命中 ""）。I2（评审修复）: 回传**字符串原值**
+// 支持两位小数比例（原 Int64() 把 2.50 截成 2, 少付佣金且记录失真）。
+func (i *DistributionLogicImpl) rateOf(ctx context.Context, spuId int64, level int) string {
 	spu, err := dao.ProductSpu.Ctx(ctx).
 		Fields(dao.ProductSpu.Columns().CategoryId).
 		Where(dao.ProductSpu.Columns().Id, spuId).One()
 	if err != nil || spu.IsEmpty() {
-		return 0
+		return ""
 	}
 	col := "level1_rate"
 	if level == 2 {
@@ -412,17 +435,17 @@ func (i *DistributionLogicImpl) rateOf(ctx context.Context, spuId int64, level i
 	v, err := g.DB().Model("commission_rule").Ctx(ctx).
 		Where("scope_type", 2).Where("scope_id", spuId).
 		Where("status", 1).Where("deleted", 0).Value(col)
-	if err == nil && v != nil && !v.IsNil() {
-		return v.Int64()
+	if err == nil && v != nil && !v.IsNil() && v.String() != "" {
+		return v.String()
 	}
 	// 分类默认
 	v, err = g.DB().Model("commission_rule").Ctx(ctx).
 		Where("scope_type", 1).Where("scope_id", spu["category_id"].Int64()).
 		Where("status", 1).Where("deleted", 0).Value(col)
-	if err == nil && v != nil && !v.IsNil() {
-		return v.Int64()
+	if err == nil && v != nil && !v.IsNil() && v.String() != "" {
+		return v.String()
 	}
-	return 0
+	return ""
 }
 
 // ConfirmSettle 结算保护期保护期满批量入账（D7; V1 常量保护期 7 天）。返回迁移条数。
@@ -435,6 +458,7 @@ func (i *DistributionLogicImpl) ConfirmSettle(ctx context.Context) (int64, error
 	}
 	var settled int64
 	for _, r := range due {
+		migrated := false
 		e := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 			// 条件迁移（判行数——并发/重复任务只入账一次）
 			res, e := tx.Model("commission_record").Ctx(ctx).
@@ -446,13 +470,16 @@ func (i *DistributionLogicImpl) ConfirmSettle(ctx context.Context) (int64, error
 			if n, _ := res.RowsAffected(); n == 0 {
 				return nil // 已被并发任务处理
 			}
+			migrated = true
 			return creditAccount(ctx, tx, r["beneficiary_user_id"].Int64(),
 				r["amount"].String(), 1, fmt.Sprintf("%d", r["id"].Int64()))
 		})
 		if e != nil {
 			return settled, e
 		}
-		settled++
+		if migrated { // M1（评审修复）: 并发输家不计入返回值
+			settled++
+		}
 	}
 	return settled, nil
 }
@@ -504,7 +531,9 @@ func (i *DistributionLogicImpl) ReverseOnRefund(ctx context.Context, orderItemId
 	}
 	for _, r := range recs {
 		if r["status"].Int() == 1 {
-			// 未结算: 条件置失效（判行数防重放）
+			// 未结算: 条件置失效（判行数防重放）。
+			// C5（评审修复）: 置失效**输给并发**（n==0）时必须跳过——原实现 fall-through 进负额
+			// 冲销路径, 把从未入账的佣金也扣了（评审探针: 余额 100→90, 佣金从未入账）。
 			res, e := g.DB().Model("commission_record").Ctx(ctx).
 				Where("id", r["id"].Int64()).Where("status", 1).
 				Data(g.Map{"status": 3}).Update()
@@ -515,46 +544,52 @@ func (i *DistributionLogicImpl) ReverseOnRefund(ctx context.Context, orderItemId
 				continue
 			}
 		}
-		// 已结算（或置失效输给了并发）: 负额冲销记录 + 扣回（幂等: 原记录已有回指则跳过）
-		dup, e := g.DB().Model("commission_record").Ctx(ctx).
-			Where("reversal_of_id", r["id"].Int64()).Count()
-		if e != nil {
-			return gerror.Wrap(e, "查询冲销记录失败")
-		}
-		if dup > 0 {
-			continue
-		}
+		// 已结算: 负额冲销记录 + 扣回。
+		// C4（评审修复）: 幂等正解是 **uk_reversal_of 唯一键**（迁移 000043, NULL 不参与唯一）——
+		// 原 check-then-insert 并发双冲销双扣（评审探针: 100→80 应 90）。
 		amount := r["amount"].String()
-		e = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		e := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 			res, e := tx.Model("commission_record").Ctx(ctx).Data(g.Map{
 				"order_no":            r["order_no"].String(),
 				"order_item_id":       r["order_item_id"].Int64(),
 				"beneficiary_user_id": r["beneficiary_user_id"].Int64(),
 				"level":               r["level"].Int(),
 				"base_amount":         r["base_amount"].String(),
-				"rate":                r["rate"].Int64(),
+				"rate":                r["rate"].String(),
 				"amount":              "-" + amount, // 负额冲销
 				"status":              4,
 				"reversal_of_id":      r["id"].Int64(),
 			}).Insert()
 			if e != nil {
+				if isDupKeyUser(e) { // C4: 唯一键兜底并发双冲销 → 幂等跳过
+					return nil
+				}
 				return gerror.Wrap(e, "写入冲销记录失败")
 			}
 			revId, e := res.LastInsertId()
 			if e != nil {
 				return gerror.Wrap(e, "读取冲销ID失败")
 			}
-			// 原记录回指 + 置冲销中（条件更新防重放）
-			if _, e = tx.Model("commission_record").Ctx(ctx).
-				Where("id", r["id"].Int64()).Where("status", 2).Where("reversal_record_id", nil).
-				Data(g.Map{"status": 4, "reversal_record_id": revId}).Update(); e != nil {
+			// 原记录回指 + 置冲销中（条件更新判行数——C4: 输家在此识别并回滚自己的冲销行）
+			pr, e := tx.Model("commission_record").Ctx(ctx).
+				Where("id", r["id"].Int64()).Where("status", 2).Where("reversal_record_id IS NULL").
+				Data(g.Map{"status": 4, "reversal_record_id": revId}).Update()
+			if e != nil {
 				return gerror.Wrap(e, "回指原记录失败")
 			}
-			// 余额扣回（可负——user_account.balance 有符号, 列注释"欠款为负"）
-			if _, e = tx.Model("user_account").Ctx(ctx).
+			if n, _ := pr.RowsAffected(); n == 0 {
+				return errcode.New(errcode.CodeStatusNotAllowed, "该佣金已被并发冲销")
+			}
+			// 余额扣回（可负——user_account.balance 有符号, 列注释"欠款为负"）。
+			// M2（评审修复）: 判行数——账户缺失静默 0 行却写流水是账实分歧。
+			pr, e = tx.Model("user_account").Ctx(ctx).
 				Where("user_id", r["beneficiary_user_id"].Int64()).
-				Data(g.Map{"balance": gdb.Raw("balance - " + amount)}).Update(); e != nil {
+				Data(g.Map{"balance": gdb.Raw("balance - " + amount)}).Update()
+			if e != nil {
 				return gerror.Wrap(e, "扣回佣金失败")
+			}
+			if n, _ := pr.RowsAffected(); n == 0 {
+				return errcode.New(errcode.CodeInventoryAdjust, "账户不存在, 扣回失败")
 			}
 			return writeAccountLog(ctx, tx, r["beneficiary_user_id"].Int64(),
 				"-"+amount, 5, fmt.Sprintf("%d", revId))
@@ -687,13 +722,28 @@ func (i *DistributionLogicImpl) WithdrawList(ctx context.Context, userId int64, 
 }
 
 
-// ShareReport 分享行为上报（归因窗口起点; 游客可报 user_id 可空; 只追加 share_record）。
+// ShareReport 分享行为上报（只追加 share_record; C2 修复: 对齐真实列
+// sharer_user_id/spu_id/share_channel/scene_value/share_code——原实现写 user_id/channel/scene
+// 三处错列, gf 静默丢弃后撞 1364）。share_code 记分享者的码（必填列; 游客分享 userId=0 拒绝——
+// 无分享者则无归因意义）。注: 归因消费在订单侧 attributed_user_id（下单带码接线属挂账 I5）。
 func (i *DistributionLogicImpl) ShareReport(ctx context.Context, userId int64, spuId int64, channel int, scene string) error {
-	data := g.Map{"spu_id": spuId, "channel": channel, "scene": scene}
-	if userId > 0 {
-		data["user_id"] = userId
+	if userId <= 0 {
+		return errcode.New(errcode.CodeUnauthorized, "分享上报需登录")
 	}
-	if _, err := g.DB().Model("share_record").Ctx(ctx).Data(data).Insert(); err != nil {
+	if channel < 1 {
+		channel = 1
+	}
+	code, _, err := i.ShareCode(ctx, userId)
+	if err != nil {
+		return err
+	}
+	if _, err = g.DB().Model("share_record").Ctx(ctx).Data(g.Map{
+		"sharer_user_id": userId,
+		"spu_id":         spuId,
+		"share_channel":  channel,
+		"scene_value":    scene,
+		"share_code":     code,
+	}).Insert(); err != nil {
 		return gerror.Wrap(err, "记录分享失败")
 	}
 	return nil
@@ -850,6 +900,13 @@ func distRateCheck(v string) (string, error) {
 
 // AdminRuleCreate 创建规则（uk_scope 1062 → 业务码）。
 func (i *DistributionAdminLogicImpl) AdminRuleCreate(ctx context.Context, scopeType int, scopeId int64, l1, l2 string) (int64, error) {
+	// M4（评审修复）: 作用域入参校验
+	if scopeType != 1 && scopeType != 2 {
+		return 0, errcode.New(errcode.CodeInvalidParam, "作用域类型非法")
+	}
+	if scopeId <= 0 {
+		return 0, errcode.New(errcode.CodeInvalidParam, "作用域目标非法")
+	}
 	if _, err := distRateCheck(l1); err != nil {
 		return 0, err
 	}
@@ -1062,10 +1119,17 @@ func (i *DistributionAdminLogicImpl) AdminWithdrawPay(ctx context.Context, withd
 			if n, _ := res.RowsAffected(); n == 0 {
 				return errcode.New(errcode.CodeStatusNotAllowed, "当前状态不可打款")
 			}
-			if _, e = tx.Model("user_account").Ctx(ctx).
+			kr, e := tx.Model("user_account").Ctx(ctx).
 				Where("user_id", r["user_id"].Int64()).Where("frozen >= ?", r["amount"].String()).
-				Data(g.Map{"frozen": gdb.Raw("frozen - " + r["amount"].String())}).Update(); e != nil {
+				Data(g.Map{"frozen": gdb.Raw("frozen - " + r["amount"].String())}).Update()
+			if e != nil {
 				return gerror.Wrap(e, "核销冻结失败")
+			}
+			// C6（评审修复）: 判行数——frozen 不足时原实现 err=nil 状态照推进 40、冻结未核销、
+			// 还写失真流水（评审探针 P6: frozen 1.00 打款 10.00 → status 40 + frozen 仍 1.00）。
+			// 报错 → 整事务回滚（含状态迁移）, 冻结账实不符留在 20 由人工收口。
+			if n, _ := kr.RowsAffected(); n == 0 {
+				return errcode.New(errcode.CodeInventoryAdjust, "冻结金额与单据不符, 打款核销失败")
 			}
 			return writeAccountLog(ctx, tx, r["user_id"].Int64(), "-"+r["amount"].String(), 3, withdrawNo)
 		})

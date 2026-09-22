@@ -386,3 +386,65 @@ func TestDistShareCode(t *testing.T) {
 		t.Assert(code2, code1) // 稳定
 	})
 }
+
+// ---- 修复轮 helper: user 包内轻量商品 fixture（分类+SPU+SKU+库存, 自清） ----
+
+type distFixture struct {
+	catId int64
+	spuId int64
+	skuId int64
+}
+
+func newDistFixture(t *gtest.T) *distFixture {
+	ctx := context.Background()
+	f := &distFixture{}
+	// 前置清理（幂等; spu_no/sku_no 唯一键——重复跑测试不留死行）
+	_, _ = g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id IN (SELECT id FROM product_sku WHERE sku_no='TF-D2-SKU')")
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_sku WHERE sku_no='TF-D2-SKU'")
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE spu_no='TF-D2-SPU'")
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_category WHERE name='TF-DIST2-分类'")
+	var err error
+	f.catId, err = g.DB().Model("product_category").Ctx(ctx).Data(g.Map{
+		"parent_id": 0, "name": "TF-DIST2-分类", "level": 3, "status": 1,
+	}).InsertAndGetId()
+	t.AssertNil(err)
+	f.spuId, err = g.DB().Model("product_spu").Ctx(ctx).Data(g.Map{
+		"spu_no": "TF-D2-SPU", "name": "TF-DIST2-商品", "category_id": f.catId,
+		"images": `[]`, "spec_definitions": `[]`, "status": 1,
+	}).InsertAndGetId()
+	t.AssertNil(err)
+	f.skuId, err = g.DB().Model("product_sku").Ctx(ctx).Data(g.Map{
+		"sku_no": "TF-D2-SKU", "spu_id": f.spuId, "name": "TF-DIST2-商品 默认",
+		"specs": "{}", "price": "100.00", "status": 1,
+	}).InsertAndGetId()
+	t.AssertNil(err)
+	_, _ = g.DB().Exec(ctx,
+		"INSERT INTO inventory(sku_id,total,locked,warn_count) VALUES(?,100,0,0) ON DUPLICATE KEY UPDATE total=100", f.skuId)
+	return f
+}
+
+func (f *distFixture) teardown(ctx context.Context) {
+	_, _ = g.DB().Exec(ctx, "DELETE FROM inventory WHERE sku_id=?", f.skuId)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_sku WHERE id=?", f.skuId)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_spu WHERE id=?", f.spuId)
+	_, _ = g.DB().Exec(ctx, "DELETE FROM product_category WHERE id=?", f.catId)
+}
+
+// seedDistOrderSku 造订单项（sku/spu 可指定, 配合归因/规则命中测试）。
+func seedDistOrderSku(ctx context.Context, t *gtest.T, orderNo string, buyer int64, payYuan string, skuId, spuId int64) int64 {
+	res, err := g.DB().Exec(ctx,
+		"INSERT INTO trade_order(order_no,user_id,status,total_amount,promotion_amount,pay_amount,currency,"+
+			"receiver_name,receiver_phone,receiver_province,receiver_city,receiver_detail) "+
+			"VALUES(?,?,40,?,0,?,'CNY','分销测试','13800000000','浙江省','杭州市','T路')",
+		orderNo, buyer, payYuan, payYuan)
+	t.AssertNil(err)
+	oid, _ := res.LastInsertId()
+	ires, err := g.DB().Exec(ctx,
+		"INSERT INTO trade_order_item(order_no,order_id,spu_id,sku_id,sku_no,spu_name,sku_name,sku_specs,"+
+			"quantity,original_price,price,pay_amount) "+
+			"VALUES(?,?,?,?,?, '分销商品2','分销商品2 默认','{}',1,?,?,?)",
+		orderNo, oid, spuId, skuId, "TF-D-SKU-"+orderNo, payYuan, payYuan, payYuan)
+	t.AssertNil(err)
+	iid, _ := ires.LastInsertId()
+	return iid
+}

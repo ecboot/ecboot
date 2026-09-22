@@ -56,22 +56,35 @@ func (commissionSettleAdapter) OnOrderConfirmed(ctx context.Context, orderNo str
 	}
 }
 
-// commissionReverseAdapter 冲销适配: user 域冲销按 order_item_id 粒度,
-// 适配器把 shop 投递的 (orderNo, afterSaleNo, refundFen) 还原为该订单的订单项集合逐项冲销。
+// commissionReverseAdapter 冲销适配: user 域冲销按 order_item_id 粒度。
+// I3（评审修复）: 按售后单的 order_item_id **精确冲销**（spec FR-4"该项退款→该项冲销"）——
+// 原实现展开订单全部订单项、忽略 refundFen, 多行订单部分退款会冲掉整单佣金（零记账偏离）。
 type commissionReverseAdapter struct{}
 
 func (commissionReverseAdapter) ReverseForAfterSale(ctx context.Context, orderNo, afterSaleNo string, refundFen int64) {
-	ids, err := g.DB().Model("trade_order_item").Ctx(ctx).
-		Fields("id").Where("order_no", orderNo).All()
+	itemId, err := g.DB().Model("after_sale_order").Ctx(ctx).
+		Fields("order_item_id").Where("after_sale_no", afterSaleNo).Value("order_item_id")
 	if err != nil {
-		g.Log().Errorf(ctx, "[佣金冲销] 订单项查询失败(需人工核对): order_no=%s after_sale_no=%s err=%v", orderNo, afterSaleNo, err)
+		g.Log().Errorf(ctx, "[佣金冲销] 售后单查询失败(需人工核对): after_sale_no=%s err=%v", afterSaleNo, err)
 		return
 	}
-	logic := user.NewDistributionLogic()
-	for _, r := range ids {
-		if err = logic.ReverseOnRefund(ctx, r["id"].Int64()); err != nil {
-			g.Log().Errorf(ctx, "[佣金冲销] 冲销失败(需人工核对): order_no=%s order_item_id=%d err=%v",
-				orderNo, r["id"].Int64(), err)
+	if itemId == nil || itemId.Int64() <= 0 {
+		g.Log().Warningf(ctx, "[佣金冲销] 售后单无订单项(仅退款整单?): after_sale_no=%s — 按订单全项冲销", afterSaleNo)
+		ids, e := g.DB().Model("trade_order_item").Ctx(ctx).Fields("id").Where("order_no", orderNo).All()
+		if e != nil {
+			g.Log().Errorf(ctx, "[佣金冲销] 订单项查询失败(需人工核对): order_no=%s err=%v", orderNo, e)
+			return
 		}
+		logic := user.NewDistributionLogic()
+		for _, r := range ids {
+			if err = logic.ReverseOnRefund(ctx, r["id"].Int64()); err != nil {
+				g.Log().Errorf(ctx, "[佣金冲销] 冲销失败(需人工核对): order_no=%s order_item_id=%d err=%v", orderNo, r["id"].Int64(), err)
+			}
+		}
+		return
+	}
+	if err = user.NewDistributionLogic().ReverseOnRefund(ctx, itemId.Int64()); err != nil {
+		g.Log().Errorf(ctx, "[佣金冲销] 冲销失败(需人工核对): order_no=%s order_item_id=%d after_sale_no=%s err=%v",
+			orderNo, itemId.Int64(), afterSaleNo, err)
 	}
 }

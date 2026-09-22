@@ -646,7 +646,7 @@ func provinceRestricted(ctx context.Context, spuId int64, provinceCode string) b
 }
 
 // Confirm 确认收货（012 FR-004）: 待收货(30) → 已完成(40) + 状态流水; 非 30 → 40006; 他人订单 → 40005。
-// 佣金计提事件位: 完成态由分销结算（批次 11 / 定时消费）按订单完成推进, 本方法只落状态与流水。
+// 佣金计提: 完成态经 ICommissionSettle 端口投递（017 批次 11 装配）, 归因+规则命中在分销域。
 func (i *OrderLogicImpl) Confirm(ctx context.Context, userId int64, orderNo string) error {
 	cols := dao.TradeOrder.Columns()
 	rec, err := dao.TradeOrder.Ctx(ctx).
